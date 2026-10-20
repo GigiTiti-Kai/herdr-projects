@@ -51,7 +51,7 @@ pub fn adopt(id: &str, letter: &str, by: &str) -> Res<Task> {
 }
 /// A losing attempt's tab closes (its agent with it). What it made stays on disk.
 pub fn close_tab(c: &Task) {
-    if let Some(api) = api_of(c) { if c.at("link").b("tab") { api.tab_close(c.at("link").s("tab")); } else if c.at("link").b("pane") { api.pane_close(c.at("link").s("pane")); } }
+    if let Some(api) = api_of(c) { if crate::hosted::is(c) { crate::hosted::close_own(&api, c.at("link").s("tab"), c.at("link").s("pane")); } else if c.at("link").b("tab") { api.tab_close(c.at("link").s("tab")); } else if c.at("link").b("pane") { api.pane_close(c.at("link").s("pane")); } }
     let _ = update_wait(c.s("id"), 10000, |c| { let s = c.at("link").at("socket").clone(); c.put("link", json!({ "socket": s })); c.put("closedAt", now()); Ok(Change::Write) });
 }
 /// An attempt is thrown away: its tab, its worktree, its branch and its own folder on the board. Any file in its

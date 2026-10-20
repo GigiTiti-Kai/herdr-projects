@@ -26,11 +26,12 @@ pub fn mark(t: &mut Obj, hosted: bool) {
     let l = t.obj_mut("link");
     if hosted { l.put("ownsWorkspace", false); l.put("hosted", true); } else { l.del("hosted"); }
 }
-/// A tab's name in a space of yours starts with the task's key, so you can tell whose it is.
+/// A tab's name in a space of yours starts with the task's key, so you can tell whose it is (an attempt's: its task's).
 pub fn label(t: &Obj, base: &str) -> String {
     if !is(t) { return base.into(); }
-    let tag = tag_of(t.s("id"), &repo_keys());
-    format!("{} {base}", if tag.is_empty() { t.t("id") } else { tag })
+    let id = if t.b("attemptOf") { t.t("attemptOf") } else { t.t("id") };
+    let tag = tag_of(&id, &repo_keys());
+    format!("{} {base}", if tag.is_empty() { id } else { tag })
 }
 /// A space of the repo at `root` that no task owns: `prefer` while it still is one, else the one you look at, else the
 /// one named after the repo, else any other. A space id herdr gave out again to another task's space is that task's, never a host.

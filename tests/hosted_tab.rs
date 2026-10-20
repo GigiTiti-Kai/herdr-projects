@@ -235,3 +235,41 @@ fn a_space_of_the_repo_you_named_otherwise_and_do_not_look_at_is_still_used() {
     assert_eq!(label_of(&w, "mine"), "My coding desk");
     assert!(calls(&w).iter().all(|c| !c.starts_with("worktree create")), "{:?}", calls(&w));
 }
+
+#[test]
+fn attempts_asked_for_while_its_plan_waits_work_in_tabs_of_your_space_and_a_pane_of_yours_beside_one_stays() {
+    let w = world_with(Opts { repo: true, settings: json!({ "workspace.place": "tab", "plan.approve": "you", "plan.agent": "codex/gpt-5.5", "worker.agent": "claude" }), ..Default::default() });
+    unsafe { std::env::set_var("HERDR_PROJECTS_SANDBOX", "bwrap") };
+    let name = repo_name(&w);
+    your_space(&w, "mine", &name, false);
+    w.script(json!({ "worker": [{ "plan": "# Plan\n\n1. Add a file.\n", "note": "Planned." }, step(1), step(2)], "picker": [{ "comparison": { "pick": "A", "why": "A is smaller." } }], "reviewer": [{ "verdict": { "meets": true, "text": "Looked at it.", "findings": [] } }] }));
+    let id = w.add("More attempts after the plan");
+    delegate(&id);
+    let t = settle(&id);
+    assert_eq!(t.s("stage"), "plan", "{}", t.at("failure"));
+    assert!(t.at("link").b("hosted"));
+    sw::store::settings::change::set_value("attempts.by", &json!(2), &sw::store::settings::lookup::Scope::task(&t)).unwrap();
+    let by_picker = yours_beside_reviewer(&w, &id, |_| {});
+    finish_line::approve(&id, None, false).unwrap();
+    settle_all(&id);
+    assert_eq!(task(&id).s("stage"), "pick", "{}", task(&id).at("failure"));
+    let by_picker = by_picker.borrow().clone();
+    assert!(!by_picker.is_empty(), "the picker ran");
+    let b = kid(&id, "B");
+    assert_eq!(b.at("link").s("workspace"), "mine"); assert!(b.at("link").b("hosted"));
+    assert_eq!(tab_label(&w, b.at("link").s("tab")), format!("{} Agent B", tag(&id)));
+    let made: Vec<String> = calls(&w).into_iter().filter(|c| c.starts_with("tab create")).collect();
+    assert!(made.iter().any(|c| c.starts_with("tab create --workspace mine ") && c.contains(&format!(" --label {} Picker ", tag(&id)))), "{made:?}");
+    let by_b = yours_in(&w.fake, b.at("link").s("tab"));
+    sw::attempts::settle::pick(&id, "A").unwrap();
+    let t = settle_all(&id);
+    assert_eq!(t.s("stage"), "approval", "{}", t.at("failure"));
+    assert!(!pane_there(&w, b.at("link").s("pane")), "the losing attempt's own pane closed");
+    finish_line::approve(&id, None, false).unwrap();
+    let t = settle_all(&id);
+    assert_eq!(t.s("stage"), "done", "{}", t.at("failure"));
+    assert!(pane_there(&w, "mine:p1")); assert!(pane_there(&w, &by_b)); assert!(pane_there(&w, &by_picker)); assert_eq!(label_of(&w, "mine"), name);
+    assert!(calls(&w).iter().all(|c| !c.starts_with("tab close") && !c.starts_with("workspace close")), "{:?}", calls(&w));
+    assert_eq!(splits(&w), 0); let mine = ["mine", "mine:p1", by_b.as_str(), by_picker.as_str()];
+    assert!(touched(&w, &mine).is_empty(), "{:?}", touched(&w, &mine));
+}

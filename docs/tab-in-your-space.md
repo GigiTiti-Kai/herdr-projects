@@ -17,6 +17,9 @@ herdr-projects delegate 12 --workspace.place tab
 A space of the task's repo that no task owns: the one you are looking at, else the one named after the repo (herdr names
 a space after its first folder), else any other. A space opened at a worktree of the repo counts too. No such space
 open: the task gets a space of its own, as with `space`. A task done by [several attempts](attempts.md) always gets one: its attempts share it.
+One that was already in a tab of yours when its attempts were made (`attempts.by` raised while its plan waited) keeps
+them there: tabs `PRJ-12 Agent A`, `PRJ-12 Agent B` and `PRJ-12 Picker` in your space, and after the pick only the other
+attempts' own panes close.
 
 ## What the task has there
 

@@ -129,12 +129,13 @@ fn fan_out(g: &mut Guard, agents: &[String]) -> Res<Task> {
     let t = g.check()?;
     let place: Obj = ["worktree", "branch", "from", "baseSha", "repoFile", "repoRefused", "root", "ownNote"].iter().filter(|k| t.contains_key(**k)).map(|k| (k.to_string(), t.at(k).clone())).collect();
     let l = t.at("link").clone();
+    let hosted = crate::hosted::is(&t); // its attempts work in tabs of that space of yours too
     let mut made = vec![];
     for (n, agent) in agents.iter().enumerate() {
         let k = agent_of(agent).kind;
         let mut extra = obj(json!({ "queuedAt": now() + n as i64, "agent": k, "app": k }));
-        if n > 0 { extra.put("link", json!({ "socket": l.at("socket") })); }
-        else { for (a, b) in &place { extra.insert(a.clone(), b.clone()); } extra.put("startedOnce", true); extra.put("link", json!({ "socket": l.at("socket"), "workspace": l.at("workspace"), "tab": l.at("tab"), "pane": l.at("pane"), "terminal": l.at("terminal"), "ownsWorkspace": false, "reviewer": null })); }
+        if n > 0 { extra.put("link", json!({ "socket": l.at("socket"), "hosted": hosted })); }
+        else { for (a, b) in &place { extra.insert(a.clone(), b.clone()); } extra.put("startedOnce", true); extra.put("link", json!({ "socket": l.at("socket"), "workspace": l.at("workspace"), "tab": l.at("tab"), "pane": l.at("pane"), "terminal": l.at("terminal"), "ownsWorkspace": false, "reviewer": null, "hosted": hosted })); }
         made.push(create_attempt(&t, LETTERS[n], agent, extra)?);
     }
     let t = g.set(|t| {
