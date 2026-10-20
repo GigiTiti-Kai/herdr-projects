@@ -31,6 +31,7 @@ impl FakeHerdr {
     pub fn ws_out(st: &Value, w: &Value) -> Value {
         let mut o = json!({ "workspace_id": w.at("workspace_id"), "label": w.at("label"), "pane_count": st.arr("panes").iter().filter(|p| p.at("workspace_id") == w.at("workspace_id")).count() });
         if w.at("worktree").is_object() { o["worktree"] = w.at("worktree").clone(); }
+        if w.b("focused") { o["focused"] = json!(true); } // the space you look at, where a test says so
         o
     }
     pub fn tab_out(st: &Value, t: &Value) -> Value { json!({ "tab_id": t.at("tab_id"), "workspace_id": t.at("workspace_id"), "label": t.at("label"), "pane_count": st.arr("panes").iter().filter(|p| p.at("tab_id") == t.at("tab_id")).count(), "focused": t.s("tab_id") == format!("{}:t1", t.s("workspace_id")) }) }

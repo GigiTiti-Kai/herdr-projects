@@ -156,6 +156,7 @@ mod helpers;
 mod herdr_keys;
 mod home_folder;
 mod home_folder_more;
+mod hosted_tab;
 mod install;
 mod keeper_update;
 mod keys_list;

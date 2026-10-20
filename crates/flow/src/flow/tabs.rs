@@ -20,7 +20,7 @@ pub fn name_tab(api: &Herdr, tab: &str, label: &str) { if !tab.is_empty() { api.
 pub fn agent_tab(t: Option<&Obj>) -> String {
     let Some(t) = t else { return AGENT_TAB.into() };
     let letter = if t.b("letter") { t.t("letter") } else { t.at("picked").t("letter") };
-    format!("{AGENT_TAB}{}{}", if letter.is_empty() { String::new() } else { format!(" {letter}") }, if t.b("on") { format!(" ({})", t.s("agent")) } else { String::new() })
+    crate::hosted::label(t, &format!("{AGENT_TAB}{}{}", if letter.is_empty() { String::new() } else { format!(" {letter}") }, if t.b("on") { format!(" ({})", t.s("agent")) } else { String::new() }))
 }
 pub fn name_agent_tab(api: &Herdr, tab: &str, t: Option<&Obj>) { name_tab(api, tab, &agent_tab(t)); }
 /// A tab's ids: { tab, pane, terminal }.
@@ -29,7 +29,7 @@ pub struct Opened { pub tab: String, pub pane: String, pub terminal: String }
 pub fn open_tab(api: &Herdr, t: &Obj, label: &str, cwd: &str, env: &[(String, String)], who: &str) -> Res<Opened> {
     let workspace = if t.at("link").b("workspace") { t.at("link").t("workspace") } else { api.pane_get(t.at("link").s("pane")).map(|p| p.t("workspace_id")).unwrap_or_default() };
     if workspace.is_empty() { crate::fail!("the task's space is gone"); }
-    let r = api.tab_create(&workspace, cwd, label, env)?;
+    let r = api.tab_create(&workspace, cwd, &crate::hosted::label(t, label), env)?;
     let tab = if r.at("tab").b("tab_id") { r.at("tab").t("tab_id") } else { r.at("root_pane").t("tab_id") };
     let pane = if r.at("root_pane").is_object() { Some(r.at("root_pane").clone()) } else { api.panes(Some(&workspace))?.into_iter().find(|p| p.s("tab_id") == tab) };
     let Some(pane) = pane else { if !tab.is_empty() { api.tab_close(&tab); } crate::fail!("herdr opened no terminal for {who}") };

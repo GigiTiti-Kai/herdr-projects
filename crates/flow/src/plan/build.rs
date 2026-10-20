@@ -37,7 +37,7 @@ pub fn begin(g: &mut Guard, t: Task, api: &Herdr) -> Res<Task> {
     let missing = (!who.kind.is_empty() && !own).then(|| format!("planned by the working agent: {} is not installed here", who.kind));
     let made = if own {
         let m = flow::tabs::open_tab(api, &t, flow::tabs::PLANNER_TAB, &dir.display().to_string(), &board_env(), "the planner")?;
-        flow::tabs::name_agent_tab(api, t.at("link").s("tab"), None);
+        flow::tabs::name_tab(api, t.at("link").s("tab"), &crate::hosted::label(&t, flow::tabs::AGENT_TAB));
         Some(m)
     } else { None };
     // From here until the yes nothing can be written in the task's own worktree, and what git ignores there is written down.
@@ -144,7 +144,8 @@ fn fan_out(g: &mut Guard, agents: &[String]) -> Res<Task> {
         let parent = std::path::Path::new(t.s("worktree")).parent().map(|p| p.display().to_string()).unwrap_or_default();
         t.put("spaceDir", parent);
         let s = t.at("link").at("socket").clone(); let w = t.at("link").at("workspace").clone();
-        t.put("link", json!({ "socket": s, "workspace": w, "ownsWorkspace": true }));
+        let hosted = crate::hosted::is(t);
+        t.put("link", json!({ "socket": s, "workspace": w, "ownsWorkspace": !hosted, "hosted": hosted })); // a space of yours stays yours
         let p = t.obj_mut("plan"); p.put("built", now()); p.put("locked", false); p.del("ignored");
         for k in FORGET.iter().chain(["worktree", "branch", "from", "baseSha", "startedOnce"].iter()) { t.del(k); }
     })?;

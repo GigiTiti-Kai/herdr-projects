@@ -16,6 +16,7 @@ pub mod extras;
 pub mod finish;
 pub mod flow;
 pub mod hook;
+pub mod hosted;
 pub mod housekeeping;
 pub mod install;
 pub mod jobs;

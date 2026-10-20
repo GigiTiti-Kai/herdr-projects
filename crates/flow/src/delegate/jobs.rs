@@ -84,7 +84,7 @@ fn delegate_steps(id: &str, g: &mut Guard, mut t: Task) -> Res<()> {
         let mut copy = false;
         let (res, mut patch): (Value, Obj);
         if exists(t.s("worktree")) {
-            res = flow::spaces::opening_worktree(&api, &root, || api.worktree_open(&root.display().to_string(), t.s("worktree"), &label))?;
+            res = match crate::hosted::again(&api, &root, &t)? { Some(r) => r, None => flow::spaces::opening_worktree(&api, &root, || api.worktree_open(&root.display().to_string(), t.s("worktree"), &label))? };
             patch = Obj::new();
         } else if can_worktree(&root) && !t.b("startedOnce") { // a task in a repo always works in a worktree of its own
             let from = match base_ref(&root, &t) { Ok(f) => f, Err(e) => return refuse_start(g, &e.msg) };
@@ -96,7 +96,7 @@ fn delegate_steps(id: &str, g: &mut Guard, mut t: Task) -> Res<()> {
             }
             let branch = free_branch(&root, &t);
             // An attempt works in a tab of its task's one space; any other task in a space of its own.
-            res = if t.b("attemptOf") { crate::attempts::place::open_place(&api, &root, &t, &branch, &from)? } else { flow::spaces::opening_worktree(&api, &root, || api.worktree_create(&root.display().to_string(), &branch, &from, &label))? };
+            res = if t.b("attemptOf") { crate::attempts::place::open_place(&api, &root, &t, &branch, &from)? } else if let Some(r) = crate::hosted::open(&api, &root, &t, &branch, &from)? { r } else { flow::spaces::opening_worktree(&api, &root, || api.worktree_create(&root.display().to_string(), &branch, &from, &label))? };
             let dir = if res.at("worktree").b("path") { res.at("worktree").t("path") } else { res.at("workspace").at("worktree").t("checkout_path") };
             // The repo's own file, read from the commit the worktree starts from: its facts, and what it was refused.
             let (facts, refused) = repo_file(&root, Some(&from));
@@ -122,6 +122,7 @@ fn delegate_steps(id: &str, g: &mut Guard, mut t: Task) -> Res<()> {
             t.put("root", root2.display().to_string()); t.put("startedOnce", true);
             let owns = !t.b("attemptOf");
             link_pane(t, &pane, &ws, owns);
+            crate::hosted::mark(t, res.b("hosted"));
             if res.at("tab").b("tab_id") { t.obj_mut("link").put("tab", res.at("tab").at("tab_id").clone()); }
         })?;
         if copy { copy_includes(&root, Path::new(t.s("worktree")), &list_of(&setting("workspace.include", Some(&t)))); }
@@ -187,7 +188,9 @@ fn restart_steps(id: &str, g: &mut Guard, mut t: Task) -> Res<()> {
     }
     if pane.is_none() {
         let ws = if t.at("link").b("workspace") { api.workspace_get(t.at("link").s("workspace")) } else { None };
-        if ws.is_some() && t.b("attemptOf") { pane = crate::attempts::place::reopen_place(&api, &t)?; } // an attempt: a tab of its own again
+        let mut hosted = false;
+        if crate::hosted::is(&t) { pane = crate::hosted::reopen(&api, &root, &t)?.map(|r| r.at("root_pane").clone()); hosted = pane.is_some(); } // never a split of your pane
+        else if ws.is_some() && t.b("attemptOf") { pane = crate::attempts::place::reopen_place(&api, &t)?; } // an attempt: a tab of its own again
         else if let Some(ws) = &ws { if let Some(first) = api.panes(Some(ws.s("workspace_id")))?.into_iter().next() { pane = Some(api.pane_split(first.s("pane_id"), &cwd_of(&t).display().to_string(), "right", &board_env())?); } }
         if pane.is_none() {
             let res = if exists(t.s("worktree")) { flow::spaces::opening_worktree(&api, &root, || api.worktree_open(&root.display().to_string(), t.s("worktree"), &flow::sidebar::space_label(&t)))? }
@@ -195,7 +198,7 @@ fn restart_steps(id: &str, g: &mut Guard, mut t: Task) -> Res<()> {
             pane = Some(root_pane(&api, &res)?);
         }
         let p = pane.clone().unwrap();
-        t = g.set(|t| { let owns = !t.b("attemptOf"); link_pane(t, &p, "", owns); })?;
+        t = g.set(|t| { let owns = !t.b("attemptOf"); link_pane(t, &p, "", owns); crate::hosted::mark(t, hosted); })?;
     }
     t = agent_now(g, t)?;
     // A start that was asked for and never got as far as its agent (its setup failed): this is that start.
@@ -216,9 +219,9 @@ pub fn reopen(id: &str, restart: bool) -> Res<(Value, bool, Task)> {
         None => {
             if !exists(t.s("worktree")) { crate::fail!("Its terminal is gone. Reply or delegate again to start its agent."); }
             let root = folder_of(t.s("id"));
-            let res = flow::spaces::opening_worktree(&api, &root, || api.worktree_open(&root.display().to_string(), t.s("worktree"), &flow::sidebar::space_label(&t)))?;
+            let res = match crate::hosted::reopen(&api, &root, &t)? { Some(r) => r, None => flow::spaces::opening_worktree(&api, &root, || api.worktree_open(&root.display().to_string(), t.s("worktree"), &flow::sidebar::space_label(&t)))? };
             let p = root_pane(&api, &res)?;
-            t = update_wait(t.s("id"), 2000, |t| { link_pane(t, &p, "", true); Ok(Change::Write) })?;
+            t = update_wait(t.s("id"), 2000, |t| { link_pane(t, &p, "", true); crate::hosted::mark(t, res.b("hosted")); Ok(Change::Write) })?;
             flow::tabs::name_agent_tab(&api, p.s("tab_id"), Some(&t));
             p
         }

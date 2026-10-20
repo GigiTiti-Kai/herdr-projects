@@ -29,6 +29,7 @@ pub fn archive(id: &str) -> Res<Task> {
         let _ = h.workspace_close(&workspace);
         flow::spaces::close_repo_space(&h, &folder_of(t.s("id")));
     }
+    if crate::hosted::is(&t) && t.at("link").s("socket") == current_socket() { crate::hosted::close_tabs(&Herdr::new(Some(t.at("link").t("socket"))), &t); } // a space of yours stays open
     Ok(t)
 }
 /// Restore changes nothing in herdr and starts nothing.
