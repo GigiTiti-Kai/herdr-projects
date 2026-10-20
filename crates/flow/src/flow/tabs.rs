@@ -43,6 +43,7 @@ pub fn open_reviewer_tab(api: &Herdr, t: &Obj, round: i64, by: &str, cwd: &str, 
 /// `reviewer`: what the task keeps of it (link.reviewer). One from before reviewers had tabs has only a pane.
 pub fn close_reviewer_tab(api: &Herdr, reviewer: &Value) {
     if !reviewer.is_object() { return; }
+    if reviewer.b("hosted") { return crate::hosted::close_own(api, reviewer.s("tab"), reviewer.s("pane")); } // a pane of yours in its tab stays
     if reviewer.b("tab") { api.tab_close(reviewer.s("tab")); }
     if reviewer.b("pane") { api.pane_close(reviewer.s("pane")); }
 }

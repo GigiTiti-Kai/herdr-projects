@@ -15,8 +15,8 @@ herdr-projects delegate 12 --workspace.place tab
 ## Which space
 
 A space of the task's repo that no task owns: the one you are looking at, else the one named after the repo (herdr names
-a space after its first folder). A space opened at a worktree of the repo counts too. No such space open: the task gets a
-space of its own, as with `space`. A task done by [several attempts](attempts.md) always gets one: its attempts share it.
+a space after its first folder), else any other. A space opened at a worktree of the repo counts too. No such space
+open: the task gets a space of its own, as with `space`. A task done by [several attempts](attempts.md) always gets one: its attempts share it.
 
 ## What the task has there
 

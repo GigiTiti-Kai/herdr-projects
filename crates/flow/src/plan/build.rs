@@ -93,7 +93,7 @@ pub fn start_build_by(id: &str, g: &mut Guard, by: &str) -> Res<()> {
             t.put("agent", worker.clone()); t.put("app", worker);
             for k in FORGET { t.del(k); } // another program in another pane: nothing the board knew of the planner's is the worker's
         })?;
-        api.tab_close(&was.0); api.pane_close(&was.1);
+        if crate::hosted::is(&t) { crate::hosted::close_own(&api, &was.0, &was.1); } else { api.tab_close(&was.0); api.pane_close(&was.1); }
     }
     let many = attempts_now(&t);
     if many.len() > 1 {

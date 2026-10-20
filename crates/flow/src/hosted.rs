@@ -1,5 +1,5 @@
 //! A task that works in a tab of a space you have open (`workspace.place` = `tab`): a space of its repo that no task
-//! owns, the one you look at first, then one named after the repo. Its worktree is its own, as ever; its agent, reviewer
+//! owns, the one you look at first, then one named after the repo, then any other. Its worktree is its own, as ever; its agent, reviewer
 //! and planner each have a tab there named after the task (`PRJ-1 Agent`). The space stays yours: nothing of yours in it
 //! is split, typed into, renamed or closed, and when the task is done only its own panes close (and with them its tabs).
 //! The task's link says so: `hosted`, and `ownsWorkspace` false.
@@ -33,7 +33,7 @@ pub fn label(t: &Obj, base: &str) -> String {
     format!("{} {base}", if tag.is_empty() { t.t("id") } else { tag })
 }
 /// A space of the repo at `root` that no task owns: `prefer` while it still is one, else the one you look at, else the
-/// one named after the repo. A space id herdr gave out again to another task's space is that task's, never a host.
+/// one named after the repo, else any other. A space id herdr gave out again to another task's space is that task's, never a host.
 fn host(api: &Herdr, root: &Path, prefer: &str) -> Option<String> {
     let owned: Vec<String> = all().iter().filter(|t| t.at("link").b("ownsWorkspace")).map(|t| t.at("link").t("workspace")).collect();
     let real = |p: &str| flow::spaces::real(Path::new(p));
@@ -43,6 +43,7 @@ fn host(api: &Herdr, root: &Path, prefer: &str) -> Option<String> {
     of_repo.iter().find(|w| !prefer.is_empty() && w.s("workspace_id") == prefer)
         .or_else(|| of_repo.iter().find(|w| w.b("focused")))
         .or_else(|| of_repo.iter().find(|w| w.s("label") == name))
+        .or_else(|| of_repo.first()) // one you named otherwise is still yours
         .map(|w| w.t("workspace_id"))
 }
 /// The task's agent tab in `ws`, at `dir`: answers as `herdr worktree create` does, marked `hosted`.
@@ -91,9 +92,10 @@ fn own(t: &Obj) -> Vec<(String, String)> {
 pub fn in_tabs(t: &Obj, p: &Value) -> bool { own(t).iter().any(|(tab, _)| p.s("tab_id") == tab) }
 /// Close the task's own panes, and with the last one each tab: only a pane still in the tab it was opened in (a pane's
 /// id can be given out again), never one of yours, and never the space.
-pub fn close_tabs(api: &Herdr, t: &Obj) {
-    let ws = t.at("link").t("workspace");
-    let Ok(panes) = api.panes(if ws.is_empty() { None } else { Some(&ws) }) else { return };
-    let own = own(t);
-    for p in panes.iter().filter(|p| own.iter().any(|(tab, pane)| p.s("tab_id") == tab && p.s("pane_id") == pane)) { api.pane_close(p.s("pane_id")); }
+pub fn close_tabs(api: &Herdr, t: &Obj) { for (tab, pane) in own(t) { close_own(api, &tab, &pane); } }
+/// Close one pane of the task's own (its agent's, planner's or reviewer's), only while it is still in the tab it was
+/// opened in. Its tab goes with its last pane: one you split off in it keeps it open.
+pub fn close_own(api: &Herdr, tab: &str, pane: &str) {
+    if pane.is_empty() { return; }
+    if api.pane_get(pane).is_some_and(|p| tab.is_empty() || p.s("tab_id") == tab) { api.pane_close(pane); }
 }
