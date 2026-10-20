@@ -22,7 +22,7 @@ pub fn open_place(api: &Herdr, root: &Path, t: &Task, branch: &str, from: &str) 
             let res = flow::spaces::opening_worktree(api, root, || api.worktree_create(&root.display().to_string(), branch, from, &label))?;
             let dir = if res.at("worktree").b("path") { res.at("worktree").t("path") } else { res.at("workspace").at("worktree").t("checkout_path") };
             let ws = res.at("workspace").t("workspace_id");
-            update_wait(t.s("attemptOf"), 10000, |p| { p.obj_mut("link").put("workspace", ws.clone()); p.obj_mut("link").put("ownsWorkspace", true); p.put("spaceDir", Path::new(&dir).parent().map(|x| x.display().to_string()).unwrap_or_default()); Ok(Change::Write) })?;
+            update_wait(t.s("attemptOf"), 10000, |p| { p.obj_mut("link").put("workspace", ws.clone()); p.obj_mut("link").put("ownsWorkspace", true); crate::hosted::mark(p, false); p.put("spaceDir", Path::new(&dir).parent().map(|x| x.display().to_string()).unwrap_or_default()); Ok(Change::Write) })?;
             return Ok(res);
         };
         // Beside the first one's worktree, named as herdr names one: the branch with its slashes as dashes.
@@ -38,7 +38,7 @@ pub fn open_place(api: &Herdr, root: &Path, t: &Task, branch: &str, from: &str) 
         let tab = if r.at("tab").b("tab_id") { r.at("tab").t("tab_id") } else { r.at("root_pane").t("tab_id") };
         let pane = if r.at("root_pane").is_object() { Some(r.at("root_pane").clone()) } else { api.panes(Some(&ws))?.into_iter().find(|x| x.s("tab_id") == tab) };
         let Some(pane) = pane else { if !tab.is_empty() { api.tab_close(&tab); } crate::fail!("herdr opened no terminal for attempt {}", t.s("letter")) };
-        Ok(json!({ "workspace": { "workspace_id": ws }, "tab": { "tab_id": if tab.is_empty() { pane.t("tab_id") } else { tab } }, "root_pane": pane, "worktree": { "path": dir.display().to_string() } }))
+        Ok(json!({ "workspace": { "workspace_id": ws }, "tab": { "tab_id": if tab.is_empty() { pane.t("tab_id") } else { tab } }, "root_pane": pane, "worktree": { "path": dir.display().to_string() }, "hosted": crate::hosted::is(&p) }))
     })
 }
 /// A tab for an attempt whose terminal is gone, in the task's space, in its own worktree.

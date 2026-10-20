@@ -42,6 +42,7 @@ pub fn cleanup_with(t: &Task, o: Opts) -> Cleanup {
     let still = o.still.is_some();
     // False when herdr did not close it (a timeout): then it is still in the sidebar, and that is tried again.
     let close_space = || -> bool {
+        if crate::hosted::is(t) { if let Some(api) = &api { crate::hosted::close_tabs(api, t); } return true; } // a space of yours: only its own tabs
         let (Some(w), true, Some(api)) = (&ws, link.b("ownsWorkspace"), &api) else { return true };
         match api.workspace_close(w.s("workspace_id")) { Ok(_) => true, Err(e) => e.code.contains("not_found") || !still }
     };
@@ -86,7 +87,7 @@ pub fn cleanup_with(t: &Task, o: Opts) -> Cleanup {
         if still && unknown { return true; }
         let (true, Some(w), Some(api)) = (still, &ws, &api) else { return false };
         match api.panes(Some(w.s("workspace_id"))) {
-            Ok(ps) => ps.iter().any(|p| p.s("pane_id") != link.at("reviewer").s("pane") && { let own = p.s("pane_id") == link.s("pane"); let a = api.agent_get(p.s("pane_id")).ok().flatten(); if own && a.is_some() { false } else { a.is_some() || !api.pane_idle(p.s("pane_id")) } }),
+            Ok(ps) => ps.iter().filter(|p| !crate::hosted::is(t) || crate::hosted::in_tabs(t, p)).any(|p| p.s("pane_id") != link.at("reviewer").s("pane") && { let own = p.s("pane_id") == link.s("pane"); let a = api.agent_get(p.s("pane_id")).ok().flatten(); if own && a.is_some() { false } else { a.is_some() || !api.pane_idle(p.s("pane_id")) } }),
             Err(_) => true,
         }
     };
@@ -143,7 +144,7 @@ pub fn cleanup_with(t: &Task, o: Opts) -> Cleanup {
                     let target = match &ws { Some(w) if w.at("worktree").s("checkout_path") == wt => w.t("workspace_id"), _ => flow::spaces::opening_worktree(api, &root, || api.worktree_open(&root.display().to_string(), wt, ""))?.at("workspace").t("workspace_id") };
                     api.worktree_remove(&target, false)?;
                 }
-                _ => { git_out(&root, &["worktree", "remove", wt])?; }
+                _ => { close_space(); git_out(&root, &["worktree", "remove", wt])?; }
             }
             Ok(())
         })();
