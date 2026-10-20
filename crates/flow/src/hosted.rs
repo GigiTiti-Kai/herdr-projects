@@ -75,8 +75,11 @@ fn tab_again(api: &Herdr, root: &Path, t: &Obj) -> Res<Option<Value>> {
 /// A task that works in a tab and whose terminal is gone (restarted, or gone into): a tab again. None: not such a
 /// task, or no space to be in, and it gets a space of its own.
 pub fn reopen(api: &Herdr, root: &Path, t: &Obj) -> Res<Option<Value>> { if is(t) { tab_again(api, root, t) } else { Ok(None) } }
-/// Delegated again with its worktree still there: a tab again where it worked in one, or asks for one now.
-pub fn again(api: &Herdr, root: &Path, t: &Obj) -> Res<Option<Value>> { if wanted(t) || is(t) { tab_again(api, root, t) } else { Ok(None) } }
+/// Delegated again with its worktree still there: a tab again where it worked in one, or asks for one now. A task that
+/// still owns a space of its own stays there: moved out, that space would be nobody's and never close.
+pub fn again(api: &Herdr, root: &Path, t: &Obj) -> Res<Option<Value>> {
+    if is(t) || (wanted(t) && !t.at("link").b("ownsWorkspace")) { tab_again(api, root, t) } else { Ok(None) }
+}
 /// The task's own tabs and the pane each was opened with: its agent's (or planner's), the reviewer's, and the agent's
 /// home while a planner has the first.
 fn own(t: &Obj) -> Vec<(String, String)> {
