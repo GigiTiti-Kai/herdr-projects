@@ -12,7 +12,7 @@ use crate::flow;
 use crate::gate;
 use crate::json::*;
 use crate::runner::{is_aborted, Guard};
-use crate::store::files::{artifacts_dir, board_env};
+use crate::store::files::artifacts_dir;
 use crate::store::handovers::{handover_line, last_handover, log_handover};
 use crate::store::marks::pending_events;
 use crate::store::repos::{cwd_of, folder_of, git_out};
@@ -70,7 +70,7 @@ pub fn review_once(id: &str, g: &mut Guard, text: &str, change: Option<&Value>, 
         close_reviewer(id); // a tab left over from an interrupted round
         // Its own tab, never focused: the human stays where they are, and the agent's tab and the board keep their size.
         let label = if plan.is_some() { Some(flow::tabs::PLAN_REVIEW_TAB) } else { None };
-        let made = flow::tabs::open_reviewer_tab(&api, &t, round, if other { &rkind } else { "" }, &folder.display().to_string(), &board_env(), label)?;
+        let made = flow::tabs::open_reviewer_tab(&api, &t, round, if other { &rkind } else { "" }, &folder.display().to_string(), &crate::temp::task_env(&t), label)?;
         let pane = made.pane.clone();
         pane_tab = Some((made.pane.clone(), made.tab.clone()));
         let taken: Vec<String> = api.agents().unwrap_or_default().iter().map(|a| a.t("name")).filter(|n| !n.is_empty()).collect();
@@ -80,12 +80,12 @@ pub fn review_once(id: &str, g: &mut Guard, text: &str, change: Option<&Value>, 
         let started_at = now(); // a turn-end report older than this is from a try of this review that was cut off
         let x = launch_extras(&t, "reviewer", &rkind, round, "", None)?;
         let hosted = crate::hosted::is(&t);
-        t = g.set(|t| { t.obj_mut("link").put("reviewer", json!({ "pane": pane, "tab": made.tab, "agent": name, "kind": rkind, "hosted": hosted })); t.put("reviewSession", x.session.clone().map(Value::String).unwrap_or(Value::Null)); })?;
+        t = g.set(|t| { t.obj_mut("link").put("reviewer", json!({ "pane": pane, "tab": made.tab, "terminal": made.terminal, "agent": name, "kind": rkind, "hosted": hosted })); t.put("reviewSession", x.session.clone().map(Value::String).unwrap_or(Value::Null)); })?;
         flow::sidebar::tell_sidebar(&t); // the reviewer's pane has its entry in herdr's sidebar from the start
         let opts = |hook: Vec<String>| start::StartOpts { model: rmodel.clone(), effort: reffort.clone(), fast: Some(who.fast), access: who.access.clone(), session: x.session.clone().unwrap_or_default(), extra: hook, ..Default::default() };
         let start_with = |hook: Vec<String>| -> Res<()> {
             let args = start::start_args(&rkind, &opts(hook))?;
-            let r = if plan.is_some() { crate::plan::sandbox::start_program(&api, &get(id).unwrap_or(t.clone()), &name, &rkind, &pane, &args) } else { api.agent_start(&name, &rkind, &pane, &args, 60000).map(|_| ()) };
+            let r = if plan.is_some() { crate::plan::sandbox::start_program(&api, &get(id).unwrap_or(t.clone()), &name, &rkind, &pane, &args, "reviewer") } else { api.agent_start(&name, &rkind, &pane, &args, 60000).map(|_| ()) };
             match r { Ok(()) => { crate::submit::settle(&api, &pane, &std::iter::once(crate::agents::kinds::program(&rkind).to_string()).chain(args).collect::<Vec<_>>().join(" ")); Ok(()) } Err(e) if e.code == "agent_not_ready" => Ok(()),
                 Err(e) => Err(start_failed::say(&api, &start_failed::Start { kind: &rkind, setting: "reviewer.agent", again: "retry the review" }, &pane, &e.message, &crate::store::files::dir_of(id).join("runner.log")).into()) }
         };

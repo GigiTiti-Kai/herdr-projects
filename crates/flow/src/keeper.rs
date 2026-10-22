@@ -117,6 +117,7 @@ fn handover(own: i64) -> Result<(), String> {
         if let Ok(Some(st)) = c.try_wait() { return Err(format!("it ended: {st}")); }
         std::thread::sleep(std::time::Duration::from_millis(20));
     }
+    crate::runner::reap(c); // still running: waited for when it ends, as no zombie of this keeper
     Err("no heartbeat in 15s".into())
 }
 
@@ -134,6 +135,7 @@ pub fn tick_once(socket: &str, watch: bool) -> Option<Vec<Obj>> {
         refresh_said(&every, now());
         // A run at its time limit is stopped; a raised limit carries on (limits/tick.rs).
         crate::limits::tick::limits_tick(&every, now(), Some(&|id: &str| { let _ = crate::actions::limits::carry_on(id, true); }));
+        crate::autopilot::tick::autopilot_tick(socket, now()); // coordinators on autopilot woken (autopilot/tick.rs)
         for co in crate::coordinator::state::all(socket) { crate::coordinator::pump::tick(&co); crate::coordinator::sidebar::tell_sidebar(&co); }
         rows = Some(rs);
         Ok(())
@@ -183,6 +185,8 @@ pub fn keeper_work() -> i32 {
         if due("front-door", 30000) { crate::webui::keep::ensure_door(); }
         // On the computer you sit at: the helper that takes a call the terminal board on another machine starts.
         if due("voice-helper", 30000) { crate::calls::helper::ensure(); }
+        // Voice calls turned off: a call still on ends (its page or helper then lets go of the microphone).
+        if due("voice-off", 5000) { crate::voice::end_if_off(); }
         if live == 0 { return 3; } // every herdr it knows is gone
         std::thread::sleep(std::time::Duration::from_millis(1000));
     }

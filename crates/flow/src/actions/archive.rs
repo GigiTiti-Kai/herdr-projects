@@ -9,7 +9,8 @@ use crate::store::files::{marker, with_task_lock, SLOT_STAGES};
 use crate::store::repos::folder_of;
 use crate::store::tasks::{find, get, remove, update, update_wait, Change, Task};
 
-/// Archive closes the task's herdr workspace (the agent ends with it) and keeps everything else.
+/// Archive closes the task's own herdr workspace (the agent ends with it) and frees its temporary files; the
+/// worktree, branch and history stay.
 pub fn archive(id: &str) -> Res<Task> {
     let cur = find(id)?;
     if cur.b("archivedAt") { return Ok(cur); }
@@ -30,7 +31,10 @@ pub fn archive(id: &str) -> Res<Task> {
         flow::spaces::close_repo_space(&h, &folder_of(t.s("id")));
     }
     if crate::hosted::is(&t) && t.at("link").s("socket") == current_socket() { crate::hosted::close_tabs(&Herdr::new(Some(t.at("link").t("socket"))), &t); } // a space of yours stays open
-    Ok(t)
+    // Its agent gone with its space: its temporary files go too, and its line says what that freed.
+    let freed = crate::leftovers::sweep::free_ended(&t);
+    if crate::leftovers::said(freed).is_empty() { return Ok(t); }
+    update(t.s("id"), |t| { let m = crate::leftovers::with_said(t.s("msg"), freed); t.put("msg", m); Ok(Change::Write) })
 }
 /// Restore changes nothing in herdr and starts nothing.
 pub fn restore(id: &str) -> Res<Task> { let cur = find(id)?; update(cur.s("id"), |t| { t.put("archivedAt", Value::Null); Ok(Change::Write) }) }
@@ -47,6 +51,7 @@ pub fn clear(id: &str) -> Res<(String, Vec<String>)> {
     let mut kept = crate::land::cleanup(&t, "merged");
     if !t.arr("attempts").is_empty() { kept.extend(crate::attempts::adopt::discard_all(&cid)); }
     if kept.is_empty() { flow::task::clear_notes(&t); }
+    crate::leftovers::free(&t); // its temporary files, whatever was kept
     with_task_lock(&cid, 5000, || { remove(&cid); Ok(()) })?;
     Ok((cid, kept))
 }
