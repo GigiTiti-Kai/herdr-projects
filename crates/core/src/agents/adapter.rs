@@ -28,7 +28,8 @@ pub fn hook_args(kind: &str, h: &Hook) -> Res<Option<Vec<String>>> {
     match kind {
         // A settings file of the task's own, added to the user's settings for this one launch (the user's own hooks
         // still run). The hooks are asynchronous, so a slow or failing one never holds the agent's turn. In plan mode
-        // the plan is presented with ExitPlanMode, which asks in the terminal: the board takes the plan there instead.
+        // the plan is presented with ExitPlanMode, which asks in the terminal: the board takes the plan at that question
+        // (PermissionRequest, which runs even when the user allows ExitPlanMode) and answers no (plan/presented.rs).
         "claude" => {
             let command = hook_command(h).iter().map(|s| shq(s)).collect::<Vec<_>>().join(" ");
             let file = h.dir.join(format!("hook-{}.json", h.role));
@@ -36,7 +37,7 @@ pub fn hook_args(kind: &str, h: &Hook) -> Res<Option<Vec<String>>> {
             let mut hooks = obj(json!({ "Stop": one, "StopFailure": one }));
             if h.plan {
                 let plan_cmd = [h.shim.as_str(), "plan-written", "--id", &h.id, "--token", &h.token].iter().map(|s| shq(s)).collect::<Vec<_>>().join(" ");
-                hooks.put("PreToolUse", json!([{ "matcher": "ExitPlanMode", "hooks": [{ "type": "command", "command": plan_cmd }] }]));
+                hooks.put("PermissionRequest", json!([{ "matcher": "ExitPlanMode", "hooks": [{ "type": "command", "command": plan_cmd }] }]));
             }
             write_private(&file, &json!({ "hooks": hooks }).to_string())?;
             Ok(Some(vec!["--settings".into(), file.display().to_string()]))
@@ -241,7 +242,7 @@ pub fn skill_dir(kind: &str) -> Option<PathBuf> {
 }
 /// Mark a repo as trusted in the program's own settings, so a new worktree starts without its "trust this folder?"
 /// dialog. Claude keeps trust per repository root in ~/.claude.json; Codex in ~/.codex/config.toml (a command-line
-/// override does not count, so the table is appended to the file once).
+/// override does not count, so the table is added to the file once: codex_trust.rs).
 pub fn trust(kind: &str, root: &Path) -> bool {
     let root_s = root.display().to_string();
     match kind {
@@ -253,15 +254,7 @@ pub fn trust(kind: &str, root: &Path) -> bool {
             let tmp = PathBuf::from(format!("{}.{}.sw.tmp", file.display(), std::process::id()));
             write_private(&tmp, &serde_json::to_string_pretty(&j).unwrap_or_default()).is_ok() && fs::rename(&tmp, &file).is_ok()
         }
-        "codex" => {
-            let file = codex_file();
-            let text = match fs::read_to_string(&file) { Ok(t) => t, Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(), Err(_) => return false };
-            let head = format!("[projects.{}]", serde_json::to_string(&root_s).unwrap_or_default());
-            if text.contains(&head) { return true; }
-            if let Some(d) = file.parent() { let _ = fs::create_dir_all(d); }
-            let add = format!("{}\n{head}\ntrust_level = \"trusted\"\n", if !text.is_empty() && !text.ends_with('\n') { "\n" } else { "" });
-            fs::OpenOptions::new().create(true).append(true).open(&file).and_then(|mut f| std::io::Write::write_all(&mut f, add.as_bytes())).is_ok()
-        }
+        "codex" => super::codex_trust::trust(root),
         _ => false,
     }
 }

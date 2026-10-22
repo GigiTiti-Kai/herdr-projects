@@ -16,6 +16,10 @@ All of this runs with the board open or closed.
 - **In a git repo**, the plugin asks Herdr for a worktree space (`herdr worktree create`), on its own branch
   (`work/<n>-<title>`), started from the remote's default branch (or from your commit, with `--workspace.from here`, or
   from another branch at the remote, with `--workspace.from develop`). A task in a repo never works in your checkout.
+- **Tasks of one repo can start at the same moment.** Herdr is handed the commit the task starts from, not
+  `origin/main`, so git writes no upstream into the repo's shared `.git/config` at the start (the push at the finish
+  sets it). Another git command holding that file anyway (`could not lock config file`) is waited out, five tries in
+  under four seconds, and a start that fails still removes the empty branch it made, so the next start takes the name.
 - **The branch's name is `workspace.branch`**, `work/{n}-{slug}` unless you set it: for you, for one repo, or for one
   task, never in the repo's own file. `{n}` is the task's number (`7`, or `7b` for an attempt), `{slug}` its title
   (`fix-the-login`), `{key}` its repo's key and number (`KIC-7`). So `feat/{key}-{slug}` makes `feat/KIC-7-fix-the-login`.
@@ -102,6 +106,10 @@ When the agent's turn ends, the board:
 2. **Pushes the branch and opens a draft pull request**, when there is an `origin` remote and `gh`.
    - A pull request the agent already opened for the task's branch is taken on instead, and goes through the review and
      the merge as usual.
+   - The push may run for `merge.pushTimeout` (2 minutes unless set), the repo's pre-push hook included. A repo whose
+     hook runs its tests needs more: `herdr-projects set merge.pushTimeout 10m --repo <name>`, or `none`. A push that
+     runs out of time is stopped and the finish fails, saying so (`git push did not end within 2m
+     (merge.pushTimeout)`); finish again once it is raised.
    - A branch that brings main nothing gets no pull request: no change was needed, or the work is on main already (the
      agent merged its own pull request, or pushed to main itself). The task is done, and its row says why: "No change
      needed", "Already on main" or "Already merged in #133". Nothing is pushed then, so a repo the task archived on
@@ -136,6 +144,23 @@ it merges:
 A conflict found here goes back to the agent the same way, and the merge you approved is retried after its repair. A
 checkout with unsaved files is never forced. Merging without your yes: [merging by itself](gate.md#merging-by-itself).
 
+### Closing GitHub issues
+
+A task added for GitHub issues says which ones its work closes: `herdr-projects add "Fix the login" --merge.closes 2203,2204`
+(or later, `set merge.closes 2203 --task <id>`). Only issues of the task's own repo, by number, and only on the task
+itself: never for you or a repo. `show <id>` lists it with the rest.
+
+- **Through a pull request**, its body gets a `Closes #2203` line for each, so GitHub closes them when it merges into
+  the default branch. A pull request the agent opened itself gets the lines it lacks added (`gh pr edit`); so does one
+  opened before the setting was said, right before it merges. Changed or cleared since, the board takes its own lines of
+  the issues no longer named off again before it merges; while it cannot, nothing merges (the task says why).
+- **With no pull request** (a local merge), and through one that merges into another branch than the default, the
+  board closes each with `gh issue close` once the merge has landed, with a comment naming the task and the merge commit.
+  So it does for work the agent put on main itself (`Already merged in #133`); work that needed no change closes none.
+
+Nothing is closed on a merge that failed. A close that fails never fails the merge, and an issue closed already is
+fine: the task's line says what was closed (`Merged into main. Closed #2203, #2204.`), or which could not be and why.
+
 ### GitHub's checks must pass first
 
 With `merge.checks: github`, a pull request merges only once its checks on GitHub pass, by itself or on your yes, in
@@ -147,6 +172,9 @@ every repo the board merges in. `merge.checks: none` does not look at GitHub's c
 | failed | merges nothing. The failure goes back to the agent like a failed check of the board's own, with the failing check's name and the end of its log, within `review.rounds` (a merge you approved goes on once GitHub's checks pass on the repair). After that it waits for you, and `approve <id>` refuses and says why, as for a failed review, until `approve <id> --anyway` |
 | not reporting, still running after `check.timeout` | waits for you, with that reason |
 | passed, or there are none | merges |
+
+A failure is of one commit: once a repair is pushed, the old commit's failed checks block nothing (also when main is
+merged in before it merges). Only the checks of the commit that would merge count.
 
 Each check is counted once, a workflow for its jobs until GitHub lists them. `details` names what it waits for
 (`checksWaitingFor`).
@@ -210,6 +238,14 @@ own worktree:
 - **whenever main moves** (another task merged, a merge on GitHub, your own push; the remote is asked every two minutes):
   every task waiting for your approval is updated, and a task under review the moment its review ends;
 - **after you approve**, once more, as the last safety net. It should rarely find anything.
+
+**Fewer merges while it waits: `merge.sync approve`.** In a busy repo, merging main on every move gives a waiting
+pull request a merge commit, a CI run and a round of bot reviews each time, and only the last merge before landing
+matters. With `herdr-projects set merge.sync approve` (for a task, a repo or all), main is merged in before review and
+after your yes only. While the task waits, the board makes a test merge in memory (`git merge-tree`), which changes
+nothing in its worktree, branch or pull request: a conflict is handled as a real one (below), so you know before you
+approve; a clean one changes nothing. After your yes, main is merged, checked again and the work lands, as always.
+`always` (built in) is the behaviour described above.
 
 **A clean update is silent.** If it changed the commit, the check runs again on the result. The review is not repeated
 when taking main in is all that happened to work that already passed ([below](#a-review-that-passed-is-not-repeated-for-a-merge-of-main)),
@@ -350,3 +386,7 @@ requests, starts queued tasks, runs the Watcher, and keeps Herdr's sidebar curre
 - **Its life.** Herdr starts it with its server. Any Herdr event, or opening the board, starts it again if it died. It
   replaces itself when the plugin is updated, and exits when Herdr is gone. It looks after this machine's tasks only.
 - An open board does the same. After an update it loads the new version by itself, in place, once nothing is half typed.
+- **One pass at a time.** This round of looking after the tasks also runs after every hook and every background job.
+  Only one runs per Herdr session at a time: one that comes while another is under way (a slow Herdr) does nothing
+  itself, and the one under way goes round once more at its end if it was asked to (a pull request poll is never lost).
+  A clean-up still running for a task is not started again.
