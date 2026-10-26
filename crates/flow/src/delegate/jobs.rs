@@ -242,13 +242,29 @@ pub fn reopen(id: &str, restart: bool) -> Res<(Value, bool, Task)> {
         }
     };
     let mut has_agent = api.agent_get(pane.s("pane_id"))?.is_some();
-    if !has_agent && restart && resumable(&t) && !marker_alive(t.at("runner")) && crate::memory_wait::low().is_none() { // too little memory: only its space
-        let (stage, armed) = (t.at("stage").clone(), t.at("armedAt").clone());
-        let mut g = Guard::free(t.s("id"));
-        if start_agent(t.s("id"), &mut g, "", Some(t.s("session"))).is_ok() { has_agent = true; }
-        let _ = update_wait(t.s("id"), 10000, |c| { c.put("stage", stage.clone()); c.put("armedAt", armed.clone()); c.put("turnOpen", false); Ok(Change::Write) }); // nothing was asked of it
+    if !has_agent && restart && resumable(&t) && !marker_alive(t.at("runner")) {
+        // Too little memory: its space now, and its agent by a runner that waits for room (memory_wait.rs).
+        if crate::memory_wait::low().is_some() { crate::runner::spawn_runner("reopen", t.s("id"), &[]); }
+        else { has_agent = start_quietly(t.s("id"), &mut Guard::free(t.s("id")), &t); }
     }
     Ok((pane, has_agent, get(t.s("id")).unwrap_or(t)))
+}
+/// Its exited agent started again in the same conversation, nothing sent to it: the task stands as it stood.
+fn start_quietly(id: &str, g: &mut Guard, t: &Task) -> bool {
+    let (stage, armed) = (t.at("stage").clone(), t.at("armedAt").clone());
+    let ok = start_agent(id, g, "", Some(t.s("session"))).is_ok();
+    let _ = update_wait(id, 10000, |c| { c.put("stage", stage.clone()); c.put("armedAt", armed.clone()); c.put("turnOpen", false); Ok(Change::Write) }); // nothing was asked of it
+    ok
+}
+/// A reopen's start that waited for memory: once there is room, its agent as `reopen` would have started it.
+pub fn reopen_job(id: &str) {
+    let Ok(Some(t)) = claim(id, "reopen", |_| {}) else { return };
+    let mut g = Guard::new(id);
+    g.expect(&t, &[]);
+    if crate::memory_wait::hold(&mut g).is_ok() {
+        if let Some(t) = get(id).filter(|t| resumable(t) && flow::task::h(t).agent_get(t.at("link").s("pane")).ok().flatten().is_none()) { start_quietly(id, &mut g, &t); }
+    }
+    release(id, false);
 }
 /// Put a reopened task's pane in front in its herdr: its agent, or (herdr cannot focus a bare pane by id) with no
 /// agent in it its workspace and tab. Used by "go into the task" here and from another machine.

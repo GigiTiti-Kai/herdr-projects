@@ -16,6 +16,7 @@ pub fn run_job(job: &str, id: &str, extra: &[String]) -> i32 {
     match job {
         "delegate" => crate::delegate::jobs::delegate_job(&id),
         "restart" => crate::delegate::jobs::restart_job(&id),
+        "reopen" => crate::delegate::jobs::reopen_job(&id),
         "finish" => crate::finish::turn_ended::finish_job(&id, has("--force")),
         "pipeline" => crate::finish::pipeline::pipeline_job(&id),
         "chatreview" => crate::finish::chat::chat_review_job(&id),

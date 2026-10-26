@@ -13,6 +13,8 @@ starts a program, it reads what this machine has available (`MemAvailable` in `/
   there is room.` The keeper's next pass starts it once there is room, in its place in the queue.
 - **A reviewer, an agent started again, or a fallback agent taking over**: it waits where it is, with the same line,
   and starts once there is room. A review's time (`review.timeout`) only starts with its reviewer.
+- **Going into a task whose agent exited**: its space opens at once, and its agent is started again in the same
+  conversation by itself once there is room, the task's row saying the wait meanwhile.
 
 Nothing that already runs is stopped, and there is no limit on how many agents run (that is `board.agents`).
 

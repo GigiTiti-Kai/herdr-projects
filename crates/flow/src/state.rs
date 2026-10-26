@@ -58,6 +58,8 @@ pub fn show(t: &Obj, live: &Value, now: i64) -> Show {
     let agent = t.b("app") && t.s("app") != t.s("owner");
     // A turn cut off by a passing provider error, and the board waiting to try again by itself: work going on.
     if let Some(w) = waiting_of(t) { let msg = wait_line(w, now); let rv = w.s("who") == "reviewer"; return out("working", &|s| { s.msg = msg.clone(); s.reviewing = rv; }); }
+    // Its next program waits for memory (memory_wait.rs): its line says so, whether or not an agent is there now.
+    if t.b("memHold") && crate::store::files::marker_alive(t.at("runner")) { return out("working", &|_| {}); }
     match t.s("stage") {
         // nobody started it; what it is to wait for (after.rs) is not said on its row: only once it is queued
         "todo" => return out("idle", &|_| {}),
@@ -84,8 +86,6 @@ pub fn show(t: &Obj, live: &Value, now: i64) -> Show {
         "queued" | "starting" => { let line = stage_line(t.s("stage")); return out("working", &|s| if s.msg.is_empty() { s.msg = line.into(); }); }
         _ => {}
     }
-    // Its next program waits for memory (memory_wait.rs): its line says so, whether or not an agent is there now.
-    if t.b("memHold") { return out("working", &|_| {}); }
     // Under review the Watcher follows the reviewer. No line of this round's yet: "Review just started".
     let own_line = t.b("msg") && ![stage_line("reviewing"), "under review"].contains(&t.s("msg")) && !t.b("comparing");
     if t.s("stage") == "reviewing" && t.b("comparing") {
