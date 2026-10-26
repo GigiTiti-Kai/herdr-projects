@@ -89,8 +89,7 @@ fn delegate_steps(id: &str, g: &mut Guard, mut t: Task) -> Res<()> {
     if let Err(line) = crate::leftovers::room::make_room(&t) { g.set(|t| crate::leftovers::room::wait(t, &line))?; return Ok(()); }
     if t.b("diskWait") { t = g.set(|t| { t.del("diskWait"); })?; }
     // Room in memory too: with too little the task waits in the queue, not starts (memory_wait.rs).
-    if let Some(l) = crate::memory_wait::low() { g.set(|t| crate::memory_wait::wait(t, &l))?; return Ok(()); }
-    if t.b("memWait") { t = g.set(|t| { t.del("memWait"); })?; }
+    if crate::memory_wait::queue_if_low(g)? { return Ok(()); }
     if live_pane.is_none() {
         let mut copy = false;
         let (res, mut patch): (Value, Obj);
@@ -162,6 +161,7 @@ fn delegate_steps(id: &str, g: &mut Guard, mut t: Task) -> Res<()> {
         }
     }
     // 3. The agent, in the workspace's root pane, then the task. A task whose agent ran before continues.
+    if crate::memory_wait::queue_if_low(g)? { return Ok(()); } // memory may have run low during its setup
     agent_now(g, t)?;
     // Research only or not is decided now, for this run, right before the program is started.
     let mut refusal = None;

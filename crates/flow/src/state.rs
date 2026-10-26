@@ -84,6 +84,8 @@ pub fn show(t: &Obj, live: &Value, now: i64) -> Show {
         "queued" | "starting" => { let line = stage_line(t.s("stage")); return out("working", &|s| if s.msg.is_empty() { s.msg = line.into(); }); }
         _ => {}
     }
+    // Its next program waits for memory (memory_wait.rs): its line says so, whether or not an agent is there now.
+    if t.b("memHold") { return out("working", &|_| {}); }
     // Under review the Watcher follows the reviewer. No line of this round's yet: "Review just started".
     let own_line = t.b("msg") && ![stage_line("reviewing"), "under review"].contains(&t.s("msg")) && !t.b("comparing");
     if t.s("stage") == "reviewing" && t.b("comparing") {

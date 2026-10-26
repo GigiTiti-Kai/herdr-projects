@@ -77,8 +77,7 @@ pub fn start_build_by(id: &str, g: &mut Guard, by: &str) -> Res<()> {
     // The build is a start too: on a nearly full disk it waits in the queue with its yes kept (leftovers/room.rs).
     if let Err(line) = crate::leftovers::room::make_room(&t) { g.set(|t| crate::leftovers::room::wait(t, &line))?; return Ok(()); }
     if t.b("diskWait") { t = g.set(|t| { t.del("diskWait"); })?; }
-    if let Some(l) = crate::memory_wait::low() { g.set(|t| crate::memory_wait::wait(t, &l))?; return Ok(()); }
-    if t.b("memWait") { t = g.set(|t| { t.del("memWait"); })?; }
+    if crate::memory_wait::queue_if_low(g)? { return Ok(()); }
     // Once more, right before the first change may be made.
     let Some(undone) = put_back(&t) else { fail(g, held_failure(&t), FailHow::default())?; return Ok(()); };
     // Writable before anything is started: a start that fails leaves no read-only worktree behind.

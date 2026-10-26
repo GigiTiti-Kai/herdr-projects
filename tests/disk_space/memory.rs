@@ -109,3 +109,44 @@ fn a_reviewer_waits_for_memory_where_it_is_then_starts_and_the_review_goes_on() 
     }
     assert_eq!(reviewers(&w), 1);
 }
+
+#[test]
+fn memory_that_runs_low_during_the_setup_sends_the_start_back_to_the_queue_before_its_agent() {
+    let w = world_with(Opts { repo: true, settings: json!({ "workspace.setup": "printf 'MemAvailable: 1000000 kB\\n' > \"$HERDR_PROJECTS_MEMINFO\"" }), ..Default::default() });
+    w.script(json!({ "worker": [{ "status": "working" }] }));
+    memory_is(6.0);
+    let id = w.add("Heavy setup");
+    delegate(&id);
+    let t = settle(&id);
+    assert_eq!(t.s("stage"), "queued", "{}", t.at("failure"));
+    assert!(t.b("memWait") && t.s("msg").contains("1.0 GB free < 3.0 GB"), "{}", t.s("msg"));
+    assert!(starts(&w).is_empty(), "no agent was started: {:?}", starts(&w));
+    // Room again: it starts in the worktree it has, its setup not run again.
+    memory_is(6.0);
+    assert_eq!(sw::actions::start::start_queued(&w.socket), vec![id.clone()]);
+    let t = settle(&id);
+    assert_eq!(t.s("stage"), "working", "{}", t.at("failure"));
+    assert_eq!(starts(&w).len(), 1);
+    assert!(sw::memory_wait::low().is_none(), "the setup ran once");
+}
+
+#[test]
+fn an_exited_agent_started_again_shows_its_wait_for_memory_not_that_it_exited() {
+    let w = world();
+    w.script(json!({ "worker": [{ "status": "working" }] }));
+    let id = w.add("Exits");
+    delegate(&id);
+    let pane = settle(&id).at("link").t("pane");
+    w.patch(|s| { for p in s["panes"].as_array_mut().unwrap() { if p.s("pane_id") == pane { p["agent"] = serde_json::Value::Null; } } });
+    memory_is(1.1);
+    sw::clock::set(Some(sw::clock::now()));
+    let seen: Rc<RefCell<Vec<(String, String)>>> = Rc::default();
+    { let (seen, id) = (seen.clone(), id.clone()); sw::clock::meanwhile(move || { let r = row(&id); seen.borrow_mut().push((r.t("state"), r.t("note"))); memory_is(6.0); }); }
+    sw::delegate::jobs::restart_job(&id);
+    let seen = seen.borrow();
+    assert!(!seen.is_empty(), "it waited");
+    for (state, note) in seen.iter() { assert!(state == "working" && note.starts_with("Memory nearly full on ") && note.contains("1.1 GB free < 3.0 GB"), "{seen:?}"); }
+    let t = task(&id);
+    assert!(!t.b("memHold") && t.s("stage") == "working", "{t:?}");
+    assert_eq!(starts(&w).len(), 2, "started again once there was room");
+}
