@@ -40,7 +40,7 @@ fn a_machine_coordinator_is_named_after_its_machine_and_kept_beside_the_coordina
     w.script(json!({ "coordinator": [{ "said": "This machine has one repo." }, { "said": "Added proj/1." }, { "said": "Still one repo." }, { "said": "Back again." }] }));
     tell(&w, &m, "what is on this machine?");
     // a tab named after it in the home space, its own agent, its own folder with its own rules; the Coordinator untouched
-    assert_eq!(labels(&w), vec!["~"]); assert_eq!(tabs(&w), vec!["w1 1".to_string(), format!("w1 {name}")]);
+    assert_eq!(labels(&w), vec!["~"]); assert_eq!(tabs(&w), vec![format!("w1 {name}")]);
     let p = agent(&w, "sw-coordinator-machine");
     assert_eq!(prompts(&p), vec!["what is on this machine?"]);
     assert_eq!(p.s("cwd"), state::home(&m).display().to_string());
@@ -53,7 +53,7 @@ fn a_machine_coordinator_is_named_after_its_machine_and_kept_beside_the_coordina
     assert_eq!((v.state.as_str(), v.said.as_str()), ("idle", "This machine has one repo."));
     // the top-level Coordinator is a conversation of its own, in its own tab beside it
     tell(&w, &Co::top(&w.socket), "and you?");
-    assert_eq!(tabs(&w), vec!["w1 1".to_string(), format!("w1 {name}"), "w1 Coordinator".into()]);
+    assert_eq!(tabs(&w), vec![format!("w1 {name}"), "w1 Coordinator".into()]);
     assert_eq!(prompts(&agent(&w, "sw-coordinator")), vec!["and you?"]);
     assert_eq!(look(&w.socket).said, "Added proj/1."); assert_eq!(look(&m).said, "This machine has one repo.");
     assert_eq!(state::all(&w.socket), vec![Co::top(&w.socket), m.clone()]);
@@ -107,7 +107,7 @@ fn with_no_space_for_its_repo_one_is_made_there_and_an_unknown_repo_has_none() {
     let w2 = coord_world();
     w2.script(json!({ "coordinator": [{ "said": "Hi." }] }));
     tell(&w2, &Co::project(&w2.socket, "proj"), "hello");
-    assert_eq!(labels(&w2), vec!["proj"]); assert_eq!(tabs(&w2), vec!["w1 1", "w1 proj coordinator"]);
+    assert_eq!(labels(&w2), vec!["proj"]); assert_eq!(tabs(&w2), vec!["w1 proj coordinator"]);
     assert!(calls(&w2).iter().any(|c| c.starts_with(&format!("workspace create --cwd {} --label proj", w2.root.display()))), "{:?}", calls(&w2));
     // a repo this machine does not know has none
     let e = send(&w2.root, "hi", false, "", Co::project(&w2.socket, "nope")).unwrap_err();
