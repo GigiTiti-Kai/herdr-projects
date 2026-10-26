@@ -69,7 +69,7 @@ pub fn start_agent(id: &str, g: &mut Guard, prompt: &str, resume: Option<&str>) 
     let pane = t.at("link").t("pane");
     // Its temporary folder, as TMPDIR and the rest: removed with all in it when the task ends (temp.rs).
     let tmp = crate::temp::made(&t);
-    let _ = api.pane_run(&pane, &crate::temp::export_line(&t));
+    let _ = api.pane_run_taken(&pane, &crate::temp::export_line(&t));
     let mut start_with = |with_hook: bool| -> Res<()> {
         // In a read-only mount while its plan waits (plan/sandbox.rs).
         match plan::sandbox::start_program(&api, &t, &name, &kind, &pane, &args(with_hook)?, "writer") {

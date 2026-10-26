@@ -33,6 +33,20 @@ fn a_codex_worker_with_long_rules_starts_while_its_shell_is_still_starting() {
     assert!(kept.contains("Rules for this task") && kept.contains(&mine), "{kept}");
 }
 
+/// PRJ-3: ble.sh took the temporary folder's export and the start typed right after it as one command of two lines
+/// ("-- MULTILINE --") and ran neither. The start waits until the shell has taken the export.
+#[test]
+fn a_codex_worker_starts_once_in_a_shell_whose_line_editor_takes_the_export_late() {
+    let w = world_with(Opts { repo: true, settings: json!({ "worker.agent": "codex", "review.when": "never" }), ..Default::default() });
+    w.patch(|s| s["lineEditorLag"] = json!(3));
+    w.script(json!({ "worker": [work()] }));
+    let id = w.add("Late line editor");
+    delegate(&id);
+    let t = settle(&id);
+    assert_eq!(t.s("stage"), "approval", "{} {}", t.s("msg"), t.at("failure"));
+    assert_eq!(starts(&w, "codex").len(), 1, "{:?}", calls(&w));
+}
+
 #[test]
 fn short_rules_still_go_in_whole() {
     let _w = world();
