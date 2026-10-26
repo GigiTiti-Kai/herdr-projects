@@ -126,6 +126,7 @@ impl Guard {
     }
     pub fn check(&self) -> Res<Task> {
         let t = get(&self.id).ok_or_else(|| aborted("the task is gone"))?;
+        if self.free { return Ok(t); } // bound to nothing, as `set` is: only a task that is gone stops it
         if t.b("archivedAt") { return Err(aborted("archived")); }
         self.still(&t)?;
         if self.new_turn(&t) { return Err(aborted("the agent finished a new turn")); }

@@ -27,6 +27,7 @@ pub struct Plan { pub brief: Box<dyn Fn(&Obj, &Path) -> String> }
 fn sleep(ms: i64) { std::thread::sleep(std::time::Duration::from_millis(ms.max(0) as u64)); }
 #[allow(clippy::too_many_arguments)]
 pub fn review_once(id: &str, g: &mut Guard, text: &str, change: Option<&Value>, to_land: bool, ch: &Obj, check: &str, plan: Option<&Plan>) -> Res<Reviewed> {
+    crate::memory_wait::hold(g)?; // too little memory for the reviewer's program: it waits first, before its time runs
     // One that just took the review over says so on the row until the Watcher has a line of it.
     let mut t = g.set(|t| {
         let took = last_handover(t, "reviewer");

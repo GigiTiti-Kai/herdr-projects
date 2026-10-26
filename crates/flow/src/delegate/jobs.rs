@@ -88,6 +88,8 @@ fn delegate_steps(id: &str, g: &mut Guard, mut t: Task) -> Res<()> {
     // Room on the disk first: on a nearly full one the task waits in the queue, not fails half-way (leftovers/room.rs).
     if let Err(line) = crate::leftovers::room::make_room(&t) { g.set(|t| crate::leftovers::room::wait(t, &line))?; return Ok(()); }
     if t.b("diskWait") { t = g.set(|t| { t.del("diskWait"); })?; }
+    // Room in memory too: with too little the task waits in the queue, not starts (memory_wait.rs).
+    if crate::memory_wait::queue_if_low(g)? { return Ok(()); }
     if live_pane.is_none() {
         let mut copy = false;
         let (res, mut patch): (Value, Obj);
@@ -159,6 +161,7 @@ fn delegate_steps(id: &str, g: &mut Guard, mut t: Task) -> Res<()> {
         }
     }
     // 3. The agent, in the workspace's root pane, then the task. A task whose agent ran before continues.
+    if crate::memory_wait::queue_if_low(g)? { return Ok(()); } // memory may have run low during its setup
     agent_now(g, t)?;
     // Research only or not is decided now, for this run, right before the program is started.
     let mut refusal = None;
@@ -214,6 +217,7 @@ fn restart_steps(id: &str, g: &mut Guard, mut t: Task) -> Res<()> {
     t = agent_now(g, t)?;
     // A start that was asked for and never got as far as its agent (its setup failed): this is that start.
     if t.b("researchOpen") { let mut refusal = None; t = g.set(|t| { if let Err(e) = r::starts_as(t) { refusal = Some(e); } })?; if let Some(e) = refusal { return Err(e); } }
+    crate::memory_wait::hold(g)?; // too little memory for its program: it waits here
     let waiting: Vec<String> = take_text(id)?.iter().map(|m| m.t("text")).collect();
     let (resume, prompt) = if t.b("unsent") { unsent_prompt(&t, &waiting) } else { again_prompt(&t, &waiting) };
     if let Err(e) = start_agent(id, g, &prompt, resume.as_deref()) { if !waiting.is_empty() { untake_text(id, waiting.len())?; } return Err(e); }
@@ -239,12 +243,27 @@ pub fn reopen(id: &str, restart: bool) -> Res<(Value, bool, Task)> {
     };
     let mut has_agent = api.agent_get(pane.s("pane_id"))?.is_some();
     if !has_agent && restart && resumable(&t) && !marker_alive(t.at("runner")) {
-        let (stage, armed) = (t.at("stage").clone(), t.at("armedAt").clone());
-        let mut g = Guard::free(t.s("id"));
-        if start_agent(t.s("id"), &mut g, "", Some(t.s("session"))).is_ok() { has_agent = true; }
-        let _ = update_wait(t.s("id"), 10000, |c| { c.put("stage", stage.clone()); c.put("armedAt", armed.clone()); c.put("turnOpen", false); Ok(Change::Write) }); // nothing was asked of it
+        // Too little memory: its space now, and its agent by a runner that waits for room (memory_wait.rs).
+        if crate::memory_wait::low().is_some() { crate::runner::spawn_runner("reopen", t.s("id"), &[]); }
+        else { has_agent = start_quietly(t.s("id"), &mut Guard::free(t.s("id")), &t); }
     }
     Ok((pane, has_agent, get(t.s("id")).unwrap_or(t)))
+}
+/// Its exited agent started again in the same conversation, nothing sent to it: the task stands as it stood.
+fn start_quietly(id: &str, g: &mut Guard, t: &Task) -> bool {
+    let (stage, armed) = (t.at("stage").clone(), t.at("armedAt").clone());
+    let ok = start_agent(id, g, "", Some(t.s("session"))).is_ok();
+    let _ = update_wait(id, 10000, |c| { c.put("stage", stage.clone()); c.put("armedAt", armed.clone()); c.put("turnOpen", false); Ok(Change::Write) }); // nothing was asked of it
+    ok
+}
+/// A reopen's start that waited for memory: once there is room, its agent as `reopen` would have started it.
+pub fn reopen_job(id: &str) {
+    if !matches!(claim(id, "reopen", |_| {}), Ok(Some(_))) { return; }
+    let mut g = Guard::free(id); // as `reopen` starts it: an archived task's agent too
+    if crate::memory_wait::hold(&mut g).is_ok() {
+        if let Some(t) = get(id).filter(|t| resumable(t) && flow::task::h(t).agent_get(t.at("link").s("pane")).ok().flatten().is_none()) { start_quietly(id, &mut g, &t); }
+    }
+    release(id, false);
 }
 /// Put a reopened task's pane in front in its herdr: its agent, or (herdr cannot focus a bare pane by id) with no
 /// agent in it its workspace and tab. Used by "go into the task" here and from another machine.
