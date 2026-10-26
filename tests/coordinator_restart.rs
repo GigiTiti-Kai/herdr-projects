@@ -79,9 +79,9 @@ fn restart_keeps_the_conversation_new_starts_a_fresh_one_and_one_coordinator_can
     cli(&["coordinator", "restart"]); assert_eq!(agents(&w)[0].at("agent").s("kind"), "claude");
     cli(&["coordinator", "new"]);
     assert_eq!(agents(&w)[0].at("agent").s("kind"), "codex"); assert!(!look(&w.socket).stale);
-    // Stop closes it (its tab is gone, the home space stays); off turns the box back into adding tasks word for word.
+    // Stop closes its tab; off turns the box back into adding tasks word for word.
     cli(&["coordinator", "stop"]); assert_eq!(agents(&w).len(), 0);
-    assert_eq!(w.state().arr("tabs").iter().map(|x| x.t("label")).collect::<Vec<_>>(), vec!["1"]); assert_eq!(look(&w.socket).state, "exited");
+    assert!(w.state().arr("tabs").is_empty()); assert_eq!(look(&w.socket).state, "exited");
     cli(&["set", "coordinator.agent", "none"]);
     assert!(choice().is_none());
 }

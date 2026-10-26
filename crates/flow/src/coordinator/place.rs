@@ -8,6 +8,7 @@ use super::state::{change, get, home, pumping};
 use crate::err::Res;
 use crate::flow::spaces::real;
 use crate::herdr::Herdr;
+use crate::herdr::cli::args;
 use crate::json::*;
 use crate::store::files::user_home;
 
@@ -17,19 +18,26 @@ pub const HOME_SPACE: &str = "~";
 pub fn nowhere(c: &mut Obj) { for k in ["workspace", "tab", "pane", "terminal", "agent", "paneWas"] { c.put(k, Value::Null); } }
 /// The home space's id: the one labelled `~`, else the one the tab was last in, else a new one. Never a task's space.
 pub fn home_space(api: &Herdr, c: Option<&Obj>) -> Res<String> {
-    let list: Vec<Value> = api.workspaces()?.into_iter().filter(|w| !w.at("worktree").is_object()).collect();
-    if let Some(w) = list.iter().find(|w| w.s("label") == HOME_SPACE).or_else(|| c.and_then(|c| list.iter().find(|w| c.b("space") && w.s("workspace_id") == c.s("space")))) { return Ok(w.t("workspace_id")); }
+    if let Some(space) = find_home_space(api, c)? { return Ok(space); }
     Ok(api.workspace_create(&user_home().display().to_string(), "", &[])?.at("workspace").t("workspace_id"))
 }
-/// A project coordinator's space: the one it was last put in, else the repo's own (labelled after it, as herdr labels a
-/// space after its folder), else a new one at the repo's folder. The home folder's is the home space.
-fn space_for(api: &Herdr, co: &Co, c: Option<&Obj>) -> Res<String> {
-    let Some(root) = co.root().filter(|r| real(r) != real(&user_home())) else { return home_space(api, c) };
+fn find_home_space(api: &Herdr, c: Option<&Obj>) -> Res<Option<String>> {
     let list: Vec<Value> = api.workspaces()?.into_iter().filter(|w| !w.at("worktree").is_object()).collect();
-    let base = root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-    let repo = co.repo().unwrap_or_default();
-    if let Some(w) = list.iter().find(|w| c.map(|c| c.b("space") && w.s("workspace_id") == c.s("space")).unwrap_or(false)).or_else(|| list.iter().find(|w| w.s("label") == repo || w.s("label") == base)) { return Ok(w.t("workspace_id")); }
-    Ok(api.workspace_create(&root.display().to_string(), repo, &[])?.at("workspace").t("workspace_id"))
+    Ok(list.iter().find(|w| w.s("label") == HOME_SPACE).or_else(|| c.and_then(|c| list.iter().find(|w| c.b("space") && w.s("workspace_id") == c.s("space")))).map(|w| w.t("workspace_id")))
+}
+/// A project coordinator's space: the one it was last put in, else the repo's own (labelled after it, as herdr labels a
+/// space after its folder), else a new one. A new space's response is kept so its first pane can be used.
+fn space_for(api: &Herdr, co: &Co, c: Option<&Obj>, env: &[(String, String)]) -> Res<(String, Option<Value>)> {
+    let mut label = HOME_SPACE;
+    let space = if let Some(root) = co.root().filter(|r| real(r) != real(&user_home())) {
+        let list: Vec<Value> = api.workspaces()?.into_iter().filter(|w| !w.at("worktree").is_object()).collect();
+        let base = root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        label = co.repo().unwrap_or_default();
+        list.iter().find(|w| c.map(|c| c.b("space") && w.s("workspace_id") == c.s("space")).unwrap_or(false)).or_else(|| list.iter().find(|w| w.s("label") == label || w.s("label") == base)).map(|w| w.t("workspace_id"))
+    } else { find_home_space(api, c)? };
+    if let Some(space) = space { return Ok((space, None)); }
+    let made = api.workspace_create(&home(co).display().to_string(), label, env)?;
+    Ok((made.at("workspace").t("workspace_id"), Some(made)))
 }
 /// Not written down (the state file was lost) but there: the pane in the coordinator's own folder. A project
 /// coordinator's folder is the human's repo: only a pane in a tab named after it.
@@ -49,11 +57,13 @@ pub fn open_tab(api: &Herdr, co: &Co, env: &[(String, String)]) -> Res<Value> {
     let mut pane = adopt(api, co);
     let mut old = None;
     if let Some(p) = pane.as_ref().filter(|_| co.is_top()) { if let Some(w) = api.workspace_get(p.s("workspace_id")) { if w.s("label") == COORDINATOR_TAB && !w.at("worktree").is_object() && w.i("pane_count") == 1 { old = Some(w.t("workspace_id")); } } }
-    let space = match &pane { Some(p) => p.t("workspace_id"), None => space_for(api, co, get(co).as_ref())? };
+    let (space, made) = match &pane { Some(p) => (p.t("workspace_id"), None), None => space_for(api, co, get(co).as_ref(), env)? };
     if pane.is_none() {
-        let r = api.tab_create(&space, &home(co).display().to_string(), &co.name(), env)?;
+        let first = made.is_some();
+        let r = match made { Some(r) => r, None => api.tab_create(&space, &home(co).display().to_string(), &co.name(), env)? };
         pane = if r.at("root_pane").is_object() { Some(r.at("root_pane").clone()) } else { api.panes(Some(&space))?.into_iter().find(|p| p.s("tab_id") == r.at("tab").s("tab_id")) };
         if pane.is_none() { if r.at("tab").b("tab_id") { api.tab_close(r.at("tab").s("tab_id")); } crate::fail!("herdr opened no terminal for the {}", co.name()); }
+        if first { api.call(args(&["tab", "rename", pane.as_ref().unwrap().s("tab_id"), &co.name()]))?; }
     }
     let pane = pane.unwrap();
     change(co, |c| {
