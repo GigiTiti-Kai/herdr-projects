@@ -98,7 +98,8 @@ pub fn pane(st: &mut Value, verb: &str, arg2: &str, argv: &[String], flag: &dyn 
             let pending = p.at("pending");
             if pending.is_object() {
                 let (cwd, line) = (p.t("cwd"), pending.t("line"));
-                if pending.i("reads") > 0 { st["panes"][pi]["pending"]["reads"] = json!(pending.i("reads") - 1); return out(&format!("{}user@host:{cwd}$ {line}", p.s("screen"))); }
+                // the first of those reads finds the line not drawn yet: only the prompt
+                if pending.i("reads") > 0 { st["panes"][pi]["pending"]["reads"] = json!(pending.i("reads") - 1); let drawn = if pending.i("reads") == st.i("lineEditorLag") { "" } else { &line }; return out(&format!("{}user@host:{cwd}$ {drawn}", p.s("screen"))); }
                 st["panes"][pi]["pending"] = Value::Null; st["panes"][pi]["screen"] = json!(format!("{}user@host:{cwd}$ {line}\nuser@host:{cwd}$ \n", p.s("screen")));
                 return out(st["panes"][pi].s("screen"));
             }
