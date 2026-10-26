@@ -38,7 +38,7 @@ fn the_agent_and_the_reviewer_start_with_the_task_s_own_temporary_folder_and_are
     assert_eq!(std::fs::metadata(&tmp).unwrap().permissions().mode() & 0o777, 0o700);
     // herdr hands a worktree's space no environment: the pane's shell is given it right before the program starts
     let all = calls(&w);
-    let export = all.iter().position(|c| c.starts_with("pane run") && c.contains(&format!("export TMPDIR={0} TMP={0} TEMP={0} CLAUDE_CODE_TMPDIR={0}", tmp.display()))).expect("the export");
+    let export = all.iter().position(|c| c.starts_with("pane run") && c.contains(" export HERDR_PROJECTS_EXPORT_AT=") && c.contains(&format!(" TMPDIR={0} TMP={0} TEMP={0} CLAUDE_CODE_TMPDIR={0}", tmp.display()))).expect("the export");
     let start = all.iter().position(|c| c.starts_with("agent start sw-proj-1 ")).unwrap();
     assert!(export < start, "{all:?}");
     // the reviewer's tab has it from the start

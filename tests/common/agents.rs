@@ -35,6 +35,13 @@ pub fn agent(f: &F, verb: &str, arg2: &str, argv: &[String], flag: &dyn Fn(&str)
             // `missing`: the kinds that are not installed: the shell says so, and herdr times out too.
             let typed = sw::agents::hand_limits::typed_command(&kind, &rest.iter().map(text).collect::<Vec<_>>());
             let cwd = st["panes"][pi].t("cwd");
+            // A line the pane's line editor has not taken yet (`lineEditorLag`): ble.sh reads both lines as one command of
+            // two lines and runs neither.
+            if st["panes"][pi].at("pending").i("reads") > 0 {
+                let line = st["panes"][pi].at("pending").t("line");
+                st["panes"][pi]["screen"] = json!(format!("user@host:{cwd}$ {line}\n{typed}\n-- MULTILINE -- (RET or C-m: insert a newline, C-j: run)"));
+                return fail("timeout", "timed out waiting for agent startup");
+            }
             if st.b("slowShell") && typed.len() > 4096 {
                 st["panes"][pi]["screen"] = json!(format!("user@host:{cwd}$ {}\n>", typed.chars().scan(0, |n, c| { *n += c.len_utf8(); (*n <= 4096).then_some(c) }).collect::<String>()));
                 return fail("timeout", "timed out waiting for agent startup");

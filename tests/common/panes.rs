@@ -86,11 +86,23 @@ pub fn pane(st: &mut Value, verb: &str, arg2: &str, argv: &[String], flag: &dyn 
                 st["panes"][pi]["agent"] = json!({ "kind": kind, "name": name, "status": "idle", "seq": seq, "args": w[at + 2..], "pid": 5000000 + seq, "boxed": true });
                 let d = st.at("dialogs").i(&kind);
                 if d > 0 { st["dialogs"][&kind] = json!(d - 1); st["panes"][pi]["agent"]["status"] = json!("blocked"); }
+            } else {
+                // The shell takes the line and draws its prompt again. `lineEditorLag`: a line editor (ble.sh) that takes
+                // it only after that many reads of the pane.
+                st["panes"][pi]["pending"] = json!({ "line": argv[3..].join(" "), "reads": st.i("lineEditorLag") });
             }
             ok(json!({ "type": "ok" }))
         }
         "read" => {
             let a = p.at("agent");
+            let pending = p.at("pending");
+            if pending.is_object() {
+                let (cwd, line) = (p.t("cwd"), pending.t("line"));
+                // the first of those reads finds the line not drawn yet: only the prompt
+                if pending.i("reads") > 0 { st["panes"][pi]["pending"]["reads"] = json!(pending.i("reads") - 1); let drawn = if pending.i("reads") == st.i("lineEditorLag") { "" } else { &line }; return out(&format!("{}user@host:{cwd}$ {drawn}", p.s("screen"))); }
+                st["panes"][pi]["pending"] = Value::Null; st["panes"][pi]["screen"] = json!(format!("{}user@host:{cwd}$ {line}\nuser@host:{cwd}$ \n", p.s("screen")));
+                return out(st["panes"][pi].s("screen"));
+            }
             if a.i("boot") > 0 { st["panes"][pi]["agent"]["boot"] = json!(a.i("boot") - 1); let mut cmd = vec![a.t("kind")]; cmd.extend(a.arr("args").iter().map(text)); return out(&format!("user@host:{}$ {}\n", p.s("cwd"), cmd.join(" "))); }
             out(if a.b("screen") { a.s("screen") } else { p.s("screen") })
         }

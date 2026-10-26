@@ -45,10 +45,11 @@ pub fn env(t: &Obj) -> Vec<(String, String)> {
 /// The board's own folders and the task's temporary folder (made now), for a tab or a space opened for the task.
 pub fn task_env(t: &Obj) -> Vec<(String, String)> { made(t); [crate::store::files::board_env(), env(t)].concat() }
 /// The line that gives a pane's shell the task's temporary folder, before its program starts there: herdr hands a
-/// worktree's space no environment. A space first keeps it out of the shell's history where that is set.
-pub fn export_line(t: &Obj) -> String {
+/// worktree's space no environment. A space first keeps it out of the shell's history where that is set. `mark` (a
+/// `NAME=value` of its own) goes first, where the line has not wrapped yet: the board waits to see it taken.
+pub fn export_line(t: &Obj, mark: &str) -> String {
     let q = |s: &str| if s.chars().all(|c| c.is_ascii_alphanumeric() || "_@%+=:,./-".contains(c)) { s.to_string() } else { crate::util::shq(s) };
-    format!(" export {}", env(t).iter().map(|(k, v)| format!("{k}={}", q(v))).collect::<Vec<_>>().join(" "))
+    format!(" export {mark} {}", env(t).iter().map(|(k, v)| format!("{k}={}", q(v))).collect::<Vec<_>>().join(" "))
 }
 /// What the task's agent and reviewers are told.
 pub fn rule(t: &Obj) -> String {
