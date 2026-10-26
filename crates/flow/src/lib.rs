@@ -26,6 +26,7 @@ pub mod keeper;
 pub mod land;
 pub mod leftovers;
 pub mod limits;
+pub mod memory_wait;
 pub mod notify;
 pub mod plan;
 pub mod remote;

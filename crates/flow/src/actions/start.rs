@@ -142,6 +142,7 @@ pub fn start_queued(socket: &str) -> Vec<String> {
         for w in waiting {
             if busy >= max { break; }
             if crate::leftovers::room::still_waiting(w) { continue; } // no room on the disk yet: no runner for it
+            if crate::memory_wait::still_waiting(w) { continue; } // nor in memory
             let t = update(w.s("id"), |t| { if t.s("stage") != "queued" { return Ok(Change::Keep); } crate::hook::ask_start(t); t.put("msg", ""); Ok(Change::Write) })?;
             if t.s("stage") != "starting" { continue; }
             busy += 1;

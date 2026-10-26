@@ -88,6 +88,9 @@ fn delegate_steps(id: &str, g: &mut Guard, mut t: Task) -> Res<()> {
     // Room on the disk first: on a nearly full one the task waits in the queue, not fails half-way (leftovers/room.rs).
     if let Err(line) = crate::leftovers::room::make_room(&t) { g.set(|t| crate::leftovers::room::wait(t, &line))?; return Ok(()); }
     if t.b("diskWait") { t = g.set(|t| { t.del("diskWait"); })?; }
+    // Room in memory too: with too little the task waits in the queue, not starts (memory_wait.rs).
+    if let Some(l) = crate::memory_wait::low() { g.set(|t| crate::memory_wait::wait(t, &l))?; return Ok(()); }
+    if t.b("memWait") { t = g.set(|t| { t.del("memWait"); })?; }
     if live_pane.is_none() {
         let mut copy = false;
         let (res, mut patch): (Value, Obj);
@@ -214,6 +217,7 @@ fn restart_steps(id: &str, g: &mut Guard, mut t: Task) -> Res<()> {
     t = agent_now(g, t)?;
     // A start that was asked for and never got as far as its agent (its setup failed): this is that start.
     if t.b("researchOpen") { let mut refusal = None; t = g.set(|t| { if let Err(e) = r::starts_as(t) { refusal = Some(e); } })?; if let Some(e) = refusal { return Err(e); } }
+    crate::memory_wait::hold(g)?; // too little memory for its program: it waits here
     let waiting: Vec<String> = take_text(id)?.iter().map(|m| m.t("text")).collect();
     let (resume, prompt) = if t.b("unsent") { unsent_prompt(&t, &waiting) } else { again_prompt(&t, &waiting) };
     if let Err(e) = start_agent(id, g, &prompt, resume.as_deref()) { if !waiting.is_empty() { untake_text(id, waiting.len())?; } return Err(e); }
@@ -238,7 +242,7 @@ pub fn reopen(id: &str, restart: bool) -> Res<(Value, bool, Task)> {
         }
     };
     let mut has_agent = api.agent_get(pane.s("pane_id"))?.is_some();
-    if !has_agent && restart && resumable(&t) && !marker_alive(t.at("runner")) {
+    if !has_agent && restart && resumable(&t) && !marker_alive(t.at("runner")) && crate::memory_wait::low().is_none() { // too little memory: only its space
         let (stage, armed) = (t.at("stage").clone(), t.at("armedAt").clone());
         let mut g = Guard::free(t.s("id"));
         if start_agent(t.s("id"), &mut g, "", Some(t.s("session"))).is_ok() { has_agent = true; }

@@ -5,6 +5,7 @@
 //! (a `/tmp` of 3.4 GB) keeps free `board.diskFree`, never more than half of itself; a task that waits for room says
 //! "waiting for disk space" everywhere, never "waiting for a free slot", and doctor names it beside its disk.
 use crate::common;
+mod memory; // the same wait for room, in memory (board.memoryFree)
 use common::*;
 use serde_json::json;
 use std::path::{Path, PathBuf};

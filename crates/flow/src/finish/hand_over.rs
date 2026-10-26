@@ -101,6 +101,7 @@ pub fn hand_over_to(id: &str, g: &mut Guard, why: &str, findings: &str, first: O
             t.obj_mut("fallbacks").del("worker");
         })?;
         let shown_from = if agent_of(&from).kind == k { from.clone() } else { agent_of(&from).kind };
+        crate::memory_wait::hold(g)?; // too little memory for its program: it waits here
         if let Err(e) = start_agent(id, g, &handover_prompt(&t, &shown_from, why, findings), None) {
             if is_aborted(&e) { return Err(e); }
             // It could not be started: the task is the one before it's again, and the next on the list is asked.
