@@ -258,9 +258,8 @@ fn start_quietly(id: &str, g: &mut Guard, t: &Task) -> bool {
 }
 /// A reopen's start that waited for memory: once there is room, its agent as `reopen` would have started it.
 pub fn reopen_job(id: &str) {
-    let Ok(Some(t)) = claim(id, "reopen", |_| {}) else { return };
-    let mut g = Guard::new(id);
-    g.expect(&t, &[]);
+    if !matches!(claim(id, "reopen", |_| {}), Ok(Some(_))) { return; }
+    let mut g = Guard::free(id); // as `reopen` starts it: an archived task's agent too
     if crate::memory_wait::hold(&mut g).is_ok() {
         if let Some(t) = get(id).filter(|t| resumable(t) && flow::task::h(t).agent_get(t.at("link").s("pane")).ok().flatten().is_none()) { start_quietly(id, &mut g, &t); }
     }

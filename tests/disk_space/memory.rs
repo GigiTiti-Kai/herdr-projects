@@ -178,3 +178,31 @@ fn a_reopen_with_too_little_memory_opens_its_space_and_starts_its_agent_by_itsel
     let t = task(&id);
     assert!(t.s("stage") == "stopped" && !t.b("memHold") && t.at("runner").is_null(), "{t:?}");
 }
+
+#[test]
+fn an_archived_task_reopened_with_too_little_memory_starts_its_agent_too_once_there_is_room() {
+    let w = world_with(Opts { repo: true, settings: json!({ "worker.agent": "copilot" }), ..Default::default() });
+    w.script(json!({ "worker": [{ "status": "working" }] }));
+    let id = w.add("Reopened");
+    delegate(&id);
+    let pane = settle(&id).at("link").t("pane");
+    w.patch(|s| { for p in s["panes"].as_array_mut().unwrap() { if p.s("pane_id") == pane { p["agent"] = serde_json::Value::Null; } } });
+    sw::store::tasks::update_wait(&id, 1000, |t| { t.put("stage", "stopped"); t.put("archivedAt", sw::clock::now()); t.put("sent", json!({ "text": "Go." })); Ok(sw::store::tasks::Change::Write) }).unwrap();
+    assert!(sw::delegate::launch::resumable(&task(&id)), "{:?}", task(&id));
+    memory_is(1.1);
+    let (_, has, _) = sw::delegate::jobs::reopen(&id, true).unwrap();
+    assert!(!has && starts(&w).len() == 1, "not started now");
+    let asked: Vec<(String, String, Vec<String>)> = sw::runner::JOBS.with(|j| j.borrow().clone());
+    assert!(asked.iter().any(|j| j.0 == "reopen" && j.1 == id), "a runner waits for room: {asked:?}");
+    // The runner waits, its row saying so; room again, and its agent is started in the same conversation.
+    sw::clock::set(Some(sw::clock::now()));
+    let seen: Rc<RefCell<Vec<(String, String)>>> = Rc::default();
+    { let (seen, id) = (seen.clone(), id.clone()); sw::clock::meanwhile(move || { let r = row(&id); seen.borrow_mut().push((r.t("state"), r.t("note"))); memory_is(6.0); }); }
+    sw::runner::JOBS.with(|j| j.borrow_mut().retain(|j| j.0 != "reopen"));
+    sw::delegate::jobs::reopen_job(&id);
+    let seen = seen.borrow();
+    assert!(!seen.is_empty() && seen.iter().all(|(s, n)| s == "working" && n.contains("1.1 GB free < 3.0 GB")), "{seen:?}");
+    assert_eq!(starts(&w).len(), 2, "started again once there was room");
+    let t = task(&id);
+    assert!(t.s("stage") == "stopped" && !t.b("memHold") && t.at("runner").is_null(), "{t:?}");
+}
