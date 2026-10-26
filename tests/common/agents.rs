@@ -37,7 +37,7 @@ pub fn agent(f: &F, verb: &str, arg2: &str, argv: &[String], flag: &dyn Fn(&str)
             let cwd = st["panes"][pi].t("cwd");
             // A line the pane's line editor has not taken yet (`lineEditorLag`): ble.sh reads both lines as one command of
             // two lines and runs neither.
-            if st["panes"][pi].at("pending").is_object() {
+            if st["panes"][pi].at("pending").i("reads") > 0 {
                 let line = st["panes"][pi].at("pending").t("line");
                 st["panes"][pi]["screen"] = json!(format!("user@host:{cwd}$ {line}\n{typed}\n-- MULTILINE -- (RET or C-m: insert a newline, C-j: run)"));
                 return fail("timeout", "timed out waiting for agent startup");

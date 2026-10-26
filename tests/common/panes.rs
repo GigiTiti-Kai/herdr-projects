@@ -86,8 +86,9 @@ pub fn pane(st: &mut Value, verb: &str, arg2: &str, argv: &[String], flag: &dyn 
                 st["panes"][pi]["agent"] = json!({ "kind": kind, "name": name, "status": "idle", "seq": seq, "args": w[at + 2..], "pid": 5000000 + seq, "boxed": true });
                 let d = st.at("dialogs").i(&kind);
                 if d > 0 { st["dialogs"][&kind] = json!(d - 1); st["panes"][pi]["agent"]["status"] = json!("blocked"); }
-            } else if st.i("lineEditorLag") > 0 {
-                // `lineEditorLag`: a line editor (ble.sh) that takes the typed line only after that many reads of the pane.
+            } else {
+                // The shell takes the line and draws its prompt again. `lineEditorLag`: a line editor (ble.sh) that takes
+                // it only after that many reads of the pane.
                 st["panes"][pi]["pending"] = json!({ "line": argv[3..].join(" "), "reads": st.i("lineEditorLag") });
             }
             ok(json!({ "type": "ok" }))
