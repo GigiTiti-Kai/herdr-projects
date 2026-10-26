@@ -13,6 +13,8 @@ use crate::json::*;
 pub const RETRIES: u32 = 3;
 /// How many looks at the pane, a step apart, before a try goes ahead without having seen the prompt.
 const LOOKS: u32 = 8;
+/// How many looks at the pane, a step apart, before the next line is typed without having seen the last one taken.
+const TAKEN_LOOKS: u32 = 20;
 
 /// Did herdr refuse the line because the pane's shell is not at its prompt yet?
 pub fn not_at_prompt(e: &HerdrError) -> bool { e.message.contains("canonical mode") || no_shell_yet(e) }
@@ -43,6 +45,22 @@ impl Herdr {
                 r => return r,
             }
         }
+    }
+    /// Run `command` at the pane's shell, then wait until its shell has taken it: the pane shows `mark` (a word near
+    /// the start of `command` that no earlier line holds), and its last line no longer holds what was typed. A line
+    /// editor that reads the next typed line together with it takes both as one command of two lines and runs neither
+    /// (ble.sh: "-- MULTILINE --", PRJ-3). At most `TAKEN_LOOKS` looks.
+    pub fn pane_run_taken(&self, pane: &str, command: &str, mark: &str) -> HRes<Value> {
+        let r = self.pane_run(pane, command);
+        let typed = command.trim();
+        for _ in 0..TAKEN_LOOKS {
+            let screen = self.pane_read(pane, "recent", Some(10)).unwrap_or_default();
+            let line = screen.lines().map(str::trim).rfind(|l| !l.is_empty()).unwrap_or("");
+            // a long line wraps: its last row is a piece of it
+            if screen.contains(mark) && !line.contains(typed) && !typed.contains(line) { break; }
+            if step_ms() > 0 { crate::clock::sleep_ms(step_ms()); }
+        }
+        r
     }
     /// Wait until the pane shows the same last line twice in a row: its shell has drawn its prompt. A little longer
     /// before each later try; at most `LOOKS` steps.

@@ -20,7 +20,7 @@ fn the_popup_says_how_to_get_back_before_it_closes_for_an_agent_and_takes_no_key
     let id = w.add("Add a greeting"); delegate(&id); settle(&id);
     let mut v = open_with(&w.root, 34, true);
     v.s.ctx.leave_ms = 30; v.s.ctx.board_key = "prefix+w".into();
-    let now = sw::clock::now(); tick(&mut v, now);
+    let now = sw::clock::now(); sw::clock::set(Some(now)); tick(&mut v, now); // a key sets the board's time: the close stays 30 ms after it on a busy machine
     v.s.sel = id.clone(); v.load(); v.press(&["alt+o"]);
     assert!(!v.closed, "not at once: the line shows first");
     assert!(v.text().contains("Opening the agent. prefix+w brings the board back."), "{}", v.text());

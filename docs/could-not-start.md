@@ -52,6 +52,12 @@ Two limits once made long text fail to start an agent, with no reason given. Bot
   (`agent_pane_busy`). The Coordinator's start after an update failed that way. The board now waits and tries again the
   same way. A pane where a program really runs still fails, after those tries, with "its terminal was not at its shell
   prompt"; one where an agent already runs fails at once.
+- **The temporary folder's line is taken before the start is typed.** ble.sh reads a line that arrives while it still
+  holds the one before as part of one command of two lines, and runs neither ("-- MULTILINE -- (RET or C-m: insert a
+  newline, C-j: run)"): the agent's `export TMPDIR=…` and its start, typed right after, failed that way. The board now
+  waits until the pane's last line no longer holds the export (at most 20 looks) before it starts the agent. Each
+  export starts with a mark of its own (`HERDR_PROJECTS_EXPORT_AT=<time>`): a restarted agent's pane still shows the
+  export of the start before, which says nothing of this one.
 - **Very long messages go in a file.** A message is one argument of `herdr agent prompt`, and Linux passes at most 128 KiB
   in one argument. A message longer than 100,000 bytes (a task's first prompt, a reply, a message to the Coordinator) is
   written to a file in the board's folder (`messages/`), and a line naming that file is typed in instead. Anything shorter
