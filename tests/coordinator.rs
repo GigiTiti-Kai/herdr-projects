@@ -48,7 +48,7 @@ fn the_box_talks_to_one_long_lived_coordinator_started_once_with_nothing_held_ba
     drain();
     let st = w.state();
     assert_eq!(st.arr("workspaces").iter().map(|x| x.t("label")).collect::<Vec<_>>(), vec!["~"]);
-    assert_eq!(st.arr("tabs").iter().map(|x| x.t("label")).collect::<Vec<_>>(), vec!["1", "Coordinator"]);
+    assert_eq!(st.arr("tabs").iter().map(|x| x.t("label")).collect::<Vec<_>>(), vec!["Coordinator"]);
     let a = agents(&w);
     assert_eq!(a.len(), 1);
     let ag = a[0].at("agent");
