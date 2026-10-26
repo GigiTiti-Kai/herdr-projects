@@ -47,6 +47,22 @@ fn a_codex_worker_starts_once_in_a_shell_whose_line_editor_takes_the_export_late
     assert_eq!(starts(&w, "codex").len(), 1, "{:?}", calls(&w));
 }
 
+/// The same pane started again: the export of the last start is still on its screen, and is no sign that this one
+/// was taken.
+#[test]
+fn an_earlier_export_on_the_screen_is_no_sign_that_this_one_was_taken() {
+    let w = world();
+    let line = |at: i64| format!(" export HERDR_PROJECTS_EXPORT_AT={at} TMPDIR=/tmp/example TMP=/tmp/example");
+    let old = line(1);
+    w.patch(|s| {
+        s["lineEditorLag"] = json!(3);
+        s["panes"] = json!([{ "pane_id": "w1:p1", "cwd": "/example", "screen": format!("user@host:/example$ {old}\nuser@host:/example$ \n") }]);
+    });
+    let api = sw::herdr::Herdr::new(Some(w.socket.clone()));
+    api.pane_run_taken("w1:p1", &line(2), "HERDR_PROJECTS_EXPORT_AT=2").unwrap();
+    assert!(w.state()["panes"][0].at("pending").is_null(), "returned before this export was taken: {}", w.state()["panes"][0]);
+}
+
 #[test]
 fn short_rules_still_go_in_whole() {
     let _w = world();

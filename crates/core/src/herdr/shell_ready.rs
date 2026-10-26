@@ -46,18 +46,18 @@ impl Herdr {
             }
         }
     }
-    /// Run `command` at the pane's shell, then wait until its shell has taken it: the pane shows what was typed, and
-    /// its last line no longer holds it. A line editor that reads the next typed line together with it takes both as
-    /// one command of two lines and runs neither (ble.sh: "-- MULTILINE --", PRJ-3). At most `TAKEN_LOOKS` looks.
-    pub fn pane_run_taken(&self, pane: &str, command: &str) -> HRes<Value> {
+    /// Run `command` at the pane's shell, then wait until its shell has taken it: the pane shows `mark` (a word near
+    /// the start of `command` that no earlier line holds), and its last line no longer holds what was typed. A line
+    /// editor that reads the next typed line together with it takes both as one command of two lines and runs neither
+    /// (ble.sh: "-- MULTILINE --", PRJ-3). At most `TAKEN_LOOKS` looks.
+    pub fn pane_run_taken(&self, pane: &str, command: &str, mark: &str) -> HRes<Value> {
         let r = self.pane_run(pane, command);
         let typed = command.trim();
-        let head: String = typed.chars().take(20).collect();
         for _ in 0..TAKEN_LOOKS {
             let screen = self.pane_read(pane, "recent", Some(10)).unwrap_or_default();
             let line = screen.lines().map(str::trim).rfind(|l| !l.is_empty()).unwrap_or("");
             // a long line wraps: its last row is a piece of it
-            if screen.contains(&head) && !line.contains(typed) && !typed.contains(line) { break; }
+            if screen.contains(mark) && !line.contains(typed) && !typed.contains(line) { break; }
             if step_ms() > 0 { crate::clock::sleep_ms(step_ms()); }
         }
         r
