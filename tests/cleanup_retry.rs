@@ -187,6 +187,7 @@ fn merged_with(w: &World, flag: &str) -> Obj {
 #[cfg(target_os = "linux")]
 #[test]
 fn real_programs_a_helper_is_wired_to_the_agent_and_a_command_left_running_is_not() {
+    let _env = crate::common::env_kept(); // no world moves HOME or PATH under the programs it starts
     use std::process::{Command, Stdio};
     let me = std::process::id() as i64;
     let sleep = |i: Stdio, o: Stdio| Command::new("sleep").arg("30").stdin(i).stdout(o).stderr(Stdio::null()).spawn().unwrap();

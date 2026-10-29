@@ -5,6 +5,7 @@
 pub mod agents;
 pub mod board;
 pub mod endings;
+pub mod env_turn;
 pub mod fixtures;
 pub mod gh;
 pub mod herdr;
@@ -16,15 +17,14 @@ pub mod worktrees;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use std::sync::{Mutex, MutexGuard};
 use sw::json::*;
 
 /// A world sets this process's environment, which every test file shares (they are one test program): one test at a
-/// time in all of them. A test that sets the environment without a world takes the same turn (`one_at_a_time`).
-static ONE: Mutex<()> = Mutex::new(());
-pub fn one_at_a_time() -> MutexGuard<'static, ()> { ONE.lock().unwrap_or_else(|e| e.into_inner()) }
+/// time in all of them, and the environment as it was again after it (env_turn.rs). A test that sets the environment
+/// without a world takes the same turn (`one_at_a_time`); one that reads it, or starts a real program, `env_kept`.
+pub use env_turn::{env_kept, one_at_a_time, Turn};
 static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-pub struct World { pub base: PathBuf, pub root: PathBuf, pub fake: Rc<herdr::FakeHerdr>, pub gh: Rc<gh::FakeGh>, pub opener: Rc<opener::FakeOpener>, pub socket: String, _listen: std::os::unix::net::UnixListener, _one: MutexGuard<'static, ()> }
+pub struct World { pub base: PathBuf, pub root: PathBuf, pub fake: Rc<herdr::FakeHerdr>, pub gh: Rc<gh::FakeGh>, pub opener: Rc<opener::FakeOpener>, pub socket: String, _listen: std::os::unix::net::UnixListener, _one: Turn }
 #[derive(Default)]
 pub struct Opts { pub repo: bool, pub settings: Value, pub repo_settings: Option<Value>, pub origin: bool }
 pub fn git(cwd: &Path, a: &[&str]) -> String { worktrees::git(cwd, a).unwrap_or_else(|e| panic!("git {a:?}: {e}")) }
@@ -39,7 +39,6 @@ pub fn world_with(o: Opts) -> World {
     std::fs::create_dir_all(base.join("home")).unwrap();
     let base = std::fs::canonicalize(&base).unwrap();
     let b = |p: &str| base.join(p).display().to_string();
-    for k in ["HERDR_PANE_ID", "HERDR_TAB_ID", "HERDR_WORKSPACE_ID", "HERDR_PLUGIN_ID", "HERDR_PLUGIN_CONTEXT_JSON", "HERDR_ENV", "HERDR_SESSION", "TMUX", "NO_COLOR", "XDG_DATA_HOME", "HERDR_PROJECTS_DATA_DIR", "HERDR_PROJECTS_CONFIG_DIR", "HERDR_PROJECTS_REPORTS_DIR", "HERDR_PROJECTS_WEBUI", "HERDR_PROJECTS_PROGRESS", "HERDR_PROJECTS_SANDBOX", "HERDR_PROJECTS_BOXED", "HERDR_PROJECTS_RETRY_MS", "HERDR_PROJECTS_ENDED_MS", "HERDR_PROJECTS_QUIET_MS", "HERDR_PROJECTS_READY_MS", "HERDR_PROJECTS_SUBMIT_MS", "HERDR_PROJECTS_TICK_MS", "ELEVENLABS_API_KEY", "CLAUDE_CODE_TMPDIR", "HERDR_PROJECTS_SIZE"] { unsafe { std::env::remove_var(k) } }
     let socket = b("herdr.sock");
     // herdr's socket is there (the fake answers for herdr itself): what looks for a running herdr finds one.
     let listen = std::os::unix::net::UnixListener::bind(&socket).unwrap();

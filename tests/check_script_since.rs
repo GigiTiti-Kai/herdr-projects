@@ -40,6 +40,7 @@ impl Drop for Repo { fn drop(&mut self) { let _ = std::fs::remove_dir_all(&self.
 
 #[test]
 fn real_programs_the_shorter_check_picks_the_test_files_a_change_reaches_and_all_where_it_cannot_tell() {
+    let _env = crate::common::env_kept(); // no world moves HOME or PATH under the programs it starts
     let r = Repo::new();
     assert_eq!(r.pick(&r.first).0, "", "nothing changed: no test file");
     // by the file's name and its folder's; by its module's path; a test file itself, new or changed; a shared module by its users
