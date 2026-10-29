@@ -18,6 +18,12 @@ crates, one on top of the other, so that a change builds again only its own crat
 with the made pages in `src/` (`sw`, which the tests use) ([docs/crates.md](docs/crates.md)). There is no Node and
 nothing to `npm install`; `package.json` is only there so that every agent finds the one command that runs the tests.
 
+## Taking in upstream
+
+This repo is a fork of `eliasstravik/herdr-projects` (the `upstream` remote). Take in only its 1.2.x releases, from
+its `legacy-herdr-projects` branch. Never merge `upstream/main` or anything from v2.0.0 on (本家v2.0.0以降は取り込まない。
+1.2.xのみ).
+
 ## Where new things go
 
 - **One area, one small file.** Put a change in the file of its area. A new area is a new file, not more lines at
