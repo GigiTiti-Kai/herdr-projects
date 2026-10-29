@@ -9,7 +9,8 @@ use std::sync::{OnceLock, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 static ONE: RwLock<()> = RwLock::new(());
 static KEPT: OnceLock<HashMap<OsString, OsString>> = OnceLock::new();
-thread_local! { static SHARING: Cell<bool> = const { Cell::new(false) }; }
+// The turn this thread holds: a second one would wait for itself ("": none).
+thread_local! { static HELD: Cell<&'static str> = const { Cell::new("") }; }
 
 /// What the environment is between turns, made once (under the turn alone): the one the tests started in, less what
 /// would reach the herdr, the board or the agents they run in.
@@ -26,23 +27,27 @@ fn kept() -> &'static HashMap<OsString, OsString> {
 pub struct Turn(RwLockWriteGuard<'static, ()>);
 impl Drop for Turn {
     fn drop(&mut self) {
+        HELD.set("");
         let kept = kept();
         for (k, _) in std::env::vars_os() { if !kept.contains_key(&k) { unsafe { std::env::remove_var(&k) } } }
         for (k, v) in kept { if std::env::var_os(k).as_ref() != Some(v) { unsafe { std::env::set_var(k, v) } } }
     }
 }
 pub fn one_at_a_time() -> Turn {
-    assert!(!SHARING.get(), "a test with a shared turn (env_kept) takes no world: it would wait for itself");
+    assert_eq!(HELD.get(), "", "this test already holds a turn at the environment: a world or one_at_a_time takes none of its own");
     let g = ONE.write().unwrap_or_else(|e| e.into_inner());
     kept();
+    HELD.set("alone");
     Turn(g)
 }
 /// A shared turn: the environment stays as it is between turns while it lasts.
 pub struct Shared(RwLockReadGuard<'static, ()>);
-impl Drop for Shared { fn drop(&mut self) { SHARING.set(false); } }
+impl Drop for Shared { fn drop(&mut self) { HELD.set(""); } }
+/// For a test with no world (one with a world has the environment to itself already).
 pub fn env_kept() -> Shared {
+    assert_eq!(HELD.get(), "", "this test already holds a turn at the environment: env_kept is for a test with no world");
     if KEPT.get().is_none() { drop(one_at_a_time()); }
     let g = ONE.read().unwrap_or_else(|e| e.into_inner());
-    SHARING.set(true);
+    HELD.set("shared");
     Shared(g)
 }
