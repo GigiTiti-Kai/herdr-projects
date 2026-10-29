@@ -20,6 +20,9 @@ impl Bench {
         b.write("repo", "src/b.rs", "b");
         b.write("repo", ".gitignore", "/target/\n");
         b.commit("repo", "first");
+        // A stand-in rustc too: the real one is rustup's, found from $HOME, which the light tests in this process move.
+        b.write("bin", "rustc", "#!/bin/sh\necho 'rustc stand-in'\n");
+        assert!(Command::new("chmod").arg("+x").arg(b.dir("bin").join("rustc")).status().unwrap().success());
         b
     }
     fn dir(&self, wt: &str) -> PathBuf { self.base.join(wt) }
@@ -56,7 +59,7 @@ impl Bench {
         let built = if build { format!("mkdir -p target/quick && echo 'built in {wt}' > target/quick/herdr-projects") } else { ":".into() };
         let o = Command::new("/bin/sh").arg("-c").arg(format!("set -e; . '{}'; ws_seed; {built}; ws_keep", script.display()))
             .current_dir(self.dir(wt)).env("XDG_CACHE_HOME", self.base.join("cache")).env_remove("HERDR_PROJECTS_NO_WARM")
-            .env_remove("CARGO_TARGET_DIR").env("GIT_CONFIG_GLOBAL", "/dev/null").env("GIT_CONFIG_NOSYSTEM", "1").output().unwrap();
+            .env_remove("CARGO_TARGET_DIR").env("PATH", format!("{}:{}", self.dir("bin").display(), std::env::var("PATH").unwrap_or_default())).env("GIT_CONFIG_GLOBAL", "/dev/null").env("GIT_CONFIG_NOSYSTEM", "1").output().unwrap();
         assert!(o.status.success(), "the setup's steps failed: {}", String::from_utf8_lossy(&o.stderr));
         String::from_utf8_lossy(&o.stdout).into_owned()
     }
