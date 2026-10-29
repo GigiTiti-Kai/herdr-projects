@@ -47,7 +47,8 @@ jobs:
         run: npm run check -- --all
 
   macos:
-    runs-on: macos-14
+    # macos-14 is retired on 2026-11-02 and its runners were already too few to take the job
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
 
