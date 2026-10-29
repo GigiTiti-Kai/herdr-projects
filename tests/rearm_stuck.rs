@@ -23,6 +23,9 @@ fn a_task_already_stuck_re_armed_is_handed_to_the_human_never_finished_by_itself
     // the state an earlier version left behind, without the fields this one writes
     patch(&id, |t| { let h = t.obj_mut("handled"); h.del("seq"); h.del("term"); let at = h.i("at"); t.del("terms"); t.del("last"); t.del("turnBy"); t.put("stage", "working"); t.put("turnOpen", true); t.put("armedAt", at + 11); t.put("since", at + 11); t.put("msg", ""); t.obj_mut("review").put("stale", true); t.put("requireApproval", true); }).unwrap();
     let t = task(&id);
+    // From here the clock is the test's: a wall clock set back under load (WSL's is, by up to two seconds) would put the
+    // re-arming in the future, and the late "done" below would not be seen as the end of a turn that never came.
+    sw::clock::set(Some(t.i("armedAt")));
     let pane = t.at("link").t("pane");
     let tree = Path::new(t.s("worktree")).to_path_buf();
     assert_eq!(row(&id).s("state"), "working");
