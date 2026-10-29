@@ -39,12 +39,12 @@ pub fn world_with(o: Opts) -> World {
     std::fs::create_dir_all(base.join("home")).unwrap();
     let base = std::fs::canonicalize(&base).unwrap();
     let b = |p: &str| base.join(p).display().to_string();
-    for k in ["HERDR_PANE_ID", "HERDR_TAB_ID", "HERDR_WORKSPACE_ID", "HERDR_PLUGIN_ID", "HERDR_PLUGIN_CONTEXT_JSON", "HERDR_ENV", "HERDR_SESSION", "TMUX", "NO_COLOR", "HERDR_PROJECTS_DATA_DIR", "HERDR_PROJECTS_CONFIG_DIR", "HERDR_PROJECTS_REPORTS_DIR", "HERDR_PROJECTS_WEBUI", "HERDR_PROJECTS_PROGRESS", "HERDR_PROJECTS_SANDBOX", "HERDR_PROJECTS_BOXED", "HERDR_PROJECTS_RETRY_MS", "HERDR_PROJECTS_ENDED_MS", "HERDR_PROJECTS_QUIET_MS", "HERDR_PROJECTS_READY_MS", "HERDR_PROJECTS_SUBMIT_MS", "HERDR_PROJECTS_TICK_MS", "ELEVENLABS_API_KEY", "CLAUDE_CODE_TMPDIR", "HERDR_PROJECTS_SIZE"] { unsafe { std::env::remove_var(k) } }
+    for k in ["HERDR_PANE_ID", "HERDR_TAB_ID", "HERDR_WORKSPACE_ID", "HERDR_PLUGIN_ID", "HERDR_PLUGIN_CONTEXT_JSON", "HERDR_ENV", "HERDR_SESSION", "TMUX", "NO_COLOR", "XDG_DATA_HOME", "HERDR_PROJECTS_DATA_DIR", "HERDR_PROJECTS_CONFIG_DIR", "HERDR_PROJECTS_REPORTS_DIR", "HERDR_PROJECTS_WEBUI", "HERDR_PROJECTS_PROGRESS", "HERDR_PROJECTS_SANDBOX", "HERDR_PROJECTS_BOXED", "HERDR_PROJECTS_RETRY_MS", "HERDR_PROJECTS_ENDED_MS", "HERDR_PROJECTS_QUIET_MS", "HERDR_PROJECTS_READY_MS", "HERDR_PROJECTS_SUBMIT_MS", "HERDR_PROJECTS_TICK_MS", "ELEVENLABS_API_KEY", "CLAUDE_CODE_TMPDIR", "HERDR_PROJECTS_SIZE"] { unsafe { std::env::remove_var(k) } }
     let socket = b("herdr.sock");
     // herdr's socket is there (the fake answers for herdr itself): what looks for a running herdr finds one.
     let listen = std::os::unix::net::UnixListener::bind(&socket).unwrap();
     std::fs::create_dir_all(base.join("tmp")).unwrap();
-    for (k, v) in [("HOME", b("home")), ("HERDR_PROJECTS_TMP", b("tmp")), ("HERDR_PROJECTS_HOME", b("sw")), ("HERDR_SOCKET_PATH", socket.clone()), ("XDG_CONFIG_HOME", b("home/.config")), ("XDG_STATE_HOME", b("home/.state")),
+    for (k, v) in [("HOME", b("home")), ("HERDR_PROJECTS_TMP", b("tmp")), ("HERDR_PROJECTS_HOME", b("sw")), ("HERDR_SOCKET_PATH", socket.clone()), ("XDG_CONFIG_HOME", b("home/.config")), ("XDG_STATE_HOME", b("home/.state")), ("XDG_DATA_HOME", b("home/.local/share")),
         ("CLAUDE_CONFIG_DIR", b("claude")), ("CODEX_HOME", b("codex")), ("PI_CODING_AGENT_DIR", b("pi")), ("HERDR_PROJECTS_CLAUDE_JSON", b("claude.json")), ("HERDR_PROJECTS_CODEX_TOML", b("codex.toml")),
         ("HERDR_PROJECTS_MEMINFO", b("meminfo"))] { set(k, &v); } // no such file: memory is not looked at (memory_wait.rs)
     for (k, v) in [("HERDR_PROJECTS_INLINE", "1"), ("HERDR_PROJECTS_SETTLE_MS", "0"), ("HERDR_PROJECTS_PR_LAG_MS", "0"), ("HERDR_PROJECTS_FETCH_PAUSE_MS", "0"), ("HERDR_PROJECTS_READY_STEP_MS", "0"), ("HERDR_PROJECTS_POLL_MS", "20"),
@@ -84,7 +84,7 @@ pub fn world_with(o: Opts) -> World {
 impl Drop for World {
     // Out of the world's folder before it goes (a test may have gone into it): the other tests run in this same
     // process, and a program they start would find its folder gone.
-    fn drop(&mut self) { let _ = std::env::set_current_dir(env!("CARGO_MANIFEST_DIR")); FAKE.with(|f| *f.borrow_mut() = None); sw::webui::web::forget(); sw::herdr::cli::set_fake(None); sw::flow::git::set_fake_gh(None); sw::opener::set_fake(None); sw::clock::set(None); sw::runner::JOBS.with(|j| j.borrow_mut().clear()); let _ = std::process::Command::new("chmod").args(["-R", "u+w"]).arg(&self.base).status(); let _ = std::fs::remove_dir_all(&self.base); }
+    fn drop(&mut self) { let _ = std::env::set_current_dir(env!("CARGO_MANIFEST_DIR")); FAKE.with(|f| *f.borrow_mut() = None); sw::webui::web::forget(); sw::herdr::cli::set_fake(None); sw::flow::git::set_fake_gh(None); sw::opener::set_fake(None); sw::agents::opencode_v2::set_fake(None); sw::clock::set(None); sw::runner::JOBS.with(|j| j.borrow_mut().clear()); let _ = std::process::Command::new("chmod").args(["-R", "u+w"]).arg(&self.base).status(); let _ = std::fs::remove_dir_all(&self.base); }
 }
 impl World {
     /// The scripted turns, by role: { "worker": [step, …], "reviewer": […], "picker": […], "coordinator": […] }.
@@ -123,6 +123,8 @@ pub fn settle(id: &str) -> Obj {
 pub fn row(id: &str) -> Obj { sw::flow::live::board(true).into_iter().find(|t| t.s("id") == id).unwrap_or_default() }
 pub fn delegate(id: &str) { sw::actions::start::delegate(id, vec![]).unwrap_or_else(|e| panic!("delegate {id}: {}", e.msg)); }
 pub fn read(p: &Path) -> String { std::fs::read_to_string(p).unwrap_or_default() }
+/// The folder pi keeps a working folder's conversations in, under its sessions: named after its path (`--home-me-app--`).
+pub fn pi_folder(cwd: &Path) -> String { let p = cwd.display().to_string(); format!("--{}--", p.strip_prefix('/').unwrap_or(&p).replace(['/', '\\', ':'], "-")) }
 /// The pane's agent, as the fake herdr has it now.
 pub fn agent_of(w: &World, pane: &str) -> Value { w.state().arr("panes").iter().find(|p| p.s("pane_id") == pane).map(|p| p.at("agent").clone()).unwrap_or(Value::Null) }
 pub fn prompts(w: &World, pane: &str) -> Vec<String> { agent_of(w, pane).arr("prompts").iter().map(text).collect() }
