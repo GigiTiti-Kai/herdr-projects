@@ -241,7 +241,7 @@ pub fn ask_approve(id: &str, socket: &str, to: &str) -> Res<()> {
 }
 pub fn take_approve(socket: &str, me: &str) -> String {
     let Some(q) = read_obj(&approve_file()) else { return String::new() };
-    if q.s("socket") != socket { return String::new(); }
+    if !crate::herdr::cli::same_socket(q.s("socket"), socket) { return String::new(); }
     let fresh = now() - q.i("at") < 15000;
     if fresh && q.b("to") && !me.is_empty() && q.s("to") != me { return String::new(); } // the other board's
     let _ = std::fs::remove_file(approve_file());
@@ -266,8 +266,10 @@ pub fn details(id: &str) -> Res<Value> {
         "worktree": if t.b("worktree") { t.at("worktree").clone() } else { Value::Null },
         "branch": if t.b("branch") { t.at("branch").clone() } else { Value::Null },
         "kept": if t.b("kept") { t.at("kept").clone() } else { Value::Null },
+        "stillRunning": if t.b("stillRunning") { t.at("stillRunning").clone() } else { Value::Null }, // what its clean-up or archive left for you to end
         "inUse": if t.at("tidy").b("inUse") { t.at("tidy").at("inUse").clone() } else { Value::Null }, // what keeps its space in use, every thing
         "limits": limits_detail(&t, now()),
+        "addedBy": crate::autopilot::history::added_by(&t), // you, an automation, a coordinator's autopilot, or which coordinator you asked
     }));
     // Waiting in the queue: its place, and in words ("waiting for a free slot, Q#2", "waiting for disk space, Q#1").
     if let Some(n) = crate::flow::live::queue_place(&t) { let mut q = t.clone(); q.put("queuePlace", n); out.put("queue", json!({ "place": n, "words": crate::shown::queue::words(&q) })); }

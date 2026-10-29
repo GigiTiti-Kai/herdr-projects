@@ -26,14 +26,12 @@ pub enum Ink {
     Review,
     /// The board runs the check itself: a plain light grey.
     Check,
-    /// It waits for a free slot: a pink no other state has.
+    /// It waits for a free slot, or for other tasks: a magenta no other state has.
     Queue,
     /// Nobody has started it: the dim grey of "to do".
     Todo,
     /// The automations' own purple.
     Auto,
-    /// An autopilot's wakes in the chat: an orange no status, automation or queue has (its row on the list has none).
-    Pilot,
     /// herdr's thin rules and frames (surface1), its dimmest separators (surface_dim).
     Rule,
     Dim,
@@ -46,7 +44,7 @@ impl Ink {
     pub fn name(self) -> &'static str {
         match self { Ink::Plain => "plain", Ink::Text => "text", Ink::Soft => "subtext0", Ink::Muted => "overlay0", Ink::Red => "red", Ink::Green => "green",
             Ink::Yellow => "yellow", Ink::Teal => "teal", Ink::Peach => "peach", Ink::Mauve => "mauve", Ink::Accent => "accent", Ink::Review => "review",
-            Ink::Check => "check", Ink::Queue => "queue", Ink::Todo => "todo", Ink::Auto => "auto", Ink::Pilot => "pilot", Ink::Rule => "surface1", Ink::Dim => "surface_dim",
+            Ink::Check => "check", Ink::Queue => "queue", Ink::Todo => "todo", Ink::Auto => "auto", Ink::Rule => "surface1", Ink::Dim => "surface_dim",
             Ink::Sidebar => "sidebar_bg", Ink::Selection => "selection" }
     }
 }

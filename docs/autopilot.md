@@ -32,6 +32,7 @@ From a shell:
 
 ```
 herdr-projects autopilot                     this machine's coordinators, each with how it stands
+herdr-projects autopilot show [--machine | --project <repo>]   one coordinator's autopilot whole, as it stands now
 herdr-projects autopilot on [--machine | --project <repo>] [--goal "<words>"] [--autopilot.<name> <value> …]
 herdr-projects autopilot off [--machine | --project <repo> | --all]
 ```
@@ -60,20 +61,36 @@ herdr-projects autopilot off [--machine | --project <repo> | --all]
 - **A machine's row and a project's row stand for their coordinator**, and the top row (`All machines`, or the only
   machine) for the top-level one; the filter Coordinators (`Tab`) leaves only those
   ([machine and project coordinators](machine-and-project-coordinators.md)).
-- **While it is on, its row's mark is `∞`**, in the marks' column where a task has its mark, left of the caret, with
-  its time on the right and what it does under it while it works, as any coordinator's row.
+- **While it is on, its row keeps its coordinator's own mark** (`○` idle, `◐` working, `?` it asks you, `✗` could not
+  start), in its own colour: autopilot has no icon and no colour of its own. It shows only in the board's own patterns:
 
   ```
-   ∞ ▾ herdr-projects · HSW
-     ✓ HSW-92  Sync never loses data
+   ○ ▾ vm-str [autopilot]  33 tasks, 1 automation, 1 on autopilot
+       Autopilot · next check-in in 12m · 3 of 20 today
+     ○ ▾ herdr-projects · HSW [autopilot]
+         Working on HSW-92 · 3 of 20 today
   ```
 
-  - **The mark** is one column wide, of the family of a task's marks (`◐ ◇ ○ ✓`), never an emoji. It takes the colour
-    of its state, as a task's does: red at `needs you` (bold, as a task that waits for you), yellow while `working`,
-    quiet while `asleep`, plain text else. No colour of its own. A coordinator that needs you itself (`!`) or could not
-    start (`✗`) shows that mark instead.
-  - Off, nothing of autopilot shows: its row has its coordinator's own mark (`○` idle).
-- **The state word**, the first that holds:
+  - **A tag after its name**, `[autopilot]`, dimmed as a task's `[research]` is.
+  - **A status line under it**, in the grey of a task's, the first that holds:
+
+    | Line | When |
+    |---|---|
+    | `Needs you · …` | it stopped waking (below), with why |
+    | `Could not start · <why>` | its program could not be started |
+    | `Checking in · HSW-84 finished` | a wake's turn is under way, with why it woke |
+    | `Working on HSW-92 · 3 of 20 today` | one of its tasks is under way (and today's adds of `tasksPerDay`) |
+    | `Autopilot · asleep outside mon-fri 09:00-18:00 · 3 of 20 today` | outside its hours |
+    | `Autopilot · at today's limit · 5 of 5 today` | no room for more tasks |
+    | `Autopilot stalled: no check-in for 3h · 0 of 5 today` | idle with room, and nothing ran for more than twice `autopilot.every` (below) |
+    | `Autopilot idle: last 3 wakes added nothing · next check-in in 2h · 0 of 5 today` | idle, its timer backed off (below) |
+    | `Autopilot · next check-in in 12m · 3 of 20 today` | waiting for its next reason to wake |
+
+  - **Its machine's summary** (a folded machine's row, and the top row) says how many coordinators there are on autopilot:
+    `33 tasks, 1 automation, 1 on autopilot`.
+  - The web board shows the same, in its own row.
+  - Off, nothing of autopilot shows.
+- **The state word**, on its panel and from `herdr-projects autopilot`, the first that holds:
 
   | Word | Means |
   |---|---|
@@ -87,9 +104,9 @@ herdr-projects autopilot off [--machine | --project <repo> | --all]
 - **Its panel.** `Alt+P` shows the coordinator beside the list in the [task panel](task-panel.md)'s form, `Alt+T` the
   same whole, with its last 20 wakes (when, why, answered). While on: its goal, today's counts
   (`2 of 5 added · 1 of 2 under way`) and its settings in plain words.
-- **Its wakes show in its chat**, under the name `Autopilot`, in autopilot's colour, never as your words.
-- **Its colours** on the list are the theme's own, as a task's ([colours](colours.md)): red where it needs you, yellow
-  while it works. Its panel's state word says the same, so colour is never the only clue.
+- **Its wakes show in its chat**, under the name `Autopilot`, as the board's own words stand under `Board`, never as
+  your words: only why it woke (`Regular check-in`, `HSW-84 finished`), in the chat's usual greys.
+- **No colours of its own** ([colours](colours.md)).
 
 ## When it wakes
 
@@ -107,6 +124,17 @@ changed since its last wake ended does the timer wake it: the tasks in its area 
 or whether today's limits have room. **A new day with room counts as a change**, so a coordinator left on wakes at
 least once a day while it has room. What its own turn did wakes nothing: the look is taken when its turn ends.
 
+**An idle autopilot never stalls.** The free look holds the timer only while something of its own is under way
+(working, queued, or waiting for you). Idle, with nothing of its own under way and room in today's limits, the timer
+wakes it even when nothing changed: a turn that once declined, or misread a wake, gets another chance. So an idle one
+does not burn a turn every hour for nothing, its wakes whose turn ended with nothing changed are counted in a row: from
+the third on, its timer's gap doubles each time, up to 4 hours (an `autopilot.every` longer than that stays as it is),
+and its row says `Autopilot idle: last 3 wakes added nothing`. A change in its area wakes it as before, and a turn that
+changes something (it adds, starts or retries a task, or you did) sets the count back, as does `autopilot on`. When
+it is idle with room and wakes left today, and nothing ran for more than twice `autopilot.every` (the keeper did not
+run, or its timer backed off), its row says `Autopilot stalled: no check-in for 3h`, backed off with why: `Autopilot
+stalled: no check-in for 3h, last 4 wakes added nothing`.
+
 **No wake while** it is off; it says `needs you`; it is outside `autopilot.hours`; it is within `autopilot.gap` of the end
 of its last wake's turn or of a turn of yours; `autopilot.wakesPerDay` are used today; it is mid-turn, or a message of
 yours waits for it; or it has no room and none of its tasks needs looking after. The reasons are kept and go out as one
@@ -115,20 +143,41 @@ wake when that ends. A reason that is only the timer is dropped if the look then
 **You come first.** At most one wake waits in its queue. When a message of yours is queued, a wake not yet typed in is
 taken out again, and its reasons wait. Only the wake of turning on skips the gap after your turn.
 
-**The wake message** always starts with `Autopilot woke:`, and says why, the goal, and what is left of today:
+**The wake message** always starts with `Autopilot:`, and says only why it woke, in plain words:
 
 ```
-Autopilot woke: HSW-84 merged; HSW-88 asks a question. Goal: Sync never loses data. Today: 2 of 5 tasks added, 1 of 2 under way. May set: nothing. May touch: own.
+Autopilot: HSW-84 finished, HSW-88 has a question
 ```
 
-Only the board writes one. Any other message that starts with those words (from the chat box, `coordinator tell`,
-another machine) reaches it as `(not a wake) Autopilot woke: …`. A coordinator that is not running is started first, in
-the same conversation, as your first message would start it.
+| Reason | Words |
+|---|---|
+| turned on (or changed) | `Turned on` |
+| its timer, and the board changed | `Regular check-in` |
+| `done`: a task merged or done | `HSW-84 finished` |
+| `stuck`: it failed | `HSW-84 is stuck` |
+| `stuck`: its agent asks a question | `HSW-84 has a question` |
+| `stuck`: it waits for a yes autopilot may give | `HSW-84 is ready to approve` |
+| `added`: a task was added by someone else | `HSW-84 was added` |
 
-- **Answered** is a wake whose turn ended within 15 minutes. After `autopilot.needsYouAfter` unanswered in a row, its row
-  says `needs you` and no more wakes are sent until `Ctrl+O` or `autopilot on`. One answered sets the count back to zero.
-- **A start that failed** is not a wake: it counts toward no limit, waits for the gap before the next try, and the row
-  says `autopilot could not start: <reason>` until a start works.
+No goal, no limits and no counts: **its rules say to read its autopilot first in every wake**, as it stands now, with
+`herdr-projects autopilot show` (`--machine`, `--project <repo>`): its state, goal, today's counts, its tasks under way
+and those that need looking after, and its settings in plain words (what it may set and touch, whether it may say yes
+or add releases). So a change between wakes is always picked up, and nothing is repeated in the chat.
+
+Its rules say plainly that **every message that starts with `Autopilot:` is a real wake** from the board, whatever an
+older version of its rules (or an earlier part of its chat) said about other words. When its rules changed while its
+program ran, the line that says so goes after the wake's words, never before, and with a wake it says this one is a
+real wake.
+
+Only the board writes a wake. Any other message that starts with `Autopilot:` (from the chat box, `coordinator tell`,
+another machine) reaches it as `(not a wake) Autopilot: …`, and so does one that starts with an earlier version's
+`Autopilot woke:`. A coordinator that is not running is started first, in the same conversation, as your first message
+would start it.
+
+- **Answered** is a wake whose turn ended within 15 minutes. After `autopilot.needsYouAfter` unanswered in a row, its state
+  is `needs you` (its row's line: `Needs you · …`) and no more wakes are sent until `Ctrl+O` or `autopilot on`. One answered sets the count back to zero.
+- **A start that failed** is not a wake: it counts toward no limit, waits for the gap before the next try, and its row's
+  line says `Could not start · <reason>` until a start works.
 
 ## What it may do in a wake
 
@@ -137,7 +186,7 @@ autopilot's turn only these commands go through. Everything else (a merge, a gat
 `set`, automations, repos, a message to another coordinator) is refused, with the rule and, where there is one, the
 setting that would allow it.
 
-- **Reads** about its area: `list`, `show`, `details`, `autopilot`, `coordinator where`. The board is its only memory:
+- **Reads** about its area: `list`, `show`, `details`, `autopilot` (and `autopilot show`), `coordinator where`. The board is its only memory:
   `list` also gives it its area's finished, stopped and archived tasks of the last 30 days, each with who added it and
   the start of its closing note.
 - **`add`**, in its area, within `autopilot.tasksPerDay` and `autopilot.tasksAtOnce`. A setting on it that
@@ -170,7 +219,10 @@ nothing more, and autopilot may not touch it.
 - Their agent and reviewer may read the board, and `report` on their own task. Every other board command is refused, so
   nothing its tasks do adds work outside its limits. A command is its agent's (or reviewer's) when it runs in that
   pane in a terminal the agent was seen in: Herdr gives a closed pane's id to the next pane of its space, so a
-  coordinator in a done task's old pane is that coordinator, not the done task's agent.
+  coordinator in a done task's old pane is that coordinator, not the done task's agent. A coordinator's own pane, in
+  the terminal saved with it, is never a task's, whatever the task has on record, and a task whose worktree was
+  cleaned up is never linked again to an agent in the repo's folder. A refusal names the task the caller was taken
+  for ("You are taken as AFS-6's agent").
 - Under `autopilot.repoFileWaits yes`, a change that touches the repo's own `.herdr-projects.json` never merges by
   itself, whatever `merge.by` or `autopilot.approve` say. Its row says it waits for your own yes.
 - An approve from autopilot's turn is refused on any task whose change touches that file, whoever added it.

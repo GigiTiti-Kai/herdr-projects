@@ -12,8 +12,11 @@ pub mod add;
 pub mod automations;
 pub mod carry;
 pub mod check;
+pub mod control;
 pub mod lookup;
 pub mod own_names;
+pub mod pins;
+pub mod projects;
 pub mod sidebar;
 pub mod why;
 
@@ -45,8 +48,9 @@ pub fn machines() -> Vec<Machine> {
         Machine { id: m.t("id"), target: pick(&["ssh_target", "target", "ssh", "host"]), session: pick(&["remote_session", "session"]), label }
     }).filter(|m| !m.target.is_empty() && !m.label.is_empty()).collect()
 }
-/// Its own known-hosts file, so an old saved key elsewhere cannot get in the way; one shared connection per machine,
-/// so asking again every few seconds costs almost nothing. The remote side runs through a login shell so PATH is set.
+/// Its own known-hosts file, so an old saved key elsewhere cannot get in the way; one shared connection per machine
+/// (its socket: remote/control.rs), so asking again every few seconds costs almost nothing. The remote side runs
+/// through a login shell so PATH is set.
 /// `remote` holds no single quote (what it carries is cleaned or base64), so it reads alike in single quotes everywhere.
 pub fn ssh_command(m: &Machine, remote: &str, tty: bool) -> (String, Vec<String>) {
     debug_assert!(!remote.contains('\''), "{remote}");
@@ -55,7 +59,7 @@ pub fn ssh_command(m: &Machine, remote: &str, tty: bool) -> (String, Vec<String>
     let d = data_dir();
     let mut a: Vec<String> = if tty { vec!["-t".into()] } else { vec!["-o".into(), "BatchMode=yes".into()] };
     for o in ["ConnectTimeout=6", "StrictHostKeyChecking=accept-new"] { a.extend(["-o".into(), o.into()]); }
-    a.extend(["-o".into(), format!("UserKnownHostsFile={}", d.join("known_hosts").display()), "-o".into(), "ControlMaster=auto".into(), "-o".into(), format!("ControlPath={}", d.join("ssh-%C").display()), "-o".into(), "ControlPersist=120".into(), "-o".into(), "LogLevel=ERROR".into()]);
+    a.extend(["-o".into(), format!("UserKnownHostsFile={}", d.join("known_hosts").display()), "-o".into(), "ControlMaster=auto".into(), "-o".into(), format!("ControlPath={}", control::control_path()), "-o".into(), "ControlPersist=120".into(), "-o".into(), "LogLevel=ERROR".into()]);
     a.push(m.target.clone());
     a.push(login_line(&session, remote));
     ("ssh".into(), a)
@@ -123,6 +127,8 @@ fn snapshot(t: &Obj) -> Value {
 /// `autopilot`: what each of its coordinators shows of autopilot (autopilot/far.rs); `version` is this side's version (a machine on an older
 /// one sends none). Pending hook events are this machine's own and are not sent. `automations`: this machine's own.
 /// `sidebar`: this machine's herdr list of machines, in the order its sidebar shows them (remote/sidebar.rs).
+/// `archived`: its archived projects, each a heading in the asking board's archive (remote/projects.rs). `pins`: whether
+/// it is pinned itself, and its pinned projects (store/pins.rs).
 pub fn remote_list() -> Value {
     let keys = repo_keys();
     let tasks: Vec<Value> = board(true).into_iter().map(|mut t| {
@@ -139,7 +145,7 @@ pub fn remote_list() -> Value {
     let coordinator = crate::coordinator::far::sent(&crate::coordinator::look::look(&socket), ready);
     // Its machine's and its repos' coordinators that were ever talked to, by level ("machine", "project:<repo>").
     let coordinators: Obj = crate::coordinator::state::all(&socket).into_iter().filter(|co| !co.is_top()).map(|co| (co.to(), crate::coordinator::far::sent(&crate::coordinator::look::look(&co), ready))).collect();
-    json!({ "host": check::hostname(), "version": VERSION, "free": crate::leftovers::room::free_here(), "automations": automations::automations_sent(), "coordinator": coordinator, "coordinators": coordinators, "autopilot": crate::autopilot::far::sent(&socket, crate::clock::now()), "sidebar": sidebar::sent(), "tasks": tasks })
+    json!({ "host": check::hostname(), "version": VERSION, "free": crate::leftovers::room::free_here(), "automations": automations::automations_sent(), "coordinator": coordinator, "coordinators": coordinators, "autopilot": crate::autopilot::far::sent(&socket, crate::clock::now()), "sidebar": sidebar::sent(), "archived": crate::store::archived_repos::archived_repos().keys().collect::<Vec<_>>(), "pins": crate::store::pins::pins().json(), "tasks": tasks })
 }
 pub fn remote_main(a: &[String]) -> i32 {
     let what = a.first().cloned().unwrap_or_default();
@@ -172,6 +178,8 @@ pub fn door_with(what: &str, req: &Value, bytes: &[u8]) -> Res<Value> {
         "add" => add::door(req), // a task the asking machine adds here (remote/add.rs)
         "hello" => Ok(json!({ "ok": true, "host": check::hostname(), "version": VERSION })), // the check a machine runs on itself (remote/check.rs)
         "do" if automations::is_automation_action(req.s("action")) => automations::automation_do(req), // an automation of this machine, not a task
+        "do" if projects::is_project_action(req.s("action")) => projects::door(req), // a project of this machine archived or restored (remote/projects.rs)
+        "do" if pins::is_pin_action(req.s("action")) => pins::door(req), // this machine or a project of it pinned or unpinned (remote/pins.rs)
         "do" if req.s("action").starts_with("autopilot-") || req.s("action").starts_with("coordinator-") => crate::autopilot::far::door(req), // a coordinator's autopilot switched, or it started or stopped, from another machine
         "do" => {
             let t = find(req.s("id"))?;
@@ -199,7 +207,8 @@ pub fn door_with(what: &str, req: &Value, bytes: &[u8]) -> Res<Value> {
                 "again" => ok(finish_line::retry(&id)?.msg),
                 "review" => ok(finish_line::send_review(&id)?.msg),
                 "finish" => ok(finish_line::finish_anyway(&id)?.msg),
-                "pin" => { let p = filing::pin(&id)?; ok(format!("{id}: {}", if p.b("pinned") { "pinned" } else { "unpinned" })) }
+                // `on`: pinned or not, whatever it was (the command line); without it, the other way round (the pin key).
+                "pin" => { let p = if req.at("on").is_boolean() { filing::set_pin(&id, req.b("on"))? } else { filing::pin(&id)? }; ok(format!("{id}: {}", if p.b("pinned") { "pinned" } else { "unpinned" })) }
                 "stop" => { let s = talk::stop(&id)?; ok(talk::stopped(&format!("{id}: stopped."), &s.msg)) }
                 // Where a task stands, whole, with its closing note: for a coordinator elsewhere that looks after it.
                 "details" => { let mut d = tidy(finish_line::details(&id)?); crate::autopilot::history::with_note(&mut d); Ok(json!({ "ok": true, "msg": "", "details": d })) }
@@ -215,7 +224,7 @@ pub fn door_with(what: &str, req: &Value, bytes: &[u8]) -> Res<Value> {
                     }
                     Ok(a)
                 }
-                "clear" => { let (cid, kept) = archive::clear(&id)?; ok(if kept.is_empty() { format!("{cid}: removed") } else { format!("{cid}: removed. Kept, so no work is lost: {}", kept.join(", ")) }) }
+                "clear" => { let (cid, kept, ends) = archive::clear(&id)?; ok(crate::leftovers::then_say(&if kept.is_empty() { format!("{cid}: removed") } else { format!("{cid}: removed. Kept, so no work is lost: {}", kept.join(", ")) }, &ends.said())) }
                 other => Ok(json!({ "ok": false, "msg": format!("Unknown action {other}") })),
             }
         }

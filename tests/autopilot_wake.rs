@@ -1,6 +1,6 @@
-//! Waking a coordinator on autopilot: its timer only when the board changed (the free look), the board's events in its
-//! area once each, its awake hours, the gap after a turn and the wakes a day, one wake in the queue at most, and no wake
-//! while it is mid-turn or a message of yours waits for it.
+//! Waking a coordinator on autopilot: its timer only when the board changed (the free look) while its own work is under
+//! way (idle, tests/autopilot/idle.rs), the board's events in its area once each, its awake hours, the gap after a turn
+//! and the wakes a day, one wake in the queue at most, and no wake while it is mid-turn or a message of yours waits.
 use crate::common;
 use common::pilot::*;
 use common::*;
@@ -23,27 +23,31 @@ fn own_task(co: &Co, w: &World, title: &str) -> String {
 }
 
 #[test]
-fn the_timer_wakes_only_when_the_board_changed_and_its_own_adds_wake_it_not() {
+fn while_its_own_work_is_under_way_the_timer_wakes_only_when_the_board_changed_and_its_own_adds_wake_it_not() {
     let w = pilot_world();
     let co = proj(&w);
-    on_and_quiet(&w, &co, &["--autopilot.every", "1h", "--autopilot.when", "none"]);
-    // an hour on, nothing changed: no wake, no model, no tokens
+    on_and_quiet(&w, &co, &["--autopilot.every", "1h", "--autopilot.when", "none", "--autopilot.startAtOnce", "no"]);
+    // idle with room, its timer wakes it (autopilot/idle.rs); in that turn it adds a task, which then waits for the human
     minutes(61); tick(&w);
-    assert_eq!(prompts_of(&w, &co).len(), 1);
+    assert_eq!(prompts_of(&w, &co).len(), 2);
+    let id = own_task(&co, &w, "Its own");
+    sw::store::tasks::set(&id, json!({ "stage": "approval" })).unwrap();
+    tick(&w); // the board sees the turn's end: what it did is in the snapshot
+    // an hour on, its own work under way and nothing changed: no wake, no model, no tokens
+    minutes(61); tick(&w);
+    assert_eq!(prompts_of(&w, &co).len(), 2);
     assert!(record(&co).arr("pending").is_empty());
     // the human adds a task: the next timer wakes it
     w.add("Fix the docs index");
-    minutes(30); tick(&w); assert_eq!(prompts_of(&w, &co).len(), 1, "not before its timer");
+    minutes(30); tick(&w); assert_eq!(prompts_of(&w, &co).len(), 2, "not before its timer");
     minutes(31); tick(&w);
-    assert_eq!(prompts_of(&w, &co).len(), 2);
-    assert!(last_prompt(&w, &co).starts_with("Autopilot woke: its timer, and the board changed. Goal: Docs."), "{}", last_prompt(&w, &co));
-    // what its own turn did (a task it added in it) is in the snapshot taken when that turn ended: no wake for it
-    own_task(&co, &w, "Its own");
-    tick(&w); // the board sees the turn's end
-    minutes(61); tick(&w);
-    assert_eq!(prompts_of(&w, &co).len(), 2);
-    w.add("And yours"); minutes(61); tick(&w);
     assert_eq!(prompts_of(&w, &co).len(), 3);
+    assert_eq!(last_prompt(&w, &co), "Autopilot: Regular check-in");
+    tick(&w);
+    minutes(61); tick(&w);
+    assert_eq!(prompts_of(&w, &co).len(), 3);
+    w.add("And yours"); minutes(61); tick(&w);
+    assert_eq!(prompts_of(&w, &co).len(), 4);
 }
 
 #[test]
@@ -59,13 +63,13 @@ fn events_in_its_area_wake_it_once_and_its_own_adds_and_other_repos_do_not() {
     let id = w.add("Yours");
     minutes(2); tick(&w);
     assert_eq!(prompts_of(&w, &co).len(), 2);
-    assert!(last_prompt(&w, &co).starts_with(&format!("Autopilot woke: {} was added.", short(&id))), "{}", last_prompt(&w, &co));
+    assert_eq!(last_prompt(&w, &co), format!("Autopilot: {} was added", short(&id)));
     minutes(2); tick(&w); tick(&w);
     assert_eq!(prompts_of(&w, &co).len(), 2, "once");
     // done: a task in its area is done
     sw::store::tasks::set(&id, json!({ "stage": "done" })).unwrap();
     minutes(2); tick(&w);
-    assert!(last_prompt(&w, &co).starts_with(&format!("Autopilot woke: {} is done.", short(&id))), "{}", last_prompt(&w, &co));
+    assert_eq!(last_prompt(&w, &co), format!("Autopilot: {} finished", short(&id)));
 }
 
 #[test]
@@ -77,7 +81,7 @@ fn a_task_of_its_own_that_starts_to_need_looking_after_wakes_it_once_and_after_i
     tick(&w);
     sw::store::tasks::set(&id, json!({ "stage": "failed" })).unwrap();
     minutes(2); tick(&w);
-    assert!(last_prompt(&w, &co).starts_with(&format!("Autopilot woke: {} failed.", short(&id))), "{}", last_prompt(&w, &co));
+    assert_eq!(last_prompt(&w, &co), format!("Autopilot: {} is stuck", short(&id)));
     let n = prompts_of(&w, &co).len();
     minutes(2); tick(&w); tick(&w);
     assert_eq!(prompts_of(&w, &co).len(), n, "not again while it stays so");
@@ -86,7 +90,7 @@ fn a_task_of_its_own_that_starts_to_need_looking_after_wakes_it_once_and_after_i
     minutes(2); tick(&w); assert_eq!(prompts_of(&w, &co).len(), n);
     sw::store::tasks::set(&id, json!({ "stage": "asks", "kind": "question" })).unwrap();
     minutes(2); tick(&w);
-    assert!(last_prompt(&w, &co).contains(&format!("{} asks a question", short(&id))), "{}", last_prompt(&w, &co));
+    assert!(last_prompt(&w, &co).contains(&format!("{} has a question", short(&id))), "{}", last_prompt(&w, &co));
     // a retry used: failing again leaves it to you, and wakes nothing
     sw::autopilot::record::change(&co, |ap, _| { sw::autopilot::record::with_task(ap, &id, |r| { r.put("retries", 1); }); true }).unwrap();
     sw::store::tasks::set(&id, json!({ "stage": "working" })).unwrap(); minutes(2); tick(&w);
@@ -148,7 +152,7 @@ fn reasons_wait_for_the_gap_merge_into_one_wake_and_wait_while_it_is_mid_turn_or
     busy(&w, &co); tick(&w);
     assert_eq!(prompts_of(&w, &co).len(), 1);
     end_turn(&w, &co); tick(&w);
-    assert!(last_prompt(&w, &co).starts_with(&format!("Autopilot woke: {} was added; {} was added.", short(&a), short(&b))), "{}", last_prompt(&w, &co));
+    assert_eq!(last_prompt(&w, &co), format!("Autopilot: {} was added, {} was added", short(&a), short(&b)));
     tick(&w);
     // a turn a message of yours started (through the board): the gap counts from its end
     minutes(20);

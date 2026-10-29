@@ -59,8 +59,8 @@ pub fn list_of(s: &State, t: &Theme) -> Value {
     // A folded heading's count: how many rows it hides, in words where automations are among them (`7 tasks, 1 automation`).
     let count = |folded: usize, autos: usize| if autos > 0 { json!(crate::board::update::heads::holds(folded, autos)) } else { json!(folded) };
     // A machine's or a project's row: its coordinator's state as a task's mark, where it says something, and its time
-    // (board/view/pilot.rs); null else. Never a second line: what it says is in the chat.
-    let pilot = |x: Option<crate::board::view::pilot::Shown>| x.map(|x| json!({ "mark": pieces(&x.mark), "label": x.label, "cols": if x.time.is_empty() { vec![] } else { vec![pieces(&x.time)] }, "under": [] })).unwrap_or(Value::Null);
+    // (board/view/pilot.rs), and while on autopilot its status line (`under`), as a task's second line; null else.
+    let pilot = |x: Option<crate::board::view::pilot::Shown>| x.map(|x| json!({ "mark": pieces(&x.mark), "label": x.label, "cols": if x.time.is_empty() { vec![] } else { vec![pieces(&x.time)] }, "under": pieces(&x.under) })).unwrap_or(Value::Null);
     let coord = |id: &str| crate::board::update::coords::of_head(s, id).is_some();
     // How far in each row stands (board/update/depth.rs): all machines → machine → project → task.
     let deep = crate::board::update::depth::depths(&s.rows);
@@ -82,7 +82,7 @@ pub fn list_of(s: &State, t: &Theme) -> Value {
             }
             Row::Auto(a) => push(&mut groups, deep_row(auto_row_of(s, t, a, now))),
             Row::Rec(r) => push(&mut groups, deep_row(row_of(s, t, r, now))),
-            Row::Note(n) => if let Some(g) = groups.last_mut() { g.put("more", crate::re!(r"(\d+) more").captures(n).and_then(|c| c[1].parse::<i64>().ok()).unwrap_or(0)); },
+            Row::Note(n) => if let Some(g) = groups.last_mut() { g.put("more", crate::re!(r"(\d+) done").captures(n).and_then(|c| c[1].parse::<i64>().ok()).unwrap_or(0)); },
         }
     }
     // The characters each task's tag (`#134`, `HSW-134`) fills: the terminal board's column and its limit on the space
@@ -99,7 +99,7 @@ pub fn list_of(s: &State, t: &Theme) -> Value {
     }
     let home = crate::store::files::user_home().display().to_string();
     let unread = unread(s);
-    let empty = if !s.rows.is_empty() || (!unread.is_empty() && s.scope != "*") { "" } else if !s.filter.is_empty() { "Nothing matches." } else if s.archive_view { "No archived tasks." } else { "Nothing here yet. Type what needs doing." };
+    let empty: String = if !s.rows.is_empty() || (!unread.is_empty() && s.scope != "*") { String::new() } else if !s.filter.is_empty() { "Nothing matches.".into() } else if s.archive_view { "No archived tasks.".into() } else if crate::board::update::pinned::on(s) { crate::board::update::pinned::empty_says() } else { "Nothing here yet. Type what needs doing.".into() };
     json!({
         "head": {
             // The repo new tasks go to, by its name: no folder path, and nothing for the home folder.

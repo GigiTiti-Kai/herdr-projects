@@ -36,8 +36,8 @@ there. `herdr-projects doctor` names messages that wait in a queue for more than
 ## Its row, and its settings
 
 **Its row is the top row**: `All machines`, or the only machine. It reads as every coordinator's row does: its mark
-(`○` idle, `◐` working, `?` it asks you, `∞` on [autopilot](autopilot.md)), its time on the right, what it does under
-it ([machine and project coordinators](machine-and-project-coordinators.md)). With one other machine picked, the top
+(`○` idle, `◐` working, `?` it asks you), its time on the right, what it does under it (on
+[autopilot](autopilot.md), `[autopilot]` after its name and what autopilot does under it) ([machine and project coordinators](machine-and-project-coordinators.md)). With one other machine picked, the top
 row is that machine's, and this one is not on the board.
 
 - `Space` there talks to it; `Space` on another row talks to that row's agent, and again comes back here. `Alt+O` goes
@@ -117,6 +117,12 @@ same file), and when you start the program in that folder by hand.
 
 - **Kept up to date.** The files are written again at every start and before every message. So a new version's rules
   are in place under a running Coordinator, which reads them at its next new chat or restart.
+- **A running one hears that they changed, once.** The board keeps a fingerprint of the rules each coordinator's
+  program started with. When the rules differ by the time the board types your next message in (a new version of the
+  board, a new `coordinator.instructions`), one line goes before it: "[The board was updated: your standing rules in
+  <file> changed; read them again.]". An autopilot wake keeps its first words (`Autopilot:`): the line goes after it,
+  and says the message is a real wake whatever older rules said. That happens once, and never as a message of its own: that would cost a turn
+  and could land in the middle of one. A program started by an older board, which kept no fingerprint, hears it too.
 - **Your own notes are kept.** The board owns only the block between its two marker lines. What you write above or
   below it in `AGENTS.md` or `CLAUDE.md` stays, and the Coordinator reads it too.
 - **One way per kind, never two.** The Coordinator gets no launch flag for its rules any more (it used to: Claude's and
