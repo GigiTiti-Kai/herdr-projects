@@ -49,6 +49,7 @@ fn as_rust(args: &[&str]) -> Vec<String> {
 
 #[test]
 fn real_programs_without_mold_a_build_links_as_rust_does_by_itself() {
+    let _env = crate::common::env_kept(); // no world moves HOME or PATH under the programs it starts
     let b = Bench::new("none");
     assert_eq!(b.link(LINK, &[]), as_rust(LINK));
     std::fs::remove_file(b.base.join("bin/rust-lld")).unwrap();
@@ -57,6 +58,7 @@ fn real_programs_without_mold_a_build_links_as_rust_does_by_itself() {
 
 #[test]
 fn real_programs_with_mold_installed_a_build_links_with_it() {
+    let _env = crate::common::env_kept(); // no world moves HOME or PATH under the programs it starts
     let b = Bench::new("mold");
     b.install_mold();
     assert_eq!(b.link(LINK, &[]), ran(&["mold"], LINK));
@@ -64,6 +66,7 @@ fn real_programs_with_mold_installed_a_build_links_with_it() {
 
 #[test]
 fn real_programs_a_release_build_and_a_build_with_mold_turned_off_link_as_before() {
+    let _env = crate::common::env_kept(); // no world moves HOME or PATH under the programs it starts
     let b = Bench::new("release");
     b.install_mold();
     let release = ["main.o", "-o", "/w/target/x86_64-unknown-linux-gnu/release/deps/herdr_projects-1"];
@@ -113,6 +116,7 @@ fn flags_for(config: &toml::Table, target: &str) -> Vec<String> {
 
 #[test]
 fn real_programs_rustc_takes_the_cargo_configs_flags_on_every_platform_with_stable_rust() {
+    let _env = crate::common::env_kept(); // no world moves HOME or PATH under the programs it starts
     // a flag that is unstable on one target fails every build there at once (`-C linker-features=-lld` on ARM Linux):
     // rustc says so before it needs that target's library, so this holds on a machine of any platform
     let config: toml::Table = std::fs::read_to_string(root().join(".cargo/config.toml")).unwrap().parse().unwrap();

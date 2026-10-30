@@ -78,6 +78,7 @@ fn long_ago() -> SystemTime { SystemTime::UNIX_EPOCH + Duration::from_secs(1_000
 
 #[test]
 fn real_programs_a_new_worktree_starts_from_the_build_kept_and_builds_again_only_what_changed_since() {
+    let _env = crate::common::env_kept(); // no world moves HOME or PATH under the programs it starts
     let b = Bench::new("warm");
     let first = b.git("repo", &["rev-parse", "HEAD"]);
     // the first worktree has nothing to start from: it builds, and keeps its build
@@ -105,6 +106,7 @@ fn real_programs_a_new_worktree_starts_from_the_build_kept_and_builds_again_only
 
 #[test]
 fn real_programs_what_was_built_with_the_other_folders_path_in_it_is_built_again() {
+    let _env = crate::common::env_kept(); // no world moves HOME or PATH under the programs it starts
     let b = Bench::new("path");
     b.worktree("one", "main");
     b.setup("one", true);
@@ -123,6 +125,7 @@ fn real_programs_what_was_built_with_the_other_folders_path_in_it_is_built_again
 
 #[test]
 fn real_programs_no_build_is_kept_off_the_main_line_from_a_changed_folder_or_older_than_the_one_kept() {
+    let _env = crate::common::env_kept(); // no world moves HOME or PATH under the programs it starts
     let b = Bench::new("kept");
     let first = b.git("repo", &["rev-parse", "HEAD"]);
     b.write("repo", "src/a.rs", "a2");

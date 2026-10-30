@@ -6,6 +6,9 @@
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 
+/// The tests' turns at the environment they share in one process (scripts/run-tests.sh).
+mod env_turn;
+
 /// A copy of the check's scripts in a git repo of its own, an empty home, a machine of three cores, and a `cargo` that
 /// writes down what it was given and stops the check (exit 7, without a word), so only the check's start runs.
 struct Bench { base: PathBuf, others: Vec<Child> }
@@ -84,6 +87,7 @@ fn files(dir: &Path) -> Vec<String> {
 
 #[test]
 fn real_programs_a_lone_check_starts_in_an_empty_home_on_every_core_and_says_why_it_stopped() {
+    let _env = crate::common::env_kept(); // no world moves HOME or PATH under the programs it starts
     let b = Bench::new("empty");
     let (code, err, saw) = b.check(&[]);
     // three cores, no other check: all three; no build cache: cargo as it is
@@ -97,6 +101,7 @@ fn real_programs_a_lone_check_starts_in_an_empty_home_on_every_core_and_says_why
 
 #[test]
 fn real_programs_the_cores_are_shared_between_the_checks_running_now_and_one_that_died_is_not_counted() {
+    let _env = crate::common::env_kept(); // no world moves HOME or PATH under the programs it starts
     let mut b = Bench::new("shared");
     let one = b.another();
     let (_, err, saw) = b.check(&[]);
@@ -116,6 +121,7 @@ fn real_programs_the_cores_are_shared_between_the_checks_running_now_and_one_tha
 
 #[test]
 fn real_programs_your_own_job_count_wins_and_reaches_cargo_as_its_jobs_not_where_the_build_cache_keys_on_it() {
+    let _env = crate::common::env_kept(); // no world moves HOME or PATH under the programs it starts
     let mut b = Bench::new("yours");
     b.another();
     let (_, err, saw) = b.check(&[("CARGO_BUILD_JOBS", "5")]);
@@ -127,6 +133,7 @@ fn real_programs_your_own_job_count_wins_and_reaches_cargo_as_its_jobs_not_where
 
 #[test]
 fn real_programs_the_tests_run_on_the_share_when_they_start_or_on_your_own_count() {
+    let _env = crate::common::env_kept(); // no world moves HOME or PATH under the programs it starts
     let mut b = Bench::new("tests");
     // a cargo that builds one test program, which writes down how many threads it was given
     let prog = b.base.join("bin/main-0");
@@ -150,6 +157,7 @@ fn real_programs_the_tests_run_on_the_share_when_they_start_or_on_your_own_count
 
 #[test]
 fn real_programs_a_check_that_stops_before_it_starts_says_why_once() {
+    let _env = crate::common::env_kept(); // no world moves HOME or PATH under the programs it starts
     let b = Bench::new("refused");
     let (code, err, saw) = {
         let o = Command::new("/bin/sh").args(["scripts/check.sh", "--nope"]).current_dir(b.base.join("proj")).env_clear()

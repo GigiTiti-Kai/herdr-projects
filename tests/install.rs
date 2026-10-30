@@ -2,13 +2,12 @@
 //! herdr runs: platform names, release URLs, versions, checksums, the update put in place, the launcher, and run.sh in
 //! a scratch plugin folder with a release folder of its own (file://). No network, never the real ~/.herdr-projects.
 use std::path::{Path, PathBuf};
-use std::sync::MutexGuard;
 use sw::install::*;
 
 static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 fn set(k: &str, v: &str) { unsafe { std::env::set_var(k, v) } }
 /// A scratch home of its own: HOME and HERDR_PROJECTS_HOME point into it.
-fn scratch() -> (PathBuf, MutexGuard<'static, ()>) {
+fn scratch() -> (PathBuf, crate::common::Turn) {
     let one = crate::common::one_at_a_time(); // the environment is the whole test program's
     let base = std::env::temp_dir().join(format!("sw-install-{}-{}", std::process::id(), N.fetch_add(1, std::sync::atomic::Ordering::SeqCst)));
     let _ = std::fs::remove_dir_all(&base);

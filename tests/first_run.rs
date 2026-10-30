@@ -1,14 +1,13 @@
 //! The first run of this version on data an older (Node) version wrote (crates/core/src/store/old_copy.rs): one copy of
 //! the data folder as it was, beside it, made once, and its one line for the human. In a scratch HERDR_PROJECTS_HOME.
 use std::path::{Path, PathBuf};
-use std::sync::MutexGuard;
 use sw::store::move_home::OLD_NAME;
 use sw::store::old_copy::*;
 
 static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 fn set(k: &str, v: &str) { unsafe { std::env::set_var(k, v) } }
 /// A scratch home and board folder; returns the data folder.
-fn scratch() -> (PathBuf, PathBuf, MutexGuard<'static, ()>) {
+fn scratch() -> (PathBuf, PathBuf, crate::common::Turn) {
     let one = crate::common::one_at_a_time(); // the environment is the whole test program's
     let base = std::env::temp_dir().join(format!("sw-first-run-{}-{}", std::process::id(), N.fetch_add(1, std::sync::atomic::Ordering::SeqCst)));
     let _ = std::fs::remove_dir_all(&base);

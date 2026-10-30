@@ -44,6 +44,7 @@ fn real_programs_the_page_server_that_ends_is_reaped() {
 
 #[test]
 fn real_programs_a_detached_job_nobody_waits_for_stays_a_zombie_that_reads_as_alive() {
+    let _env = crate::common::env_kept(); // no world moves HOME or PATH under the programs it starts
     // What every job was before: started detached, and its `Child` dropped.
     let mut c = std::process::Command::new("sh");
     c.args(["-c", "exit 0"]).stdin(std::process::Stdio::null());
