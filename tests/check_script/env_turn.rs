@@ -10,6 +10,8 @@ fn a_world_leaves_the_environment_as_it_found_it_and_herdrs_session_is_never_in_
     let before = { let _env = common::env_kept(); now() };
     assert_eq!(before.get(std::ffi::OsStr::new("HERDR_SOCKET_PATH")).and_then(|v| v.to_str()), Some("/nonexistent"), "between turns no test reaches the real herdr");
     for k in ["HERDR_ENV", "HERDR_PANE_ID", "TMUX"] { assert!(!before.contains_key(std::ffi::OsStr::new(k)), "{k} is herdr's session's"); }
+    let waits: Vec<_> = before.keys().filter_map(|k| k.to_str()).filter(|k| k.starts_with("HERDR_PROJECTS_") && k.ends_with("_MS")).collect();
+    assert!(waits.is_empty(), "the waits are each test's own, none from outside: {waits:?}");
     {
         let w = common::world();
         assert_eq!(std::env::var("HOME").unwrap(), w.base.join("home").display().to_string());

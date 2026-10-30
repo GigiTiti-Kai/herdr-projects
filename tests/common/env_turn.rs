@@ -13,10 +13,12 @@ static KEPT: OnceLock<HashMap<OsString, OsString>> = OnceLock::new();
 thread_local! { static HELD: Cell<&'static str> = const { Cell::new("") }; }
 
 /// What the environment is between turns, made once (under the turn alone): the one the tests started in, less what
-/// would reach the herdr, the board or the agents they run in.
+/// would reach the herdr, the board or the agents they run in, and the waits the tests set themselves (every
+/// `HERDR_PROJECTS_…_MS`): one given from outside would hold in a test before it sets its own.
 fn kept() -> &'static HashMap<OsString, OsString> {
     KEPT.get_or_init(|| {
-        for k in ["HERDR_PANE_ID", "HERDR_TAB_ID", "HERDR_WORKSPACE_ID", "HERDR_PLUGIN_ID", "HERDR_PLUGIN_CONTEXT_JSON", "HERDR_ENV", "HERDR_SESSION", "TMUX", "NO_COLOR", "XDG_DATA_HOME", "HERDR_PROJECTS_DATA_DIR", "HERDR_PROJECTS_CONFIG_DIR", "HERDR_PROJECTS_REPORTS_DIR", "HERDR_PROJECTS_WEBUI", "HERDR_PROJECTS_PROGRESS", "HERDR_PROJECTS_SANDBOX", "HERDR_PROJECTS_BOXED", "HERDR_PROJECTS_RETRY_MS", "HERDR_PROJECTS_ENDED_MS", "HERDR_PROJECTS_QUIET_MS", "HERDR_PROJECTS_READY_MS", "HERDR_PROJECTS_SUBMIT_MS", "HERDR_PROJECTS_TICK_MS", "ELEVENLABS_API_KEY", "CLAUDE_CODE_TMPDIR", "HERDR_PROJECTS_SIZE"] { unsafe { std::env::remove_var(k) } }
+        for k in ["HERDR_PANE_ID", "HERDR_TAB_ID", "HERDR_WORKSPACE_ID", "HERDR_PLUGIN_ID", "HERDR_PLUGIN_CONTEXT_JSON", "HERDR_ENV", "HERDR_SESSION", "TMUX", "NO_COLOR", "XDG_DATA_HOME", "HERDR_PROJECTS_DATA_DIR", "HERDR_PROJECTS_CONFIG_DIR", "HERDR_PROJECTS_REPORTS_DIR", "HERDR_PROJECTS_WEBUI", "HERDR_PROJECTS_PROGRESS", "HERDR_PROJECTS_SANDBOX", "HERDR_PROJECTS_BOXED", "HERDR_PROJECTS_COORDINATOR_DIR", "ELEVENLABS_API_KEY", "CLAUDE_CODE_TMPDIR", "HERDR_PROJECTS_SIZE"] { unsafe { std::env::remove_var(k) } }
+        for (k, _) in std::env::vars_os() { if k.to_str().is_some_and(|k| k.starts_with("HERDR_PROJECTS_") && k.ends_with("_MS")) { unsafe { std::env::remove_var(&k) } } }
         // Not the real herdr, and a board of its own when nothing (scripts/run-tests.sh) gave one: a plain `cargo test` too.
         for (k, v) in [("HERDR_SOCKET_PATH", "/nonexistent"), ("HERDR_BIN_PATH", "/bin/false"), ("HERDR_PROJECTS_TESTING", "1")] { unsafe { std::env::set_var(k, v) } }
         if std::env::var_os("HERDR_PROJECTS_HOME").is_none() { unsafe { std::env::set_var("HERDR_PROJECTS_HOME", std::env::temp_dir().join(format!("sw-test-{}-board", std::process::id()))) } }
