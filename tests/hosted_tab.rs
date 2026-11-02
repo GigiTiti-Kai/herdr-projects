@@ -1,6 +1,7 @@
 //! `workspace.place` = `tab`: a task works in a tab of your own space of its repo, in a worktree of its own. Your panes
 //! are never split, typed into or closed and your space keeps its name, at the start, a restart, going into it, clean-up
-//! and archive; only the task's own panes close. No space of yours open: a space of its own, as ever.
+//! and archive; only the task's own panes close. No space of the repo open: the board opens one for it, and the repo's
+//! later tasks open their tabs there.
 use crate::common;
 use common::herdr;
 use common::*;
@@ -71,6 +72,7 @@ fn yours_beside_reviewer(w: &World, id: &str, then: impl Fn(&str) + 'static) -> 
     mine
 }
 fn splits(w: &World) -> usize { calls(w).iter().filter(|c| c.starts_with("pane split")).count() }
+mod space; // the space it goes to: one you opened yourself, never the one herdr opened, else one the board opens
 
 #[test]
 fn a_task_set_to_a_tab_works_in_a_tab_of_your_repo_space_never_a_tasks_own_and_leaves_with_its_own_tab_only() {
@@ -147,15 +149,16 @@ fn restarted_gone_into_and_archived_in_your_space_a_tab_of_its_own_again_and_onl
 }
 
 #[test]
-fn with_no_space_of_yours_open_a_task_gets_a_space_of_its_own_and_the_space_you_look_at_comes_first() {
+fn with_no_space_of_yours_open_a_task_opens_one_for_the_repo_and_the_space_you_look_at_comes_first() {
     let w = tab_world();
     worker(&w, 1);
     let a = w.add("No space of yours");
     delegate(&a);
     let t = settle(&a);
     assert_eq!(t.s("stage"), "approval", "{}", t.at("failure"));
-    assert!(t.at("link").b("ownsWorkspace")); assert!(!t.at("link").b("hosted"));
-    assert_eq!(calls(&w).iter().filter(|c| c.starts_with("worktree create")).count(), 1);
+    assert!(!t.at("link").b("ownsWorkspace")); assert!(t.at("link").b("hosted"));
+    assert_eq!(label_of(&w, t.at("link").s("workspace")), repo_name(&w));
+    assert_eq!(calls(&w).iter().filter(|c| c.starts_with("worktree create")).count(), 0);
     // one named after the repo and one in front: the one in front
     your_space(&w, "named", &repo_name(&w), false);
     your_space(&w, "front", "elsewhere", true);
@@ -165,7 +168,7 @@ fn with_no_space_of_yours_open_a_task_gets_a_space_of_its_own_and_the_space_you_
     let t = settle(&b);
     assert_eq!(t.s("stage"), "approval", "{}", t.at("failure"));
     assert_eq!(t.at("link").s("workspace"), "front"); assert!(t.at("link").b("hosted"));
-    assert_eq!(calls(&w).iter().filter(|c| c.starts_with("worktree create")).count(), 1);
+    assert_eq!(calls(&w).iter().filter(|c| c.starts_with("worktree create")).count(), 0);
     assert!(touched(&w, &["named", "named:p1", "front", "front:p1"]).is_empty(), "{:?}", touched(&w, &["named", "named:p1", "front", "front:p1"]));
 }
 

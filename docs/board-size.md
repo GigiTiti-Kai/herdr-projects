@@ -18,7 +18,7 @@ Nothing the board starts opens on the board's screen, takes its focus, or takes 
 
 | Helper | Where it runs |
 |---|---|
-| A task's agent | a Herdr space of its own (`herdr worktree create`, or `workspace create` outside git), opened with `--no-focus` |
+| A task's agent | a Herdr space of its own (`herdr worktree create`, or `workspace create` outside git), opened with `--no-focus`; with `workspace.place` = `tab`, a tab in a space of its repo (`tab create --no-focus`) or the repo's space the board opens (`workspace create --no-focus`) |
 | Its reviewer | a tab of its own in the task's space (`tab create --no-focus`, see [a task's tabs](tabs.md)); closed when the review ends |
 | The Coordinator | a tab of its own in your home space, opened without focus ([the Coordinator](coordinator.md)); closed when it is stopped |
 | The Watcher | a hidden model call: no pane at all |

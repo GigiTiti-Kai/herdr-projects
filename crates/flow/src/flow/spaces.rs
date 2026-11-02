@@ -26,6 +26,11 @@ pub fn opening_worktree<T>(api: &Herdr, root: &Path, f: impl FnOnce() -> T) -> T
     }
     res
 }
+/// The repo space herdr opened for the board at `root` and the board still owes closing, if any.
+pub fn made_by_herdr(api: &Herdr, root: &Path) -> Option<String> {
+    let id = read_obj(&spaces_file()).unwrap_or_default().t(&format!("{}|{}", api.socket_path(), real(root).display()));
+    (!id.is_empty()).then_some(id)
+}
 fn cleanup_on(task: Option<&Obj>) -> bool { setting("workspace.cleanup", task) == json!(true) }
 /// The housekeeping pass looks again at the ones that could not be closed when their last task ended.
 pub fn sweep_repo_spaces(socket: &str) {

@@ -181,10 +181,12 @@ impl FakeHerdr {
     fn tab(&self, st: &mut Value, verb: &str, arg2: &str, argv: &[String], flag: &dyn Fn(&str) -> Option<String>, env_of: &dyn Fn() -> Value) -> Out {
         match verb {
             "focus" => { arr(st, "focus").push(json!(format!("tab {arg2}"))); return ok(json!({ "type": "ok" })); }
+            "list" if st.b("tabListFails") && flag("--workspace").is_none() => return fail("timeout", "timed out"),
             "list" => { let w = flag("--workspace"); let ts: Vec<Value> = st.arr("tabs").iter().filter(|t| w.as_deref().map(|w| t.s("workspace_id") == w).unwrap_or(true)).map(|t| Self::tab_out(st, t)).collect(); return ok(json!({ "type": "tab_list", "tabs": ts })); }
             "create" => {
                 let wid = flag("--workspace").unwrap_or_default();
                 let Some(wi) = st.arr("workspaces").iter().position(|w| w.s("workspace_id") == wid) else { return fail("workspace_not_found", &format!("workspace {wid} not found")) };
+                if st.s("tabGone") == wid { arr(st, "panes").retain(|p| p.s("workspace_id") != wid); Self::drop_empty(st); return fail("workspace_not_found", &format!("workspace {wid} not found")); } // herdr closed it as the tab was asked for
                 if st.b("tabFails") { return fail("timeout", "timed out"); }
                 let n = st["workspaces"][wi].i("nextT").max(2);
                 let t = Self::new_tab(st, wi, &format!("{wid}:t{n}"), &flag("--label").unwrap_or_else(|| n.to_string()));
