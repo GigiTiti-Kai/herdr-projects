@@ -186,6 +186,7 @@ impl FakeHerdr {
             "create" => {
                 let wid = flag("--workspace").unwrap_or_default();
                 let Some(wi) = st.arr("workspaces").iter().position(|w| w.s("workspace_id") == wid) else { return fail("workspace_not_found", &format!("workspace {wid} not found")) };
+                if st.s("tabGone") == wid { arr(st, "panes").retain(|p| p.s("workspace_id") != wid); Self::drop_empty(st); return fail("workspace_not_found", &format!("workspace {wid} not found")); } // herdr closed it as the tab was asked for
                 if st.b("tabFails") { return fail("timeout", "timed out"); }
                 let n = st["workspaces"][wi].i("nextT").max(2);
                 let t = Self::new_tab(st, wi, &format!("{wid}:t{n}"), &flag("--label").unwrap_or_else(|| n.to_string()));

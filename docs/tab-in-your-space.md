@@ -19,7 +19,8 @@ a space after its first folder), else any other. A space opened at a worktree of
 opened yourself, in herdr or with `herdr workspace create`, counts when its first tab works in the repo's own folder or
 in one of its worktrees; a repo of its own inside the repo's folder is not the repo. The repo space herdr opened by
 itself beside a worktree of the board's (the one the board closes again after its last task) never counts. No such space
-open: the task gets a space of its own, as with `space`. A task done by [several attempts](attempts.md) always gets one: its attempts share it.
+open: the board opens one for the repo, named after its folder, with the task's agent in its first tab; the repo's later
+tasks open their tabs there, and herdr closes it with its last pane. No bare shell is left behind in it. A task done by [several attempts](attempts.md) always gets one: its attempts share it.
 One that was already in a tab of yours when its attempts were made (`attempts.by` raised while its plan waited) keeps
 them there: tabs `PRJ-12 Agent A`, `PRJ-12 Agent B` and `PRJ-12 Picker` in your space, and after the pick only the other
 attempts' own panes close.
@@ -38,3 +39,5 @@ attempts' own panes close.
 - When the task is done, or archived, only its own panes close, and with them its tabs. A pane you split off inside its
   tab is yours: it stays, and so does that tab.
 - Clean-up waits for what runs in the task's own tabs, not for what runs in yours.
+- The space the board opened for the repo is closed by herdr, with its last pane, never by the board. A pane of yours
+  in it keeps it open after the repo's last task.
