@@ -71,6 +71,7 @@ fn yours_beside_reviewer(w: &World, id: &str, then: impl Fn(&str) + 'static) -> 
     mine
 }
 fn splits(w: &World) -> usize { calls(w).iter().filter(|c| c.starts_with("pane split")).count() }
+mod space; // the space it goes to: one you opened yourself, never the one herdr opened, else one the board opens
 
 #[test]
 fn a_task_set_to_a_tab_works_in_a_tab_of_your_repo_space_never_a_tasks_own_and_leaves_with_its_own_tab_only() {

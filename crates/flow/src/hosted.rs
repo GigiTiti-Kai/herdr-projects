@@ -2,7 +2,9 @@
 //! owns, the one you look at first, then one named after the repo, then any other. Its worktree is its own, as ever; its agent, reviewer
 //! and planner each have a tab there named after the task (`PRJ-1 Agent`). The space stays yours: nothing of yours in it
 //! is split, typed into, renamed or closed, and when the task is done only its own panes close (and with them its tabs).
-//! The task's link says so: `hosted`, and `ownsWorkspace` false.
+//! The task's link says so: `hosted`, and `ownsWorkspace` false. A space opened without herdr's worktree commands
+//! counts when its first tab works in the repo; the repo space herdr opened for the board never does.
+mod of_repo;
 use crate::err::Res;
 use crate::flow;
 use crate::herdr::Herdr;
@@ -34,18 +36,19 @@ pub fn label(t: &Obj, base: &str) -> String {
     format!("{} {base}", if tag.is_empty() { id } else { tag })
 }
 /// A space of the repo at `root` that no task owns: `prefer` while it still is one, else the one you look at, else the
-/// one named after the repo, else any other. A space id herdr gave out again to another task's space is that task's, never a host.
-fn host(api: &Herdr, root: &Path, prefer: &str) -> Option<String> {
-    let owned: Vec<String> = all().iter().filter(|t| t.at("link").b("ownsWorkspace")).map(|t| t.at("link").t("workspace")).collect();
-    let real = |p: &str| flow::spaces::real(Path::new(p));
-    let of_repo: Vec<Value> = api.workspaces().ok()?.into_iter()
-        .filter(|w| w.at("worktree").is_object() && real(w.at("worktree").s("repo_root")) == real(&root.display().to_string()) && !owned.contains(&w.t("workspace_id"))).collect();
+/// one named after the repo, else any other. A space id herdr gave out again to another task's space is that task's,
+/// never a host; nor is the repo space herdr opened for the board, which the board closes after its last task.
+/// Err: herdr did not say which spaces are open.
+fn host(api: &Herdr, root: &Path, prefer: &str) -> Res<Option<String>> {
+    let mut not: Vec<String> = all().iter().filter(|t| t.at("link").b("ownsWorkspace")).map(|t| t.at("link").t("workspace")).collect();
+    not.extend(flow::spaces::made_by_herdr(api, root));
+    let of_repo: Vec<Value> = of_repo::spaces(api, root)?.into_iter().filter(|w| !not.contains(&w.t("workspace_id"))).collect();
     let name = root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-    of_repo.iter().find(|w| !prefer.is_empty() && w.s("workspace_id") == prefer)
+    Ok(of_repo.iter().find(|w| !prefer.is_empty() && w.s("workspace_id") == prefer)
         .or_else(|| of_repo.iter().find(|w| w.b("focused")))
         .or_else(|| of_repo.iter().find(|w| w.s("label") == name))
         .or_else(|| of_repo.first()) // one you named otherwise is still yours
-        .map(|w| w.t("workspace_id"))
+        .map(|w| w.t("workspace_id")))
 }
 /// The task's agent tab in `ws`, at `dir`: answers as `herdr worktree create` does, marked `hosted`.
 fn tab_in(api: &Herdr, ws: &str, dir: &str, t: &Obj) -> Res<Value> {
@@ -61,7 +64,7 @@ fn tab_in(api: &Herdr, ws: &str, dir: &str, t: &Obj) -> Res<Value> {
 /// such space is open, and the task gets a space of its own.
 pub fn open(api: &Herdr, root: &Path, t: &Obj, branch: &str, from: &str) -> Res<Option<Value>> {
     if !wanted(t) { return Ok(None); }
-    let Some(ws) = host(api, root, "") else { return Ok(None) };
+    let Some(ws) = host(api, root, "")? else { return Ok(None) };
     let name: String = branch.chars().map(|c| if c.is_ascii_alphanumeric() || "._-".contains(c) { c } else { '-' }).collect();
     let dir = data_dir().join("worktrees").join(t.s("repo")).join(name).display().to_string();
     git_slow(root, &["worktree", "add", "--no-track", "-b", branch, &dir, from], 120000)?;
@@ -71,7 +74,7 @@ pub fn open(api: &Herdr, root: &Path, t: &Obj, branch: &str, from: &str) -> Res<
 /// start. None: no such space is open.
 fn tab_again(api: &Herdr, root: &Path, t: &Obj) -> Res<Option<Value>> {
     let prefer = if is(t) { t.at("link").t("workspace") } else { String::new() };
-    let Some(ws) = host(api, root, &prefer) else { return Ok(None) };
+    let Some(ws) = host(api, root, &prefer)? else { return Ok(None) };
     tab_in(api, &ws, &crate::store::repos::cwd_of(t).display().to_string(), t).map(Some)
 }
 /// A task that works in a tab and whose terminal is gone (restarted, or gone into): a tab again. None: not such a

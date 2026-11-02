@@ -181,6 +181,7 @@ impl FakeHerdr {
     fn tab(&self, st: &mut Value, verb: &str, arg2: &str, argv: &[String], flag: &dyn Fn(&str) -> Option<String>, env_of: &dyn Fn() -> Value) -> Out {
         match verb {
             "focus" => { arr(st, "focus").push(json!(format!("tab {arg2}"))); return ok(json!({ "type": "ok" })); }
+            "list" if st.b("tabListFails") && flag("--workspace").is_none() => return fail("timeout", "timed out"),
             "list" => { let w = flag("--workspace"); let ts: Vec<Value> = st.arr("tabs").iter().filter(|t| w.as_deref().map(|w| t.s("workspace_id") == w).unwrap_or(true)).map(|t| Self::tab_out(st, t)).collect(); return ok(json!({ "type": "tab_list", "tabs": ts })); }
             "create" => {
                 let wid = flag("--workspace").unwrap_or_default();
