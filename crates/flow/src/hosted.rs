@@ -5,8 +5,10 @@
 //! The task's link says so: `hosted`, and `ownsWorkspace` false. A space opened without herdr's worktree commands
 //! counts when its first tab works in the repo; the repo space herdr opened for the board never does. With none open,
 //! the board opens the repo's space itself, the task's agent in its first tab, and herdr closes it with its last pane.
+//! Set to `pane`, the agent's pane is split off beside yours in a tab of that space instead (split.rs).
 mod new_space;
 mod of_repo;
+mod split;
 use crate::err::Res;
 use crate::flow;
 use crate::herdr::cli::args;
@@ -22,14 +24,18 @@ use std::path::Path;
 
 /// The task works in a tab of a space it does not own.
 pub fn is(t: &Obj) -> bool { t.at("link").b("hosted") }
-/// Asked for at the start: `workspace.place` is `tab`, and the task is done once (attempts share a space of their own).
+/// The task's agent pane is split off in a tab it shares with yours (`workspace.place` = `pane`): the tab is not its own.
+pub fn split(t: &Obj) -> bool { t.at("link").b("split") }
+/// Asked for at the start: `workspace.place` is `tab` or `pane`, and the task is done once (attempts share a space of their own).
 pub fn wanted(t: &Obj) -> bool {
-    !t.b("attemptOf") && setting("workspace.place", Some(t)) == json!("tab") && attempt_count(&setting("attempts.by", Some(t))) <= 1
+    !t.b("attemptOf") && [json!("tab"), json!("pane")].contains(&setting("workspace.place", Some(t))) && attempt_count(&setting("attempts.by", Some(t))) <= 1
 }
-/// What the link says of the place it was just given.
-pub fn mark(t: &mut Obj, hosted: bool) {
+fn beside(t: &Obj) -> bool { setting("workspace.place", Some(t)) == json!("pane") }
+/// What the link says of the place it was just given (`placed`: what opened it, null for a space of its own).
+pub fn mark(t: &mut Obj, placed: &Value) {
     let l = t.obj_mut("link");
-    if hosted { l.put("ownsWorkspace", false); l.put("hosted", true); } else { l.del("hosted"); }
+    if placed.b("hosted") { l.put("ownsWorkspace", false); l.put("hosted", true); } else { l.del("hosted"); }
+    if placed.b("split") { l.put("split", true); } else { l.del("split"); }
 }
 /// A tab's name in a space of yours starts with the task's key, so you can tell whose it is (an attempt's: its task's).
 pub fn label(t: &Obj, base: &str) -> String {
@@ -53,22 +59,24 @@ fn host(api: &Herdr, root: &Path, prefer: &str) -> Res<Option<String>> {
         .or_else(|| of_repo.first()) // one you named otherwise is still yours
         .map(|w| w.t("workspace_id")))
 }
-/// The task's agent tab in `ws`, at `dir`: answers as `herdr worktree create` does, marked `hosted`.
-fn tab_in(api: &Herdr, ws: &str, dir: &str, t: &Obj) -> Res<Value> {
-    let mut named = t.clone();
-    mark(&mut named, true);
-    let r = api.tab_create(ws, dir, &flow::tabs::agent_tab(Some(&named)), &board_env())?;
+/// A new tab in `ws` at `dir`, labelled `label` (herdr numbers one with none): answers as `herdr worktree create`
+/// does, marked `hosted`.
+fn tab_in(api: &Herdr, ws: &str, dir: &str, label: &str, t: &Obj) -> Res<Value> {
+    let r = api.tab_create(ws, dir, label, &board_env())?;
     let tab = if r.at("tab").b("tab_id") { r.at("tab").t("tab_id") } else { r.at("root_pane").t("tab_id") };
     let pane = if r.at("root_pane").is_object() { Some(r.at("root_pane").clone()) } else { api.panes(Some(ws))?.into_iter().find(|p| p.s("tab_id") == tab) };
     let Some(pane) = pane else { if !tab.is_empty() { api.tab_close(&tab); } crate::fail!("herdr opened no terminal for {}", t.s("id")) };
     Ok(json!({ "workspace": { "workspace_id": ws }, "tab": { "tab_id": if tab.is_empty() { pane.t("tab_id") } else { tab } }, "root_pane": pane, "worktree": { "path": dir }, "hosted": true }))
 }
-/// The task's agent at `dir`: a tab in a space found (`prefer` first), else the repo's space the board opens. One repo
-/// at a time, from the search to the space made, so two tasks starting at once never open two spaces.
+/// The task's agent tab's name in a space of yours (`PRJ-1 Agent`).
+fn own_label(t: &Obj) -> String { let mut named = t.clone(); mark(&mut named, &json!({ "hosted": true })); flow::tabs::agent_tab(Some(&named)) }
+/// The task's agent at `dir`: a tab (or, set to `pane`, a pane beside yours) in a space found (`prefer` first), else
+/// the repo's space the board opens. One repo at a time, from the search to the space made, so two tasks starting at
+/// once never open two spaces, nor split the same pane.
 fn place(api: &Herdr, root: &Path, dir: &str, t: &Obj, prefer: &str) -> Res<Value> {
     with_lock_wait(&format!("host:{}|{}", api.socket_path(), flow::spaces::real(root).display()), 60000, || {
         if let Some(ws) = host(api, root, prefer)? { // a search herdr did not answer fails the start: never a second space
-            match tab_in(api, &ws, dir, t) {
+            match if beside(t) { split::beside(api, &ws, dir, t) } else { tab_in(api, &ws, dir, &own_label(t), t) } {
                 Ok(r) => return Ok(r),
                 Err(e) => match api.call(args(&["workspace", "get", &ws])) {
                     Err(gone) if gone.code.contains("not_found") => {} // herdr closed it as the tab was asked for: the repo gets a space again
@@ -76,7 +84,7 @@ fn place(api: &Herdr, root: &Path, dir: &str, t: &Obj, prefer: &str) -> Res<Valu
                 },
             }
         }
-        new_space::open(api, root, dir, t)
+        new_space::open(api, root, dir, t, beside(t))
     })
 }
 /// A first start that asked for a tab: its worktree, made as herdr makes one, and its place (`place`). None: the task
@@ -104,18 +112,19 @@ pub fn reopen(api: &Herdr, root: &Path, t: &Obj) -> Res<Option<Value>> {
 pub fn again(api: &Herdr, root: &Path, t: &Obj) -> Res<Option<Value>> {
     if is(t) || (wanted(t) && !t.at("link").b("ownsWorkspace")) { tab_again(api, root, t) } else { Ok(None) }
 }
-/// The task's own tabs and the pane each was opened with: its agent's (or planner's), the reviewer's, and the agent's
-/// home while a planner has the first.
-fn own(t: &Obj) -> Vec<(String, String)> {
-    let l = t.at("link");
-    [(l.t("tab"), l.t("pane")), (l.at("reviewer").t("tab"), l.at("reviewer").t("pane")), (t.at("plan").at("home").t("tab"), t.at("plan").at("home").t("pane"))]
-        .into_iter().filter(|(tab, pane)| !tab.is_empty() && !pane.is_empty()).collect()
+/// The task's tabs and the pane each was opened with: its agent's (or planner's), the reviewer's, and the agent's
+/// home while a planner has the first. `shared`: the agent's pane split off in a tab of yours, which is not the task's.
+fn own(t: &Obj) -> Vec<(String, String, bool)> {
+    let (l, home) = (t.at("link"), t.at("plan").at("home"));
+    [(l.t("tab"), l.t("pane"), split(t) && !home.is_object()), (l.at("reviewer").t("tab"), l.at("reviewer").t("pane"), false), (home.t("tab"), home.t("pane"), split(t))]
+        .into_iter().filter(|(tab, pane, _)| !tab.is_empty() && !pane.is_empty()).collect()
 }
-/// Is this pane in one of the task's own tabs (a pane you split there counts: it is looked at before anything closes).
-pub fn in_tabs(t: &Obj, p: &Value) -> bool { own(t).iter().any(|(tab, _)| p.s("tab_id") == tab) }
+/// Is this pane the task's: in one of its own tabs (a pane you split there counts: it is looked at before anything
+/// closes), or its own pane in a tab it shares with yours (yours there are not).
+pub fn in_tabs(t: &Obj, p: &Value) -> bool { own(t).iter().any(|(tab, pane, shared)| if *shared { p.s("pane_id") == pane } else { p.s("tab_id") == tab }) }
 /// Close the task's own panes, and with the last one each tab: only a pane still in the tab it was opened in (a pane's
 /// id can be given out again), never one of yours, and never the space.
-pub fn close_tabs(api: &Herdr, t: &Obj) { for (tab, pane) in own(t) { close_own(api, &tab, &pane); } }
+pub fn close_tabs(api: &Herdr, t: &Obj) { for (tab, pane, _) in own(t) { close_own(api, &tab, &pane); } }
 /// Close one pane of the task's own (its agent's, planner's or reviewer's), only while it is still in the tab it was
 /// opened in. Its tab goes with its last pane: one you split off in it keeps it open.
 pub fn close_own(api: &Herdr, tab: &str, pane: &str) {

@@ -115,7 +115,7 @@ pub fn task_at(pane: &str) -> Option<Obj> {
     crate::flow::pane_owner::whose(crate::store::tasks::list(Default::default()), &socket, pane).map(|(t, _)| t)
 }
 // ---- the board's own tab -------------------------------------------------------------------------------------------
-pub const BOARD_TAB: &str = "herdr-projects";
+pub use crate::flow::tabs::BOARD_TAB;
 fn tabs_file() -> std::path::PathBuf { data_dir().join("board-tabs.json") }
 /// The herdr pane of a board you started yourself in a terminal, "" when there is none to name.
 pub fn board_pane() -> String { if env("HERDR_ENV") == "1" && env("HERDR_PLUGIN_ID").is_empty() && env("TMUX").is_empty() { env("HERDR_PANE_ID") } else { String::new() } }

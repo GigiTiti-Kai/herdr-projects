@@ -37,7 +37,7 @@ pub fn begin(g: &mut Guard, t: Task, api: &Herdr) -> Res<Task> {
     let missing = (!who.kind.is_empty() && !own).then(|| format!("planned by the working agent: {} is not installed here", who.kind));
     let made = if own {
         let m = flow::tabs::open_tab(api, &t, flow::tabs::PLANNER_TAB, &dir.display().to_string(), &board_env(), "the planner")?;
-        flow::tabs::name_tab(api, t.at("link").s("tab"), &crate::hosted::label(&t, flow::tabs::AGENT_TAB));
+        if !crate::hosted::split(&t) { flow::tabs::name_tab(api, t.at("link").s("tab"), &crate::hosted::label(&t, flow::tabs::AGENT_TAB)); } // split off beside yours: the tab is yours
         Some(m)
     } else { None };
     // From here until the yes nothing can be written in the task's own worktree, and what git ignores there is written down.
@@ -142,7 +142,7 @@ fn fan_out(g: &mut Guard, agents: &[String]) -> Res<Task> {
         let k = agent_of(agent).kind;
         let mut extra = obj(json!({ "queuedAt": now() + n as i64, "agent": k, "app": k }));
         if n > 0 { extra.put("link", json!({ "socket": l.at("socket"), "hosted": hosted })); }
-        else { for (a, b) in &place { extra.insert(a.clone(), b.clone()); } extra.put("startedOnce", true); extra.put("link", json!({ "socket": l.at("socket"), "workspace": l.at("workspace"), "tab": l.at("tab"), "pane": l.at("pane"), "terminal": l.at("terminal"), "ownsWorkspace": false, "reviewer": null, "hosted": hosted })); }
+        else { for (a, b) in &place { extra.insert(a.clone(), b.clone()); } extra.put("startedOnce", true); extra.put("link", json!({ "socket": l.at("socket"), "workspace": l.at("workspace"), "tab": l.at("tab"), "pane": l.at("pane"), "terminal": l.at("terminal"), "ownsWorkspace": false, "reviewer": null, "hosted": hosted, "split": l.at("split") })); }
         made.push(create_attempt(&t, LETTERS[n], agent, extra)?);
     }
     let t = g.set(|t| {

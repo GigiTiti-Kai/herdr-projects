@@ -22,7 +22,13 @@ pub fn agent_tab(t: Option<&Obj>) -> String {
     let letter = if t.b("letter") { t.t("letter") } else { t.at("picked").t("letter") };
     crate::hosted::label(t, &format!("{AGENT_TAB}{}{}", if letter.is_empty() { String::new() } else { format!(" {letter}") }, if t.b("on") { format!(" ({})", t.s("agent")) } else { String::new() }))
 }
-pub fn name_agent_tab(api: &Herdr, tab: &str, t: Option<&Obj>) { name_tab(api, tab, &agent_tab(t)); }
+/// A task split off beside your panes (`workspace.place` = `pane`) names its pane instead: the tab is yours.
+pub fn name_agent_tab(api: &Herdr, tab: &str, t: Option<&Obj>) {
+    if let Some(t) = t.filter(|t| crate::hosted::split(t)) { if t.at("link").b("pane") { api.pane_rename(t.at("link").s("pane"), &agent_tab(Some(t))); } return; }
+    name_tab(api, tab, &agent_tab(t));
+}
+/// The board's own tab, when it runs in one.
+pub const BOARD_TAB: &str = "herdr-projects";
 /// A tab's ids: { tab, pane, terminal }.
 pub struct Opened { pub tab: String, pub pane: String, pub terminal: String }
 /// A tab of its own in the task's space, with one pane at its shell.
