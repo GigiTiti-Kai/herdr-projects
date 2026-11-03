@@ -14,7 +14,15 @@ use crate::store::repos::repo_of;
 use crate::store::tasks::{get as get_task, one_line};
 use std::path::Path;
 
-pub fn tab_note() -> String { "[Sent with --delegate: start every task you add from this message right away, without asking. Add each with \"board add … --delegate\"; if \"board add\" answers only \"added\", run \"board delegate <id>\". If this message leads to no new task, delegate nothing extra.]".into() }
+/// The note after who sent it: the same in today's note and in the one of older conversations ("[Sent with ctrl+s on the board: …").
+const NOTE_TAIL: &str = "start every task you add from this message right away, without asking. Add each with \"board add … --delegate\"; if \"board add\" answers only \"added\", run \"board delegate <id>\". If this message leads to no new task, delegate nothing extra.]";
+pub fn tab_note() -> String { format!("[Sent with --delegate: {NOTE_TAIL}") }
+/// The words without the note under them, today's or an older one: None when there is none.
+pub fn without_note(text: &str) -> Option<&str> {
+    let head = text.strip_suffix(NOTE_TAIL)?.strip_suffix(": ")?;
+    let at = head.rfind("[Sent with ")?;
+    (!head[at..].contains('\n')).then(|| text[..at].trim_end())
+}
 pub fn context(cwd: &Path, delegate: bool, about: &str) -> Res<Value> {
     let (repo, root) = repo_of(cwd)?;
     let t = if about.is_empty() { None } else { get_task(about) };

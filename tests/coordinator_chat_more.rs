@@ -6,7 +6,7 @@ use common::board::open;
 use common::*;
 use serde_json::json;
 use sw::board::keys::key_name;
-use sw::coordinator::{requests::{send, tab_note, where_text}, rules::rules, state};
+use sw::coordinator::{look::look, requests::{send, tab_note, where_text}, rules::rules, state};
 use sw::json::*;
 
 fn coord_world() -> World {
@@ -101,6 +101,15 @@ fn sent_with_tab_every_task_the_coordinator_adds_from_that_message_gets_an_agent
     w.script(json!({ "coordinator": [{ "said": "Two are being worked on." }] }));
     send(&w.root, "how is it going?", true, "", &w.socket).unwrap(); drain();
     assert_eq!(ids().len(), 6); assert_eq!(on(), vec!["proj/3", "proj/4", "proj/5"]);
+    // The chat shows the words alone: also in a conversation from before, whose note named the key instead.
+    let you = || look(&w.socket).talk.iter().filter(|m| m.you).map(|m| m.text.clone()).last();
+    assert_eq!(you().as_deref(), Some("how is it going?"));
+    let projects = std::path::PathBuf::from(std::env::var_os("CLAUDE_CONFIG_DIR").unwrap()).join("projects");
+    let file = std::fs::read_dir(&projects).unwrap().flatten().flat_map(|d| std::fs::read_dir(d.path()).unwrap().flatten()).map(|f| f.path()).find(|p| p.extension().is_some_and(|e| e == "jsonl")).unwrap();
+    let old = format!("and dark mode\n\n{}", tab_note().replacen("[Sent with --delegate:", "[Sent with ctrl+s on the board:", 1));
+    let line = json!({ "type": "user", "message": { "role": "user", "content": old }, "timestamp": sw::clock::iso(sw::clock::now()) });
+    { use std::io::Write; writeln!(std::fs::OpenOptions::new().append(true).open(&file).unwrap(), "{line}").unwrap(); }
+    assert_eq!(you().as_deref(), Some("and dark mode"));
     // enter: as before. The words go in alone, and what is added from them is only added.
     w.script(json!({ "coordinator": [{ "status": "working" }] }));
     send(&w.root, "note down: tidy the footer", false, "", &w.socket).unwrap(); drain();
