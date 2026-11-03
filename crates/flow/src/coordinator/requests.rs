@@ -1,11 +1,10 @@
 //! Requests to the Coordinator: written down here (send, restart, new, stop, open), carried out by the pump. What the
 //! human types goes in word for word. Where they were (the repo, the task they had open) is kept beside it, and the
 //! Coordinator asks for it with `coordinator where`, so one conversation serves every repo the board is opened in. A
-//! message sent with the start key (ctrl+s) carries a line under the words saying so; the chat shows the words alone.
+//! message sent with `coordinator tell … --delegate` carries a line under the words saying so; the chat shows the words alone.
 use super::co::Co;
 use super::state::{change, get, home};
 use super::who::{choice, OFF_WORDS};
-use crate::board::keys::key_name;
 use crate::clock::now;
 use crate::err::Res;
 use crate::herdr::Herdr;
@@ -15,7 +14,7 @@ use crate::store::repos::repo_of;
 use crate::store::tasks::{get as get_task, one_line};
 use std::path::Path;
 
-pub fn tab_note() -> String { format!("[Sent with {} on the board: start every task you add from this message right away, without asking. Add each with \"board add … --delegate\"; if \"board add\" answers only \"added\", run \"board delegate <id>\". If this message leads to no new task, delegate nothing extra.]", key_name("delegate")) }
+pub fn tab_note() -> String { "[Sent with --delegate: start every task you add from this message right away, without asking. Add each with \"board add … --delegate\"; if \"board add\" answers only \"added\", run \"board delegate <id>\". If this message leads to no new task, delegate nothing extra.]".into() }
 pub fn context(cwd: &Path, delegate: bool, about: &str) -> Res<Value> {
     let (repo, root) = repo_of(cwd)?;
     let t = if about.is_empty() { None } else { get_task(about) };
@@ -30,13 +29,13 @@ pub fn where_text(co: impl Into<Co>) -> String {
     if list.is_empty() { return "Nothing was sent from the board yet, so it is not known which repo the human is in: ask them, or see \"board list\".".into(); }
     let one = |w: &Value| [format!("\"{}\" was sent from the repo \"{}\" ({}).", one_line(w.s("said"), 80), w.s("repo"), tilde(w.s("root"))),
         if w.b("task") { format!("Task {} (\"{}\") was open: for this message \"it\" and \"this\" mean that task.", w.s("task"), w.s("title")) } else { "No task was open.".into() },
-        if w.b("delegate") { format!("It was sent with {}: put an agent on every task you add from it, without asking.", key_name("delegate")) } else { format!("It was sent with {}: delegate only what the human asked you to.", key_name("enter")) }].join(" ");
+        if w.b("delegate") { "It was sent with --delegate: put an agent on every task you add from it, without asking.".into() } else { "It was sent without --delegate: delegate only what the human asked you to.".into() }].join(" ");
     let head = format!("The human's last {} from the board{}:", if list.len() > 1 { format!("{} messages", list.len()) } else { "message".into() }, if list.len() > 1 { ", the newest last. Each has its own repo, open task and delegate choice: use the ones of the message you are acting on" } else { "" });
     std::iter::once(head).chain(list.iter().map(|w| format!("- {}", one(w)))).collect::<Vec<_>>().join("\n")
 }
-/// The board's own half of "sent with the start key": a task added from the Coordinator's pane is delegated by `add` itself when
-/// it can only come from a tab message (the last message went in while it was at rest, it is still in that turn, and
-/// every message it may still have ahead of it was sent with the start key).
+/// The board's own half of "sent with --delegate": a task added from the Coordinator's pane is delegated by `add` itself when
+/// it can only come from such a message (the last message went in while it was at rest, it is still in that turn, and
+/// every message it may still have ahead of it was sent with --delegate).
 pub fn tab_turn(pane: &str, socket: &str) -> bool { super::state::all(socket).iter().any(|co| tab_turn_of(pane, co)) }
 fn tab_turn_of(pane: &str, co: &Co) -> bool {
     let socket = co.socket.as_str();

@@ -1,6 +1,6 @@
 //! More of the Coordinator's chat: esc never shows, hides or closes it (only alt+c does), a task with no agent is talked
 //! about to the Coordinator, enter goes into a task's agent, the chat's head line at every width, a narrow or short
-//! window; and a message sent with tab, whose tasks the board itself delegates when they come from that turn.
+//! window; and a message sent with --delegate, whose tasks the board itself delegates when they come from that turn.
 use crate::common;
 use common::board::open;
 use common::*;
@@ -59,7 +59,7 @@ fn esc_hides_but_never_shows_the_chat_and_a_task_with_no_agent_is_talked_about_t
     assert!(has(&txt, &format!(r"\n╭─ [^\n]*PRJ-\d+  · Agent ─*╮\n(?:│ +│\n)?│ +❯ Send message to the machine coordinator +│")), "{txt}");
     s.typed("make it shorter"); s.press(&["enter"]); drain();
     assert_eq!(prompts_of(&w)[2], "make it shorter");
-    assert!(has(&where_text(&w.socket), r#"\n- "make it shorter"[^\n]*Task proj/1 \("Write the docs"\) was open: for this message "it" and "this" mean that task\. It was sent with enter"#), "{}", where_text(&w.socket));
+    assert!(has(&where_text(&w.socket), r#"\n- "make it shorter"[^\n]*Task proj/1 \("Write the docs"\) was open: for this message "it" and "this" mean that task\. It was sent without --delegate"#), "{}", where_text(&w.socket));
     assert!(cli(&["coordinator", "where"]).contains("was sent from the repo \"proj\""), "the Coordinator's own command says it");
 }
 
@@ -75,11 +75,13 @@ fn sent_with_tab_every_task_the_coordinator_adds_from_that_message_gets_an_agent
     let end_turn = || w.patch(|st| { let seq = st.i("seq") + 1; st["seq"] = json!(seq); for p in st["panes"].as_array_mut().unwrap() { if p.at("agent").is_object() { p["agent"]["status"] = json!("done"); p["agent"]["seq"] = json!(seq); p["agent"]["completion"] = json!(seq); } } });
     let pane_env = |p: Option<&str>| unsafe { match p { Some(p) => std::env::set_var("HERDR_PANE_ID", p), None => std::env::remove_var("HERDR_PANE_ID") } };
     unsafe { std::env::set_var("HERDR_PROJECTS_HANDLED_MS", "0") };
-    // tab: the message itself says so, under the words. The Coordinator is now in that message's turn.
+    // --delegate: the message itself says so, under the words. The Coordinator is now in that message's turn.
     w.script(json!({ "coordinator": [{ "status": "working" }] }));
     send(&w.root, "a login page, and dark mode", true, "", &w.socket).unwrap(); drain();
     assert_eq!(prompts_of(&w)[0], format!("a login page, and dark mode\n\n{}", tab_note()));
-    assert!(has(&rules("board"), r"A message sent with ctrl\+s ends with a line in square brackets saying so\.[^\n]*every task you add from that message gets an agent at once, with no question back"));
+    assert!(has(&rules("board"), r#"A message sent with "coordinator tell … --delegate" ends with a line in square brackets saying so\.[^\n]*every task you add from that message gets an agent at once, with no question back"#));
+    assert!(has(&rules("board"), r#"reaches you word for word, with nothing added: it always goes with enter\. The only thing ever added is one line in square brackets under the words of a message sent with "coordinator tell … --delegate""#));
+    assert!(!has(&rules("board"), &format!("sent (them )?with {}", regex::escape(&key_name("delegate")))));
     let pane = get(&w).t("pane");
     // A task added from anywhere else is only added: the human's shell, a working agent's pane.
     assert_eq!(board(&["add", "Mine"]), "proj/1: added");
@@ -87,15 +89,15 @@ fn sent_with_tab_every_task_the_coordinator_adds_from_that_message_gets_an_agent
     assert_eq!(board(&["add", "A worker's follow-up"]), "proj/2: added");
     // Added from the Coordinator's pane, with no flag at all (it forgot): the board delegates it. Every one of them.
     pane_env(Some(&pane));
-    assert_eq!(board(&["add", "Login page"]), "proj/3: added, an agent is on it (the message was sent with ctrl+s)");
-    assert_eq!(board(&["add", "Dark mode"]), "proj/4: added, an agent is on it (the message was sent with ctrl+s)");
+    assert_eq!(board(&["add", "Login page"]), "proj/3: added, an agent is on it (the message was sent with --delegate)");
+    assert_eq!(board(&["add", "Dark mode"]), "proj/4: added, an agent is on it (the message was sent with --delegate)");
     // It remembered the flag: the same, once.
     assert_eq!(board(&["add", "Sign up", "--delegate"]), "proj/5: added, an agent is on it");
     assert_eq!(on(), vec!["proj/3", "proj/4", "proj/5"]);
     // Its turn is over. What it adds later is not that message's: added, not delegated.
     end_turn();
     assert_eq!(board(&["add", "Later"]), "proj/6: added");
-    // A tab message that adds nothing (a question) delegates nothing.
+    // A --delegate message that adds nothing (a question) delegates nothing.
     w.script(json!({ "coordinator": [{ "said": "Two are being worked on." }] }));
     send(&w.root, "how is it going?", true, "", &w.socket).unwrap(); drain();
     assert_eq!(ids().len(), 6); assert_eq!(on(), vec!["proj/3", "proj/4", "proj/5"]);
@@ -104,16 +106,16 @@ fn sent_with_tab_every_task_the_coordinator_adds_from_that_message_gets_an_agent
     send(&w.root, "note down: tidy the footer", false, "", &w.socket).unwrap(); drain();
     assert_eq!(prompts_of(&w).last().unwrap(), "note down: tidy the footer");
     assert_eq!(board(&["add", "Tidy the footer"]), "proj/7: added");
-    // A tab message that goes in while it is still busy with the enter one: the board leaves it to the line in the message.
+    // A --delegate message that goes in while it is still busy with the enter one: the board leaves it to the line in the message.
     w.script(json!({ "coordinator": [{ "status": "working" }] }));
     send(&w.root, "and a new logo", true, "", &w.socket).unwrap(); drain();
     assert_eq!(prompts_of(&w).last().unwrap(), &format!("and a new logo\n\n{}", tab_note()));
     assert_eq!(board(&["add", "New logo"]), "proj/8: added");
-    // Both dealt with; the next tab message is clear again.
+    // Both dealt with; the next --delegate message is clear again.
     end_turn();
     w.script(json!({ "coordinator": [{ "status": "working" }] }));
     send(&w.root, "a pricing page", true, "", &w.socket).unwrap(); drain();
-    assert_eq!(board(&["add", "Pricing page"]), "proj/9: added, an agent is on it (the message was sent with ctrl+s)");
+    assert_eq!(board(&["add", "Pricing page"]), "proj/9: added, an agent is on it (the message was sent with --delegate)");
     // A Coordinator that was restarted is not in that turn any more.
     state::change(&w.socket, |c| { let n = c.i("startedAt") + 1; c.put("startedAt", n); true }).unwrap();
     assert_eq!(board(&["add", "After a restart"]), "proj/10: added");

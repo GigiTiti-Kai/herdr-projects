@@ -59,7 +59,7 @@ pub fn command(cmd: &str, a: &Args) -> Res<(Value, String)> {
             };
             // Added from a coordinator's pane, in any turn: its own, which its autopilot's `added` never wakes it for.
             if let (None, Some(co)) = (&pilot, crate::autopilot::turn::caller()) { crate::store::tasks::set(t.s("id"), json!({ "coordinator": co.settings_key() }))?; }
-            // Added by the Coordinator from a message the human sent with the start key: delegated here, flag or no flag.
+            // Added by the Coordinator from a message sent with --delegate: delegated here, flag or no flag.
             let mut tab = false;
             if !flags.b("delegate") && !crate::util::env_set("HERDR_PLUGIN_ID") { if let Some(p) = crate::util::env_val("HERDR_PANE_ID") { tab = crate::coordinator::requests::tab_turn(&p, &current_socket()); } }
             let after = after.filter(|d| !d.is_empty());
@@ -67,7 +67,7 @@ pub fn command(cmd: &str, a: &Args) -> Res<(Value, String)> {
             let on = if flags.b("delegate") || tab || start {
                 let d = start::delegate(t.s("id"), vec![])?;
                 let how = crate::after::waiting_words(&d).map(|w| format!(", it {w}")).unwrap_or_else(|| ", an agent is on it".into());
-                format!("{how}{}", if tab { format!(" (the message was sent with {})", key_name("delegate")) } else { String::new() })
+                format!("{how}{}", if tab { " (the message was sent with --delegate)" } else { "" })
             } else if let Some(d) = &after { format!(", it will wait for {} to be done once it is delegated", crate::after::names(d)) } else { String::new() };
             (shown_of(t.s("id")), format!("{}: added{}{on}{}{dropped}", t.s("id"), if crate::chat_only::is_chat(&t) { " as chat only" } else if is_research(&t) { " as research only" } else { "" }, title_note(&rest(1))))
         }
