@@ -96,12 +96,13 @@ fn draw_at(s: &mut State, t: &Theme, width: usize, rows: usize) -> Screen {
     let picks = super::guard::part(|| super::skills::skill_lines(s, t, width, rows_n / 3)).unwrap_or_default();
     s.chat_folded = (s.full || s.auto_open || s.menu.is_some() || !picks.is_empty() || rows_n < 14) && !who.as_ref().map(|w| w.always).unwrap_or(false);
     let framed = !s.chat_folded && s.ask.is_none() && chat_up(s, who.as_ref()) && who.as_ref().map(|w| w.said).unwrap_or(false) && width >= 8;
-    // What just happened, on a line of its own: the hints below it stay readable.
+    // What just happened, on a line of its own: the hints below it stay readable. A result keeps to three lines; an
+    // error, which stays until esc, wraps whole (only a window too short for it cuts it, from its end).
     let stale = if s.stale.is_empty() { String::new() } else if !s.ctx.can_reload { "herdr-projects was updated: close the board and open it again for the new version.".into() } else { "herdr-projects was updated: the new version loads when nothing is half typed.".into() };
     let said: Vec<Inked> = if !s.msg.is_empty() && !(!s.off_note.is_empty() && s.msg_kind != Ink::Red) {
         let mut m = Inked::of(s.msg.clone(), s.msg_kind);
         if s.msg_kind == Ink::Red { m = m.add(Inked::of(format!("  ({} dismisses)", key_name("back")), Ink::Muted)); }
-        m.wrap(width.saturating_sub(4).max(10)).into_iter().take(3).map(|l| Inked::plain("  ").add(l)).collect()
+        m.wrap(width.saturating_sub(4).max(10)).into_iter().take(if s.msg_kind == Ink::Red { usize::MAX } else { 3 }).map(|l| Inked::plain("  ").add(l)).collect()
     } else if !s.off_note.is_empty() { Inked::of(s.off_note.clone(), Ink::Yellow).wrap(width.saturating_sub(4).max(10)).into_iter().take(3).map(|l| Inked::plain("  ").add(l)).collect() }
     else if !stale.is_empty() { vec![Inked::plain("  ").add(Inked::of(stale, Ink::Muted))] } else { vec![] };
     let said: Vec<Inked> = broke.iter().map(|b| failed(b, width)).chain(said).collect();
@@ -138,9 +139,10 @@ fn draw_at(s: &mut State, t: &Theme, width: usize, rows: usize) -> Screen {
         let l = Inked::plain(" ").add(if bad { Inked::of(t.mark("error", ""), Ink::Red) } else { Inked::of(t.mark("working", ""), Ink::Yellow) }).add(Inked::plain(format!(" {}", crate::shown::words::clean(j.s("text"))))).add(if bad { Inked::of(format!("  {}", crate::shown::words::clean(j.s("msg"))), Ink::Soft) } else { Inked::new() });
         if j.s("id") == s.sel { super::list::hl(t, &l, width) } else { l }
     }).collect() } else { vec![] };
-    // Whatever the window, the text box and its hints are whole: the chat, then the rows above it, give way.
+    // Whatever the window, the text box and its hints are whole: the chat, then the rows above it, give way. With hints
+    // the list keeps one line (h below), so they leave it that one.
     let mut said = said;
-    while jobs.len() + chat.len() + input.len() + said.len() + hint_n > rows_n && (!chat.is_empty() || !jobs.is_empty() || !said.is_empty()) {
+    while jobs.len() + chat.len() + input.len() + said.len() + 2 * hint_n > rows_n &&(!chat.is_empty() || !jobs.is_empty() || !said.is_empty()) {
         if !chat.is_empty() { chat.remove(0); } else if !jobs.is_empty() { jobs.pop(); } else { said.pop(); }
     }
     let mut bottom: Vec<Inked> = vec![];
