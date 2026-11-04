@@ -83,7 +83,7 @@ fn what_you_say_is_never_lost_a_dialog_on_its_screen_holds_it_a_failed_start_say
     drain();
     assert_eq!(look(&so).state, "working");
     assert_eq!(said(&w), (1..=7).map(|n| format!("busy {n}")).collect::<Vec<_>>(), "all seven it still has ahead of it");
-    assert!(has(&where_text(&so), r#"- "busy 1" was sent from the repo "elsewhere"[^\n]*It was sent with ctrl\+s"#));
+    assert!(has(&where_text(&so), r#"- "busy 1" was sent from the repo "elsewhere"[^\n]*It was sent with --delegate"#));
     // There is no number at which one it has not dealt with is let go.
     w.script(json!({ "coordinator": (0..61).map(|_| json!({ "status": "working" })).collect::<Vec<_>>() }));
     for n in 8..=68 { tell(&w, &w.root, &format!("busy {n}"), false); }

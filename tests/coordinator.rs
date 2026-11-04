@@ -59,7 +59,7 @@ fn the_box_talks_to_one_long_lived_coordinator_started_once_with_nothing_held_ba
     assert!(read(&sw::coordinator::state::home(&socket).join("AGENTS.md")).contains("You are the Coordinator of the human's work board"));
     assert_eq!(ag.arr("prompts")[0].s(""), "", "{}", ag.at("prompts"));
     assert_eq!(text(&ag.arr("prompts")[0]), "build a login page", "your words go in exactly as typed");
-    assert!(has(&sw::coordinator::requests::where_text(&socket), r#"^The human's last message from the board:\n- "build a login page" was sent from the repo "proj" \(.*\)\. No task was open\. It was sent with enter: delegate only what the human asked you to\.$"#), "{}", sw::coordinator::requests::where_text(&socket));
+    assert!(has(&sw::coordinator::requests::where_text(&socket), r#"^The human's last message from the board:\n- "build a login page" was sent from the repo "proj" \(.*\)\. No task was open\. It was sent without --delegate: delegate only what the human asked you to\.$"#), "{}", sw::coordinator::requests::where_text(&socket));
     // Its reply takes the place of what you said: the box holds one message, never both.
     s.load();
     for width in [160, 120, 60] {
@@ -82,7 +82,7 @@ fn the_box_talks_to_one_long_lived_coordinator_started_once_with_nothing_held_ba
     let p = agents(&w)[0].at("agent").arr("prompts").to_vec();
     assert_eq!(p.len(), 2);
     assert_eq!(text(&p[1]), "and start it");
-    assert!(has(&sw::coordinator::requests::where_text(&socket), r#"2 messages[^\n]*\n- "build a login page"[^\n]*It was sent with enter[^\n]*\n- "and start it"[^\n]*It was sent with enter[^\n]*$"#));
+    assert!(has(&sw::coordinator::requests::where_text(&socket), r#"2 messages[^\n]*\n- "build a login page"[^\n]*It was sent without --delegate[^\n]*\n- "and start it"[^\n]*It was sent without --delegate[^\n]*$"#));
     // Hidden, the new reply waits; shown again, it is there.
     s.load(); assert!(!s.s.chat_open);
     assert!(!s.text().contains("Delegated proj/1."), "{}", s.text());
