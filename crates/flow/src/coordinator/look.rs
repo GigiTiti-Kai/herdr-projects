@@ -3,7 +3,7 @@
 //! `state` is one of: none, starting, working, blocked, idle, exited.
 use super::co::Co;
 use super::pump::active;
-use super::requests::{open, tab_note, typed_there};
+use super::requests::{open, typed_there, without_note};
 use super::rules_place::intro_line_of;
 use super::state::{get, home, pumping};
 use super::who::{choice_of, describe, same_choice};
@@ -40,8 +40,7 @@ fn bare(text: &str, co: &Co) -> String {
     let mut s = text.to_string();
     let intro = intro_line_of(co);
     if let Some(r) = s.strip_prefix(&intro) { s = r.trim().to_string(); }
-    let note = tab_note();
-    if let Some(r) = s.strip_suffix(&note) { s = r.trim().to_string(); }
+    if let Some(r) = without_note(&s) { s = r.trim().to_string(); }
     s
 }
 pub fn look(co: impl Into<Co>) -> Look {
