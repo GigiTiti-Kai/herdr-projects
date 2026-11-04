@@ -7,12 +7,22 @@ use crate::common;
 use common::*;
 use serde_json::json;
 use sw::actions::{finish_line, talk};
+use sw::coordinator::{co::Co, place::{close_place, open_tab}, state};
 use sw::herdr::Herdr;
 use sw::json::*;
+use sw::store::tasks::{update_wait, Change};
 
 fn pane_world() -> World { world_with(Opts { repo: true, settings: json!({ "review.when": "never", "workspace.place": "pane" }), ..Default::default() }) }
 fn pane_label(w: &World, pane: &str) -> String { w.state().arr("panes").iter().find(|p| p.s("pane_id") == pane).map(|p| p.t("label")).unwrap_or_default() }
 fn split_calls(w: &World) -> Vec<String> { calls(w).into_iter().filter(|c| c.starts_with("pane split")).collect() }
+/// A task in a plan step, its planner in a tab of its own, in your space.
+fn planned_world() -> World {
+    let w = world_with(Opts { repo: true, settings: json!({ "workspace.place": "pane", "review.when": "never", "plan.approve": "you", "plan.agent": "codex/gpt-5.5", "worker.agent": "claude" }), ..Default::default() });
+    unsafe { std::env::set_var("HERDR_PROJECTS_SANDBOX", "bwrap") };
+    your_space(&w, "mine", &repo_name(&w), false);
+    w
+}
+fn labels(w: &World) -> Vec<String> { w.state().arr("tabs").iter().filter(|x| x.s("workspace_id") == "mine").map(|x| x.t("label")).collect() }
 fn last_looked_at(w: &World, ws: &str, tab: &str) { w.patch(|s| { for x in s["workspaces"].as_array_mut().unwrap() { if x.s("workspace_id") == ws { x["active_tab_id"] = json!(tab); } } }); }
 
 #[test]
@@ -121,22 +131,129 @@ fn with_no_space_of_yours_open_the_repo_space_the_board_opens_is_shared_and_the_
 
 #[test]
 fn its_planner_has_a_tab_of_its_own_and_your_tab_keeps_its_name_while_the_agent_waits_beside_yours() {
-    let w = world_with(Opts { repo: true, settings: json!({ "workspace.place": "pane", "review.when": "never", "plan.approve": "you", "plan.agent": "codex/gpt-5.5", "worker.agent": "claude" }), ..Default::default() });
-    unsafe { std::env::set_var("HERDR_PROJECTS_SANDBOX", "bwrap") };
-    your_space(&w, "mine", &repo_name(&w), false);
+    let w = planned_world();
     w.script(json!({ "worker": [{ "plan": "# Plan\n\n1. Add h.txt.\n", "note": "Planned." }, { "files": { "h.txt": "x\n" }, "commit": "h", "note": "Did it." }] }));
     let b = w.add("Planned beside yours");
     delegate(&b);
     let t = settle(&b);
     assert_eq!(t.s("stage"), "plan", "{}", t.at("failure"));
-    let labels = |w: &World| w.state().arr("tabs").iter().filter(|x| x.s("workspace_id") == "mine").map(|x| x.t("label")).collect::<Vec<_>>();
     assert_eq!(labels(&w), vec!["1".to_string(), format!("{} Planner", tag(&b))]);
     let home = t.at("plan").at("home").t("pane");
     assert_eq!(t.at("plan").at("home").s("tab"), "mine:t1"); assert!(t.at("link").b("split"));
+    assert_eq!(pane_label(&w, &home), format!("{} Agent", tag(&b)), "named while it waits");
     finish_line::approve(&b, None, false).unwrap();
     let t = settle(&b);
     assert_eq!(t.s("stage"), "approval", "{}", t.at("failure"));
     assert_eq!(t.at("link").s("pane"), home); assert_eq!(t.at("link").s("tab"), "mine:t1");
     assert_eq!(labels(&w), vec!["1".to_string()], "the planner's tab closed, yours kept its name");
     assert_eq!(pane_label(&w, &home), format!("{} Agent", tag(&b)));
+}
+
+#[test]
+fn a_planner_whose_terminal_closed_gets_a_tab_again_and_your_tab_keeps_its_name() {
+    let w = planned_world();
+    w.script(json!({ "worker": [{ "plan": "# Plan\n\n1. Add h.txt.\n", "note": "Planned." }, { "plan": "# Plan\n\n1. Add it twice.\n", "note": "Planned again." }, { "files": { "h.txt": "x\n" }, "commit": "h", "note": "Did it." }] }));
+    let b = w.add("Planner lost");
+    delegate(&b);
+    let t = settle(&b);
+    assert_eq!(t.s("stage"), "plan", "{}", t.at("failure"));
+    let (api, home) = (Herdr::new(Some(w.socket.clone())), t.at("plan").at("home").t("pane"));
+    // a reply: its planner starts again, in a tab of its own, and the agent's pane still waits beside yours
+    api.pane_close(t.at("link").s("pane"));
+    talk::tell(&b, "revise this plan", false).unwrap();
+    let t = settle(&b);
+    assert_eq!(t.s("stage"), "plan", "{}", t.at("failure"));
+    assert_ne!(t.at("link").s("tab"), "mine:t1"); assert_eq!(t.at("plan").at("home").s("pane"), home); assert!(t.at("link").b("split"));
+    assert_eq!(labels(&w), vec!["1".to_string(), format!("{} Planner", tag(&b))]);
+    assert!(split_calls(&w).len() == 1, "only the agent's own pane was split: {:?}", split_calls(&w));
+    // gone again, and you go into the task: the same
+    api.pane_close(t.at("link").s("pane"));
+    let (pane, _, t) = sw::delegate::reopen(&b, false).unwrap();
+    assert_ne!(pane.s("tab_id"), "mine:t1"); assert!(t.at("link").b("split")); assert_eq!(tab_label(&w, "mine:t1"), "1");
+    assert!(split_calls(&w).len() == 1, "{:?}", split_calls(&w));
+}
+
+#[test]
+fn ids_of_another_session_or_of_an_ended_task_keep_no_task_out_of_your_space_or_your_tab() {
+    let w = pane_world();
+    your_space(&w, "mine", &repo_name(&w), false);
+    // the very same ids: a task at work in another herdr session, and one ended here, whose space's id was given out again
+    let (there, ended) = (w.add("In another session"), w.add("Done long ago"));
+    update_wait(&there, 1000, |t| { t.put("stage", "working"); t.put("link", json!({ "socket": "/elsewhere/herdr.sock", "workspace": "mine", "tab": "mine:t1", "pane": "mine:p1", "ownsWorkspace": true })); Ok(Change::Write) }).unwrap();
+    update_wait(&ended, 1000, |t| { t.put("stage", "done"); t.put("link", json!({ "socket": w.socket, "workspace": "mine", "tab": "mine:t1", "pane": "mine:p1", "ownsWorkspace": false, "hosted": true })); Ok(Change::Write) }).unwrap();
+    worker(&w, 1);
+    let b = w.add("Beside yours");
+    delegate(&b);
+    let t = settle(&b);
+    assert_eq!(t.s("stage"), "approval", "{}", t.at("failure"));
+    assert_eq!(t.at("link").s("workspace"), "mine"); assert_eq!(t.at("link").s("tab"), "mine:t1");
+    assert_eq!(split_calls(&w).len(), 1, "{:?}", split_calls(&w));
+    assert_eq!(tabs_in(&w, "mine"), vec!["mine:t1".to_string()]);
+}
+
+#[test]
+fn a_coordinators_tab_and_the_boards_are_passed_over_and_a_space_with_no_tab_of_yours_gets_one_the_next_task_shares() {
+    let w = pane_world();
+    let home = w.base.join("home-coord");
+    std::fs::create_dir_all(&home).unwrap();
+    unsafe { std::env::set_var("HERDR_PROJECTS_COORDINATOR_DIR", &home) };
+    your_space(&w, "mine", &repo_name(&w), false);
+    w.patch(|s| { for x in s["workspaces"].as_array_mut().unwrap() { x.as_object_mut().unwrap().remove("worktree"); } }); // a coordinator's kind of space: opened with no worktree
+    sw::store::repos::repo_of(&w.root).unwrap();
+    // the board runs in your only tab, and the repo's coordinator in a tab of its own, the one you last looked at
+    sw::store::files::write_json(&sw::flow::tabs::board_note(&w.socket), &json!({ "pane": "mine:p1", "pid": std::process::id() })).unwrap();
+    let (api, co) = (Herdr::new(Some(w.socket.clone())), Co::project(&w.socket, "proj"));
+    let coordinator = open_tab(&api, &co, &[]).unwrap();
+    assert_eq!(coordinator.s("workspace_id"), "mine");
+    last_looked_at(&w, "mine", coordinator.s("tab_id"));
+    worker(&w, 1);
+    let a = w.add("First");
+    delegate(&a);
+    let ta = settle(&a);
+    assert_eq!(ta.s("stage"), "approval", "{}", ta.at("failure"));
+    let tab = ta.at("link").t("tab");
+    assert_ne!(tab, "mine:t1"); assert_ne!(tab, coordinator.s("tab_id"));
+    assert!(ta.at("link").b("split")); assert_eq!(pane_label(&w, ta.at("link").s("pane")), format!("{} Agent", tag(&a)));
+    assert!(split_calls(&w).is_empty(), "{:?}", split_calls(&w));
+    assert!(!tab_label(&w, &tab).contains("Agent"), "a tab for the tasks' panes is named after none of them: {}", tab_label(&w, &tab));
+    // the next task shares it, and stopping the coordinator closes its tab with nothing of theirs in it
+    worker(&w, 2);
+    let b = w.add("Second");
+    delegate(&b);
+    let tb = settle(&b);
+    assert_eq!(tb.s("stage"), "approval", "{}", tb.at("failure"));
+    assert_eq!(tb.at("link").s("tab"), tab); assert!(tb.at("link").b("split"));
+    assert!(split_calls(&w)[0].starts_with(&format!("pane split {} ", ta.at("link").s("pane"))), "{:?}", split_calls(&w));
+    close_place(&api, &state::get(&co).unwrap());
+    assert!(pane_there(&w, ta.at("link").s("pane"))); assert!(pane_there(&w, tb.at("link").s("pane"))); assert!(pane_there(&w, "mine:p1"));
+}
+
+#[test]
+fn attempts_asked_for_while_its_plan_waits_attempt_a_keeps_its_pane_beside_yours_and_the_others_have_tabs() {
+    let w = world_with(Opts { repo: true, settings: json!({ "workspace.place": "pane", "plan.approve": "you", "plan.agent": "codex/gpt-5.5", "worker.agent": "claude" }), ..Default::default() });
+    unsafe { std::env::set_var("HERDR_PROJECTS_SANDBOX", "bwrap") };
+    your_space(&w, "mine", &repo_name(&w), false);
+    w.script(json!({ "worker": [{ "plan": "# Plan\n\n1. Add a file.\n", "note": "Planned." }, step(1), step(2)], "picker": [{ "comparison": { "pick": "A", "why": "A is smaller." } }], "reviewer": [{ "verdict": { "meets": true, "text": "Looked at it.", "findings": [] } }] }));
+    let id = w.add("More attempts after the plan");
+    delegate(&id);
+    let t = settle(&id);
+    assert_eq!(t.s("stage"), "plan", "{}", t.at("failure"));
+    sw::store::settings::change::set_value("attempts.by", &json!(2), &sw::store::settings::lookup::Scope::task(&t)).unwrap();
+    finish_line::approve(&id, None, false).unwrap();
+    settle_all(&id);
+    assert_eq!(task(&id).s("stage"), "pick", "{}", task(&id).at("failure"));
+    let (a, b) = (kid(&id, "A"), kid(&id, "B"));
+    assert_eq!(a.at("link").s("tab"), "mine:t1"); assert!(a.at("link").b("split"));
+    assert_eq!(pane_label(&w, a.at("link").s("pane")), format!("{} Agent A", tag(&id))); assert_eq!(tab_label(&w, "mine:t1"), "1");
+    assert!(!b.at("link").b("split")); assert_eq!(tab_label(&w, b.at("link").s("tab")), format!("{} Agent B", tag(&id)));
+    // a is picked: the task has that pane now, and leaves your tab and your busy pane there as it found them
+    sw::attempts::settle::pick(&id, "A").unwrap();
+    let t = settle_all(&id);
+    assert_eq!(t.s("stage"), "approval", "{}", t.at("failure"));
+    assert_eq!(t.at("link").s("pane"), a.at("link").s("pane")); assert!(t.at("link").b("split")); assert!(!pane_there(&w, b.at("link").s("pane")));
+    finish_line::approve(&id, None, false).unwrap();
+    let t = settle_all(&id);
+    assert_eq!(t.s("stage"), "done", "{}", t.at("failure")); assert!(t.b("cleaned"), "{}", t.at("kept"));
+    assert!(!pane_there(&w, a.at("link").s("pane"))); assert!(pane_there(&w, "mine:p1")); assert_eq!(tab_label(&w, "mine:t1"), "1");
+    assert!(calls(&w).iter().all(|c| !c.starts_with("tab close") && !c.starts_with("workspace close")), "{:?}", calls(&w));
 }

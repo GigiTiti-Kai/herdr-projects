@@ -11,7 +11,7 @@ mod of_repo;
 mod split;
 use crate::err::Res;
 use crate::flow;
-use crate::herdr::cli::args;
+use crate::herdr::cli::{args, same_socket};
 use crate::herdr::Herdr;
 use crate::json::*;
 use crate::store::attempts::attempt_count;
@@ -19,23 +19,29 @@ use crate::store::files::{board_env, data_dir, with_lock_wait};
 use crate::store::keys::{repo_keys, tag_of};
 use crate::store::repos::{git_out, git_slow};
 use crate::store::settings::lookup::setting;
-use crate::store::tasks::all;
+use crate::store::tasks::{all, Task};
 use std::path::Path;
 
 /// The task works in a tab of a space it does not own.
 pub fn is(t: &Obj) -> bool { t.at("link").b("hosted") }
 /// The task's agent pane is split off in a tab it shares with yours (`workspace.place` = `pane`): the tab is not its own.
-pub fn split(t: &Obj) -> bool { t.at("link").b("split") }
+fn split(t: &Obj) -> bool { t.at("link").b("split") }
+/// A planner of its own holds the task's link, in a tab of its own, while the agent's pane waits as the plan's `home`.
+fn planning(t: &Obj) -> bool { t.at("plan").at("home").is_object() }
+/// The link names that split-off pane, so the tab it names is not the task's.
+pub fn shared(t: &Obj) -> bool { split(t) && !planning(t) }
 /// Asked for at the start: `workspace.place` is `tab` or `pane`, and the task is done once (attempts share a space of their own).
 pub fn wanted(t: &Obj) -> bool {
     !t.b("attemptOf") && [json!("tab"), json!("pane")].contains(&setting("workspace.place", Some(t))) && attempt_count(&setting("attempts.by", Some(t))) <= 1
 }
-fn beside(t: &Obj) -> bool { setting("workspace.place", Some(t)) == json!("pane") }
+/// Its next place is a pane beside yours. A planner and an attempt always have a tab of their own.
+fn beside(t: &Obj) -> bool { !planning(t) && !t.b("attemptOf") && setting("workspace.place", Some(t)) == json!("pane") }
 /// What the link says of the place it was just given (`placed`: what opened it, null for a space of its own).
 pub fn mark(t: &mut Obj, placed: &Value) {
+    let waits = planning(t); // a planner's new tab leaves the agent's pane where it is
     let l = t.obj_mut("link");
     if placed.b("hosted") { l.put("ownsWorkspace", false); l.put("hosted", true); } else { l.del("hosted"); }
-    if placed.b("split") { l.put("split", true); } else { l.del("split"); }
+    if placed.b("split") { l.put("split", true); } else if !waits { l.del("split"); }
 }
 /// A tab's name in a space of yours starts with the task's key, so you can tell whose it is (an attempt's: its task's).
 pub fn label(t: &Obj, base: &str) -> String {
@@ -44,12 +50,14 @@ pub fn label(t: &Obj, base: &str) -> String {
     let tag = tag_of(&id, &repo_keys());
     format!("{} {base}", if tag.is_empty() { id } else { tag })
 }
+/// The tasks of `api`'s herdr session: herdr's ids are each session's own, so another's say nothing of this one's.
+fn of_session(api: &Herdr) -> Vec<Task> { let here = api.socket_path(); all().into_iter().filter(|t| same_socket(t.at("link").s("socket"), &here)).collect() }
 /// A space of the repo at `root` that no task owns: `prefer` while it still is one, else the one you look at, else the
 /// one named after the repo, else any other. A space id herdr gave out again to another task's space is that task's,
 /// never a host; nor is the repo space herdr opened for the board, which the board closes after its last task.
 /// Err: herdr did not say which spaces are open.
 fn host(api: &Herdr, root: &Path, prefer: &str) -> Res<Option<String>> {
-    let mut not: Vec<String> = all().iter().filter(|t| t.at("link").b("ownsWorkspace")).map(|t| t.at("link").t("workspace")).collect();
+    let mut not: Vec<String> = of_session(api).iter().filter(|t| t.at("link").b("ownsWorkspace")).map(|t| t.at("link").t("workspace")).collect();
     not.extend(flow::spaces::made_by_herdr(api, root));
     let of_repo: Vec<Value> = of_repo::spaces(api, root)?.into_iter().filter(|w| !not.contains(&w.t("workspace_id"))).collect();
     let name = root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
@@ -116,7 +124,7 @@ pub fn again(api: &Herdr, root: &Path, t: &Obj) -> Res<Option<Value>> {
 /// home while a planner has the first. `shared`: the agent's pane split off in a tab of yours, which is not the task's.
 fn own(t: &Obj) -> Vec<(String, String, bool)> {
     let (l, home) = (t.at("link"), t.at("plan").at("home"));
-    [(l.t("tab"), l.t("pane"), split(t) && !home.is_object()), (l.at("reviewer").t("tab"), l.at("reviewer").t("pane"), false), (home.t("tab"), home.t("pane"), split(t))]
+    [(l.t("tab"), l.t("pane"), shared(t)), (l.at("reviewer").t("tab"), l.at("reviewer").t("pane"), false), (home.t("tab"), home.t("pane"), split(t))]
         .into_iter().filter(|(tab, pane, _)| !tab.is_empty() && !pane.is_empty()).collect()
 }
 /// Is this pane the task's: in one of its own tabs (a pane you split there counts: it is looked at before anything

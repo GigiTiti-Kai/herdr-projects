@@ -37,7 +37,7 @@ pub fn begin(g: &mut Guard, t: Task, api: &Herdr) -> Res<Task> {
     let missing = (!who.kind.is_empty() && !own).then(|| format!("planned by the working agent: {} is not installed here", who.kind));
     let made = if own {
         let m = flow::tabs::open_tab(api, &t, flow::tabs::PLANNER_TAB, &dir.display().to_string(), &board_env(), "the planner")?;
-        if !crate::hosted::split(&t) { flow::tabs::name_tab(api, t.at("link").s("tab"), &crate::hosted::label(&t, flow::tabs::AGENT_TAB)); } // split off beside yours: the tab is yours
+        flow::tabs::name_agents(api, t.at("link").s("tab"), &t, &crate::hosted::label(&t, flow::tabs::AGENT_TAB));
         Some(m)
     } else { None };
     // From here until the yes nothing can be written in the task's own worktree, and what git ignores there is written down.
