@@ -142,7 +142,7 @@ fn draw_at(s: &mut State, t: &Theme, width: usize, rows: usize) -> Screen {
     // Whatever the window, the text box and its hints are whole: the chat, then the rows above it, give way. With hints
     // the list keeps one line (h below), so they leave it that one.
     let mut said = said;
-    while jobs.len() + chat.len() + input.len() + said.len() + 2 * hint_n > rows_n &&(!chat.is_empty() || !jobs.is_empty() || !said.is_empty()) {
+    while jobs.len() + chat.len() + input.len() + said.len() + 2 * hint_n > rows_n && (!chat.is_empty() || !jobs.is_empty() || !said.is_empty()) {
         if !chat.is_empty() { chat.remove(0); } else if !jobs.is_empty() { jobs.pop(); } else { said.pop(); }
     }
     let mut bottom: Vec<Inked> = vec![];
