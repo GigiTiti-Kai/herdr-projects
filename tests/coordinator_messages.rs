@@ -70,6 +70,7 @@ fn what_you_say_is_never_lost_a_dialog_on_its_screen_holds_it_a_failed_start_say
     assert_eq!(wheres(&w)[wheres(&w).len() - 2..].to_vec(), vec![s3("same words", "proj", false), s3("same words", "elsewhere", true)]);
     // The list is full (five that went in). One more that a dialog refuses takes nothing away from the oldest.
     unsafe { std::env::set_var("HERDR_PROJECTS_HANDLED_MS", "0") };
+    sw::clock::advance(60000); // from here a clock of its own, past every stamp so far: the wall clock can step back
     tell(&w, &w.root, "fifth", false); drain();
     let full = said(&w); assert_eq!(full, vec!["first", "later", "same words", "same words", "fifth"]);
     status(&w, "blocked");
