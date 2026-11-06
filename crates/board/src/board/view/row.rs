@@ -1,12 +1,13 @@
 //! One row of the list: its mark, its number, its name, its columns on the right and, for a live task, a second line
-//! that says what it does (a third on a narrow screen: row_tall.rs, where long ones wrap: row_wrap.rs). The columns
+//! that says what it does (a third on a narrow screen: row_tall.rs; where long ones wrap, and red ones at any width:
+//! row_wrap.rs). The columns
 //! are laid out once for the whole list, so each starts at the same place on every row; what is shown of them is
 //! decided one section at a time (row_fit.rs). One cell between two columns, and one wider gap of two cells on a row:
 //! right of the progress (bar, percent, minutes left), before the review, the pull request and the time.
 use super::fields::{fields, is_auto, mark, name_ink, row_title, says_beside, says_under, F};
 use super::row_fit::{label_room, shown_from, Cell, Fit, ETA_STEADY, PERCENT_MIN, PERCENT_STEADY};
 use super::row_tall::{tall_at, tall_layout, Third};
-use super::row_wrap::{wrapped_lines, wraps};
+use super::row_wrap::{is_red, red_under, wrapped_lines, wraps};
 use crate::board::state::State;
 use crate::board::tags::{number_cells, numbering, row_tag, tag_cells, Numbering};
 use crate::board::theme::Theme;
@@ -148,6 +149,7 @@ pub fn status_line(s: &State, t: &Theme, r: &Obj, w: usize, lay: &Layout) -> Ink
 /// A row as the list draws it: one line, two for a live task (an automation that says something under its name).
 pub fn row_lines(s: &State, t: &Theme, r: &Obj, w: usize, lay: &Layout) -> Vec<Inked> {
     if wraps(s, r, lay.tall) { return wrapped_lines(s, t, r, w, lay); }
+    if is_red(s, r) { let mut all = vec![row(s, t, r, w, lay)]; all.extend(red_under(s, r, w, lay.num)); return all; }
     let two = if is_auto(r) { !says_under(s, r, lay.show.get(r.s("id")).map(|x| x.1).unwrap_or(true)).is_empty() } else { is_live(r) };
     if two { vec![row(s, t, r, w, lay), status_line(s, t, r, w, lay)] } else { vec![row(s, t, r, w, lay)] }
 }

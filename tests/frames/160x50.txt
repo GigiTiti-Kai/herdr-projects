@@ -55,22 +55,23 @@
  ▾ this machine  1 project · 18 tasks                                                             │
    ▾ needs you                                                                                    │  Status ───────────────────────────────────────────────────
    ? #9     Max length for task titles                                                         1m │  State        ◐ working · for 1m
-            Should the old settings file be removed, or kept for one more version so that nobody… │  Progress     ██████████████░░░░░░░░░░ 60% · 11m left
-   @ #10    Max length for task titles                                                         1m │  Now          Found the cause; now checking every caller of
-            Needs a login                                                                         │               the resize handler for the same mistake
-   ! #12    Max length for task titles                                         R#1 PR#123456   1m │  On it        claude
-            The pull request's checks fail                                                        │
-   ✗ #13    Max length for task titles                                                         1m │  Description ──────────────────────────────────────────────
-            Conflict with main                                                                    │  A task title should have a maximum length. A longer one is
-   ✗ #14    Max length for task titles                                                         1m │  cut between words.
-            Stopped without a summary                                                             │  Second paragraph, with
-   ▾ ready to approve                                                                             │  a/very/long/path/that/has/no/space/in/it/at/all/src/board/
-   ◆ #11    Max length for task titles                                         R#1 PR#60       1m │  view/row-wrap.js and more words after it.
-            Pass                                                                                  │
-   ▾ working                                                                                      │  Settings ─────────────────────────────────────────────────
-   ◐ #2     Max length for task titles                           40% 90m left                  1m │  Reading its settings…
-            Drafting                                                                              │
-   ◇ #4     Max length for task titles                                                         1m │  alt+t shows the whole task
+            Should the old settings file be removed, or kept for one more version so that nobody  │  Progress     ██████████████░░░░░░░░░░ 60% · 11m left
+            loses what they set?                                                                  │  Now          Found the cause; now checking every caller of
+   @ #10    Max length for task titles                                                         1m │               the resize handler for the same mistake
+            Needs a login                                                                         │  On it        claude
+   ! #12    Max length for task titles                                         R#1 PR#123456   1m │
+            The pull request's checks fail                                                        │  Description ──────────────────────────────────────────────
+   ✗ #13    Max length for task titles                                                         1m │  A task title should have a maximum length. A longer one is
+            Conflict with main                                                                    │  cut between words.
+   ✗ #14    Max length for task titles                                                         1m │  Second paragraph, with
+            Stopped without a summary                                                             │  a/very/long/path/that/has/no/space/in/it/at/all/src/board/
+   ▾ ready to approve                                                                             │  view/row-wrap.js and more words after it.
+   ◆ #11    Max length for task titles                                         R#1 PR#60       1m │
+            Pass                                                                                  │  Settings ─────────────────────────────────────────────────
+   ▾ working                                                                                      │  Reading its settings…
+   ◐ #2     Max length for task titles                           40% 90m left                  1m │
+            Drafting                                                                              │  alt+t shows the whole task
+   ◇ #4     Max length for task titles                                                         1m │
             Starting                                                                              │
 ▌  ◐ #5     Max length for task titles                           60% 11m left                  1m │
 ▌           Found the cause; now checking every caller of the resize handler for the same mistake │
@@ -91,7 +92,6 @@
    ○ #19    TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT                       1m │
    ▾ done                                                                                         │
      ↓ 1 done (alt+d shows them)                                                                  │
-                                                                                                  │
                                                                                                   │
                                                                                                   │
 

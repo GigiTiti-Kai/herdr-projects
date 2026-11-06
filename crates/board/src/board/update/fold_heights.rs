@@ -16,6 +16,10 @@ impl Heights {
         let ind = super::depth::indents(rows, s.list_width);
         rows.iter().enumerate().map(|(n, r)| match r { Row::Rec(o) => self.height(s, o, s.list_width.saturating_sub(ind[n])), Row::Auto(_) => 0, _ => 1 }).sum()
     }
+    /// Is the list, folded as far as it goes, still longer than its room? Automations count here: a line each at least.
+    pub fn tight(&self, rows: &[Row], s: &State) -> bool {
+        s.list_room > 0 && self.lines(rows, s) + rows.iter().filter(|r| matches!(r, Row::Auto(_))).count() > s.list_room
+    }
     fn height(&self, s: &State, r: &Rec, width: usize) -> usize {
         *self.0.borrow_mut().entry((std::sync::Arc::as_ptr(r) as usize, width)).or_insert_with(|| {
             MEASURED.with(|m| m.set(m.get() + 1));
