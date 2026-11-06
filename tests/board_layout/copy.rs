@@ -90,6 +90,7 @@ fn a_drag_on_a_window_of_eight_cells_does_not_panic() {
 fn right_after_a_resize_a_drag_still_keeps_to_the_text_of_the_screen_on_show() {
     let (_w, mut b) = chat_board(false);
     b.s.ctx.settle_ms = 1000;
+    sw::clock::advance(0); // the clock stands still: the new size never lasts here, however slow the machine
     b.lines();
     // Lower: the screen stays laid out for 40 lines, cut from the top, until the new size has lasted.
     b.rows = 30;
