@@ -1,20 +1,24 @@
 //! The mouse in a terminal: the wheel and a click go to the board (update/mouse.rs); dragging selects text on the
-//! board's own screen, line by line, and letting go copies it (OSC 52), as pi-tui's selection did: a program that asks
-//! for the mouse gets all of it, so the board selects itself. A double click selects a word. Links are written over
+//! board's own screen, line by line inside the part it started in (view/panes.rs), and letting go copies it (OSC 52),
+//! as pi-tui's selection did: a program that asks for the mouse gets all of it, so the board selects itself. A double
+//! click selects a word. Links are written over
 //! their cells as terminal links (OSC 8), which the terminal opens.
 use super::draw::Link;
+use crate::board::state::Pane;
 use crate::board::update::Event;
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
+use ratatui::layout::{Position, Rect};
 use ratatui::style::Modifier;
 use std::io::Write;
 
 pub enum Did { Event(Event), Copied(usize), Nothing }
 #[derive(Default)]
-pub struct Selecting { grid: Vec<Vec<String>>, start: Option<(u16, u16)>, end: Option<(u16, u16)>, dragging: bool, shown: bool, last: (i64, u16, u16) }
+pub struct Selecting { grid: Vec<Vec<String>>, panes: Vec<Pane>, pane: Option<Rect>, start: Option<(u16, u16)>, end: Option<(u16, u16)>, dragging: bool, shown: bool, last: (i64, u16, u16) }
 impl Selecting {
-    /// What the screen holds, for a copy.
-    pub fn capture(&mut self, buf: &Buffer) {
+    /// What the screen holds, for a copy, and where its parts stand.
+    pub fn capture(&mut self, buf: &Buffer, panes: &[Pane]) {
+        if self.panes != panes { self.panes = panes.to_vec(); if let (Some(a), Some(b)) = (self.start, self.end) { self.pick(a.0, a.1); self.start = Some(self.kept(a.0, a.1)); self.end = Some(self.kept(b.0, b.1)); } }
         let a = buf.area;
         self.grid = (0..a.height).map(|y| (0..a.width).map(|x| buf[(a.x + x, a.y + y)].symbol().to_string()).collect()).collect();
     }
@@ -22,25 +26,36 @@ impl Selecting {
         let (a, b) = (self.start?, self.end?);
         Some(if (a.1, a.0) <= (b.1, b.0) { (a, b) } else { (b, a) })
     }
-    fn inside(&self, x: u16, y: u16) -> bool {
-        let Some((a, b)) = self.range() else { return false };
-        (y > a.1 || (y == a.1 && x >= a.0)) && (y < b.1 || (y == b.1 && x <= b.0))
+    /// The selected cells of line `y`, from the first up to but not with the last.
+    fn span(&self, y: u16) -> Option<(u16, u16)> {
+        let (a, b) = self.range()?;
+        if y < a.1 || y > b.1 { return None; }
+        let (left, right) = self.pane.map_or((0, u16::MAX), |r| (r.left(), r.right()));
+        Some((if y == a.1 { a.0 } else { left }, if y == b.1 { b.0 + 1 } else { right }))
     }
     /// The highlight, drawn by the board in reverse over what is selected.
     pub fn paint(&self, buf: &mut Buffer) {
         if !self.shown { return; }
         let a = buf.area;
-        for y in 0..a.height { for x in 0..a.width { if self.inside(x, y) { let c = &mut buf[(a.x + x, a.y + y)]; let st = c.style().add_modifier(Modifier::REVERSED); c.set_style(st); } } }
+        for y in 0..a.height { let Some((from, to)) = self.span(y) else { continue }; for x in from..to.min(a.width) { let c = &mut buf[(a.x + x, a.y + y)]; let st = c.style().add_modifier(Modifier::REVERSED); c.set_style(st); } }
     }
-    fn text(&self) -> String {
+    /// What a copy takes: the selected cells of each line, without the spaces that fill its end; no empty line on either side.
+    pub fn text(&self) -> String {
         let Some((a, b)) = self.range() else { return String::new() };
         let mut out = vec![];
         for y in a.1..=b.1 {
             let row = self.grid.get(y as usize).cloned().unwrap_or_default();
-            let (from, to) = (if y == a.1 { a.0 as usize } else { 0 }, if y == b.1 { (b.0 as usize + 1).min(row.len()) } else { row.len() });
-            out.push(row.get(from..to.max(from)).map(|c| c.concat()).unwrap_or_default().trim_end().to_string());
+            let (from, to) = self.span(y).unwrap_or_default();
+            let to = (to as usize).min(row.len()).max(from as usize);
+            out.push(row.get(from as usize..to).map(|c| c.concat()).unwrap_or_default().trim_end().to_string());
         }
-        out.join("\n")
+        out.join("\n").trim_matches('\n').to_string()
+    }
+    /// The part a selection from this place keeps to.
+    fn pick(&mut self, x: u16, y: u16) { self.pane = self.panes.iter().find(|p| p.frame.contains(Position::new(x, y))).map(|p| p.text); }
+    /// A place on the screen, kept to the text of the part the selection started in.
+    fn kept(&self, x: u16, y: u16) -> (u16, u16) {
+        match self.pane { Some(r) => (x.clamp(r.left(), r.right() - 1), y.clamp(r.top(), r.bottom() - 1)), None => (x, y) }
     }
     fn copy(&self, text: &str) -> usize {
         if text.is_empty() { return 0; }
@@ -67,12 +82,14 @@ impl Selecting {
                 self.last = (now, x, y);
                 self.shown = false; self.dragging = false;
                 if double { self.word_at(x, y); let n = self.copy(&self.text()); return if n > 0 { Did::Copied(n) } else { Did::Nothing }; }
-                self.start = Some((x, y)); self.end = Some((x, y));
+                self.pick(x, y);
+                let at = self.kept(x, y);
+                self.start = Some(at); self.end = Some(at);
                 Did::Nothing
             }
-            MouseEventKind::Drag(MouseButton::Left) => { if self.start.is_some() { self.end = Some((x, y)); self.dragging = true; self.shown = true; } Did::Nothing }
+            MouseEventKind::Drag(MouseButton::Left) => { if self.start.is_some() { self.end = Some(self.kept(x, y)); self.dragging = true; self.shown = true; } Did::Nothing }
             MouseEventKind::Up(MouseButton::Left) => {
-                if self.dragging { self.dragging = false; self.end = Some((x, y)); let n = self.copy(&self.text()); return if n > 0 { Did::Copied(n) } else { Did::Nothing }; }
+                if self.dragging { self.dragging = false; self.end = Some(self.kept(x, y)); let n = self.copy(&self.text()); return if n > 0 { Did::Copied(n) } else { Did::Nothing }; }
                 if self.shown { return Did::Nothing; }
                 Did::Event(Event::Click { x, y })
             }

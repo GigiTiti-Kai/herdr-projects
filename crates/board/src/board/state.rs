@@ -9,6 +9,10 @@ use std::collections::{BTreeMap, HashMap};
 /// A task as a row of the board, shared: the list, its groups and its rows hold the same one, never a copy.
 pub type Rec = std::sync::Arc<Obj>;
 
+/// A part of the screen, for a selection: what a drag can start on, and the text it then keeps to.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Pane { pub frame: ratatui::layout::Rect, pub text: ratatui::layout::Rect }
+
 /// What the text box is for: a message or a new task, or the words of find.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mode { New, Find }
@@ -146,6 +150,8 @@ pub struct State {
     pub pending: HashMap<String, Pending>,
     pub list_room: usize, pub list_tall: bool, pub list_width: usize, pub fold_sel: String, pub unread_top: usize, pub unread_max: usize,
     pub list_at: Option<(usize, usize)>, pub list_ids: Vec<String>,
+    /// The parts of the screen as last drawn, for a selection (view/panes.rs).
+    pub panes: Vec<Pane>,
     pub told: i64, pub rang: i64, pub err_hid: String, pub told_reply: String, pub lone_at: i64, pub prefixed: i64,
     /// The plugin changed under the board: since when (the stamp it changed to).
     pub stale: String,
@@ -177,7 +183,7 @@ impl State {
             mode: Mode::New, menu: None, ask: None, by_repo: false, draft_away: None, auto_open: false, auto_at: -1, folded: Default::default(), scope: String::new(), show: 0, show_n: vec![], show_hits: vec![], by_machine: false,
             filter: String::new(), msg: String::new(), msg_kind: Ink::Muted, chat_open: true, chat_folded: false, just_sent: HashMap::new(), chat_at: None, chat_fit: None, chat_rows: None,
             input: TextBox::default(), skill_at: (String::new(), 0), skill_closed: String::new(), editing: None, edit_line: 0, setup: None, paste_text: String::new(), paste_at: 0, paste_more: 0, paste_room: 1, closing: None, leaving: false, leave_at: 0,
-            attempt_at: HashMap::new(), pending: HashMap::new(), list_room: 0, list_tall: false, list_width: 0, fold_sel: String::new(), unread_top: 0, unread_max: 0, list_at: None, list_ids: vec![],
+            attempt_at: HashMap::new(), pending: HashMap::new(), list_room: 0, list_tall: false, list_width: 0, fold_sel: String::new(), unread_top: 0, unread_max: 0, list_at: None, list_ids: vec![], panes: vec![],
             told: 0, rang: 0, err_hid: String::new(), told_reply: String::new(), lone_at: 0, prefixed: 0, stale: String::new(), left: String::new(),
             held: None, guest: false, viewed: false, off_note: String::new(), size: Default::default(), chat_key_shown: false, web_ui_asked: false, tags_gone: false, now: crate::clock::now(), ticks: 0, osc_sent: HashMap::new(), call_link: None, call_switch: (String::new(), 0),
         }

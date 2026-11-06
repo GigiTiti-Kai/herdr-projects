@@ -50,7 +50,7 @@ pub fn box_lines(s: &mut State, width: usize, max_rows: usize, r: Option<&Obj>) 
 }
 /// The text box with the chat open: one rounded box around the latest message, a blank line and the line you type on.
 /// The cells left and right of the text inside the box: two, one in a narrow one.
-fn pad(width: usize) -> usize { if width >= 30 { 2 } else { 1 } }
+pub fn pad(width: usize) -> usize { if width >= 30 { 2 } else { 1 } }
 /// The width of the text inside the box.
 pub fn inner_width(width: usize) -> usize { width.saturating_sub(2 + 2 * pad(width)) }
 /// An empty line inside the box under its top edge and over its bottom one, where the window has the height for them.

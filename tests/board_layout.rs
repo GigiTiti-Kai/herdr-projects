@@ -4,6 +4,8 @@ use crate::common;
 use common::board::{open, Board};
 use common::*;
 
+/// What a drag copies.
+mod copy;
 /// An error on the message line, whole however long.
 mod error;
 
