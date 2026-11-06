@@ -44,7 +44,9 @@ the terminal's clipboard code (OSC 52), which Herdr passes on with its `copied t
 What this changes for you:
 
 - **Dragging selects and copies as before**, but the board draws the highlight, not Herdr. It selects what is on the
-  board's own screen, line by line, box edges included, as Herdr's selection of a pane did.
+  board's own screen, line by line, inside the part the drag started in: the list, the task panel or the chat's box.
+  A box's edges, the empty cells at its sides and the spaces that fill a line's end are not copied, nor is what stands
+  beside the part. To copy across parts, use the terminal's own selection.
 - **Herdr's own selection settings do not apply in the board's pane.** `copy_on_select = false` (keep the selection
   until `Ctrl+C`) is ignored there: the board always copies when you let go.
 - **The terminal's own selection** (the one that crosses Herdr's sidebar and panes) is unchanged. Herdr already holds
