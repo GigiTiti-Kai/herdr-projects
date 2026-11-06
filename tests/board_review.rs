@@ -47,12 +47,12 @@ fn a_row_waiting_for_approval_says_the_advice_in_words_with_the_pr_on_the_right(
     no(&v.row(&with(&pr, json!({ "reviewRound": 1 })), 120), r"review\b.*review|r1|1st"); m(&v.row(&with(&pr, json!({ "reviewRound": 1 })), 120), r" R#1 PR#12 ");
     m(&v.row(&second, 120), r"^[ ▌]! #\d+ Build a flying game +R#2 PR#12 {2}0s ago\n[ ▌] {5}Review failed · 3/5, reviewer says no$");
     m(&v.row(&with(&pr, json!({ "reviewRound": 3 })), 120), r" R#3 PR#12 {2}0s ago\n[ ▌] {5}Review failed · 3/5, reviewer says no$");
-    // narrower, the verdict has its own line, so it stays whole while the columns beside the name go; only a window
-    // narrower than the verdict itself cuts it, at its end
+    // narrower, the verdict has its own line, so it stays whole while the columns beside the name go; a window
+    // narrower than the verdict itself wraps it, red as it is
     m(&v.row(&second, 48), r"^[ ▌]! #\d+ Build a flying game +R#2 PR#12 {2}0s ago\n[ ▌] {5}Review failed · 3/5, reviewer says no$");
-    m(&v.row(&second, 35), r"^[ ▌]! #\d+ Build a flying game +0s ago\n[ ▌] {5}Review failed · 3/5, reviewe…$");
-    m(&v.row(&pr, 27), r"^[ ▌]! #\d+ Build a flying game *\n[ ▌] {5}Review failed · 3/5,…$");
-    m(&v.row(&pr, 20), r"^[ ▌]! Build a flying g…\n[ ▌] {2}Review failed · …$"); // too narrow for the task's number too: it went, and the name has its cells
+    m(&v.row(&second, 35), r"^[ ▌]! #\d+ Build a flying game +0s ago\n[ ▌] {5}Review failed · 3/5, reviewer\n[ ▌] {5}says no$");
+    m(&v.row(&pr, 27), r"^[ ▌]! #\d+ Build a flying game *\n[ ▌] {5}Review failed · 3/5,\n[ ▌] {5}reviewer says no$");
+    m(&v.row(&pr, 20), r"^[ ▌]! Build a flying g…\n[ ▌] {2}Review failed ·\n[ ▌] {2}3/5, reviewer\n[ ▌] {2}says no$"); // too narrow for the task's number too: it went, and the name has its cells
     // a failed merge needs you: it says why, and the panel still has the score and which review gave it
     let failed_merge = with(&second, json!({ "mergeFailed": true, "review": { "score": 5, "recommend": true, "text": "Crashes." }, "msg": "The merge failed: conflict in src/game.js" }));
     m(&v.row(&failed_merge, 120), r"^[ ▌]! #\d+ Build a flying game +R#2 PR#12 {2}0s ago\n[ ▌] {5}The merge failed: conflict in src/game\.js$");
@@ -92,10 +92,10 @@ fn rows_that_need_you_say_what_blocks_them_whole_under_the_name() {
     let _w = world();
     let mut v = V::new();
     let (base, working) = (v.base(), v.working());
-    // what a row needs from you is under its name, whole: it never costs the row a column, and is cut only at the window's edge
+    // what a row needs from you is under its name, whole: it never costs the row a column, and wraps at the window's edge
     let stuck = with(&working, json!({ "state": "blocked", "kind": "question", "stage": "asks", "title": "Build a flying game", "msg": "Which colour should the plane be?" }));
     m(&v.row(&stuck, 75), r"^[ ▌]\? #\d+ Build a flying game +█+░+ +50% +0s ago\n[ ▌] {5}Which colour should the plane be\?$");
-    m(&v.row(&stuck, 31), r"\n[ ▌] {5}Which colour should the …$");
+    m(&v.row(&stuck, 31), r"\n[ ▌] {5}Which colour should the\n[ ▌] {5}plane be\?$");
     m(&v.row(&stuck, 120), r"█+░+ +50% +0s ago\n[^\n]*be\?$");
     // rows that need you say what blocks them, under the name and without Markdown marks; with nothing said, in plain words
     let ask = "Which colour should the plane be, and should the **islands** have `palm` trees?";

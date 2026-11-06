@@ -59,7 +59,7 @@ fn a_review_judged_by_the_gate_says_its_result_and_a_short_tally() {
     m(&v.row(&with(&gated, json!({ "review": none })), 120), r" R#1 PR#12 [^\n]*\n[ ▌] {5}Pass$");
     m(&v.row(&with(&gated, json!({ "reviewRound": 2 })), 50), r"^[ ▌]◆ #\d+ Build a flying game +R#2 PR#12 {2}0s ago\n[ ▌] {5}Pass · 2 minor$");
     m(&v.row(&with(&gated, json!({ "reviewRound": 2 })), 35), r"^[ ▌]◆ #\d+ Build a flying game +0s ago\n[ ▌] {5}Pass · 2 minor$"); // whole on its own line, whatever the columns beside the name give up
-    m(&v.row(&bad, 33), r"\n[ ▌] {5}Review failed · 1 critical…$"); // longer than the window: cut at its end
+    m(&v.row(&bad, 33), r"\n[ ▌] {5}Review failed · 1 critical,\n[ ▌] {5}1 major, 1 minor, 1\n[ ▌] {5}pre-existing$"); // longer than the window: red, so it wraps
     assert_eq!(ink_of(&v.inked(&gated, 160, &[])[1..], "Pass"), Some(Ink::Green)); assert_eq!(ink_of(&v.inked(&bad, 160, &[])[1..], "Review failed"), Some(Ink::Red));
 }
 

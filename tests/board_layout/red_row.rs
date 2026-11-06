@@ -96,7 +96,7 @@ fn a_click_on_any_line_of_a_red_message_picks_its_task() {
 #[test]
 fn in_a_low_window_the_row_you_are_not_on_gives_way_and_the_selected_one_never_runs_past_the_list() {
     for cols in [120, 60] {
-        let (w, mut s, id) = asked(14);
+        let (_w, mut s, id) = asked(14);
         asks(&id, &long().repeat(4)); s.load();
         s.s.sel = id.clone();
         let on = s.screen(cols);
