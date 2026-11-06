@@ -47,8 +47,9 @@ jobs:
         run: npm run check -- --all
 
   macos:
-    # macos-14 is retired on 2026-11-02 and its runners were already too few to take the job
-    runs-on: macos-15
+    # shortcut: Intel, because the arm64 runners are too few: since 2026-11-02 a job there often gets none and GitHub
+    # cancels it after 15 minutes, with no step run. Back to macos-15 when they are enough again; arm64 goes untested here.
+    runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v7
 
@@ -68,8 +69,8 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: macos-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: macos-${{ runner.os }}-
+          key: macos-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: macos-${{ runner.arch }}-
 
       - name: The areas that differ on macOS
         env:
