@@ -12,11 +12,16 @@ use serde_json::json;
 use sw::board::run::{draw, mouse::Selecting};
 
 fn at(kind: MouseEventKind, (x, y): (usize, usize)) -> MouseEvent { MouseEvent { kind, column: x as u16, row: y as u16, modifiers: KeyModifiers::NONE } }
-/// The drag on the screen as it stands, and the highlighted screen beside what it would copy.
-fn drag(b: &mut Board, from: (usize, usize), to: (usize, usize)) -> (String, Buffer) {
+/// The screen as it stands, in cells.
+fn cells(b: &mut Board) -> Buffer {
     let sc = sw::board::view::screen(&mut b.s, &b.theme, b.cols, b.rows);
     let mut buf = Buffer::empty(Rect::new(0, 0, b.cols as u16, b.rows as u16));
     draw::draw(&b.theme, &sc.lines, &mut buf);
+    buf
+}
+/// The drag on the screen as it stands, and the highlighted screen beside what it would copy.
+fn drag(b: &mut Board, from: (usize, usize), to: (usize, usize)) -> (String, Buffer) {
+    let mut buf = cells(b);
     let mut sel = Selecting::default();
     sel.capture(&buf, &b.s.panes);
     sel.mouse(&at(MouseEventKind::Down(MouseButton::Left), from), 0);
@@ -79,4 +84,42 @@ fn a_drag_on_a_window_of_eight_cells_does_not_panic() {
     let last = b.rows - 2;
     drag(&mut b, (0, 0), (7, last));
     drag(&mut b, (7, last), (0, 0));
+}
+
+#[test]
+fn right_after_a_resize_a_drag_still_keeps_to_the_text_of_the_screen_on_show() {
+    let (_w, mut b) = chat_board(false);
+    b.s.ctx.settle_ms = 1000;
+    b.lines();
+    // Lower: the screen stays laid out for 40 lines, cut from the top, until the new size has lasted.
+    b.rows = 30;
+    let lines = b.lines();
+    let (top, last) = (row_of(&lines, "cd /home"), row_of(&lines, "git switch dev"));
+    assert_eq!(drag(&mut b, (0, top), (119, last)).0, "  cd /home/hadas/projects/herdr\n  git switch dev");
+    // Narrower: the box's right edge is cut off, and the text stops at the window's edge.
+    b.cols = 100;
+    assert_eq!(drag(&mut b, (0, top), (99, last)).0, "  cd /home/hadas/projects/herdr\n  git switch dev");
+    // Wider and taller than it is laid out for: what is new around it is empty, and a drag from there keeps out of the box.
+    b.cols = 140; b.rows = 44;
+    let lines = b.lines();
+    let (top, last) = (row_of(&lines, "cd /home"), row_of(&lines, "git switch dev"));
+    assert_eq!(drag(&mut b, (130, top), (130, last)).0, "  git switch dev", "from the new cells beside the box");
+    let up = drag(&mut b, (0, 43), (130, top)).0;
+    assert!(!up.contains('│') && !up.contains('╰'), "{up}");
+}
+
+#[test]
+fn a_new_size_in_the_middle_of_a_drag_moves_what_it_keeps_to() {
+    let (_w, mut b) = chat_board(false);
+    let buf = cells(&mut b);
+    let lines = b.lines();
+    let (top, last) = (row_of(&lines, "cd /home"), row_of(&lines, "git switch dev"));
+    let mut sel = Selecting::default();
+    sel.capture(&buf, &b.s.panes);
+    sel.mouse(&at(MouseEventKind::Down(MouseButton::Left), (0, top)), 0);
+    b.cols = 100;
+    let buf = cells(&mut b);
+    sel.capture(&buf, &b.s.panes);
+    sel.mouse(&at(MouseEventKind::Drag(MouseButton::Left), (99, last)), 0);
+    assert_eq!(sel.text(), "  cd /home/hadas/projects/herdr\n  git switch dev");
 }

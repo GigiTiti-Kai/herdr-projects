@@ -18,7 +18,7 @@ pub struct Selecting { grid: Vec<Vec<String>>, panes: Vec<Pane>, pane: Option<Re
 impl Selecting {
     /// What the screen holds, for a copy, and where its parts stand.
     pub fn capture(&mut self, buf: &Buffer, panes: &[Pane]) {
-        self.panes = panes.to_vec();
+        if self.panes != panes { self.panes = panes.to_vec(); if let (Some(a), Some(b)) = (self.start, self.end) { self.pick(a.0, a.1); self.start = Some(self.kept(a.0, a.1)); self.end = Some(self.kept(b.0, b.1)); } }
         let a = buf.area;
         self.grid = (0..a.height).map(|y| (0..a.width).map(|x| buf[(a.x + x, a.y + y)].symbol().to_string()).collect()).collect();
     }
@@ -51,6 +51,8 @@ impl Selecting {
         }
         out.join("\n").trim_matches('\n').to_string()
     }
+    /// The part a selection from this place keeps to.
+    fn pick(&mut self, x: u16, y: u16) { self.pane = self.panes.iter().find(|p| p.frame.contains(Position::new(x, y))).map(|p| p.text); }
     /// A place on the screen, kept to the text of the part the selection started in.
     fn kept(&self, x: u16, y: u16) -> (u16, u16) {
         match self.pane { Some(r) => (x.clamp(r.left(), r.right() - 1), y.clamp(r.top(), r.bottom() - 1)), None => (x, y) }
@@ -80,7 +82,7 @@ impl Selecting {
                 self.last = (now, x, y);
                 self.shown = false; self.dragging = false;
                 if double { self.word_at(x, y); let n = self.copy(&self.text()); return if n > 0 { Did::Copied(n) } else { Did::Nothing }; }
-                self.pane = self.panes.iter().find(|p| p.frame.contains(Position::new(x, y))).map(|p| p.text);
+                self.pick(x, y);
                 let at = self.kept(x, y);
                 self.start = Some(at); self.end = Some(at);
                 Did::Nothing

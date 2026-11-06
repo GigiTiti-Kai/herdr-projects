@@ -72,6 +72,7 @@ pub fn screen(s: &mut State, t: &Theme, width: usize, rows: usize) -> Screen {
     if at == want { s.off_note = off_note(s, width, rows, shown, f.held); }
     let sc = draw_at(s, t, at.0, at.1);
     let skip = if at == want { 0 } else { sc.lines.len().saturating_sub(want.1) };
+    if at != want { super::panes::shown_in(&mut s.panes, at, want, skip); }
     let clip = |l: Inked| if at == want { l } else { let mut out = Inked::new(); let mut room = want.0; for p in l.0 { let w = crate::text::width(&p.t); if w <= room { room -= w; out.0.push(p); } else { let h = crate::text::head(&p.t, room).to_string(); if !h.is_empty() { out.0.push(crate::shown::ink::Piece { t: h, ..p }); } break; } } out };
     let lines: Vec<Inked> = sc.lines.into_iter().skip(skip).map(clip).collect();
     let cursor = sc.cursor.filter(|(x, y)| *y as usize >= skip && (*x as usize) < want.0).map(|(x, y)| (x, y - skip as u16));

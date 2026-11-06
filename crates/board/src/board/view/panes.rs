@@ -29,3 +29,16 @@ pub fn of(width: usize, rows: usize, top: (usize, usize), list_w: Option<usize>,
     out.retain(|p| !p.text.is_empty());
     out
 }
+/// The parts as they stand while a screen laid out for `drawn` is shown in `shown` (cells and lines), its first `skip`
+/// lines cut off (layout.rs: screen). The window's new edges take over: a frame on the old ones runs on to them, and no
+/// text lies past them.
+pub fn shown_in(panes: &mut Vec<Pane>, drawn: (usize, usize), shown: (usize, usize), skip: usize) {
+    let cut = |r: Rect| { let (top, bottom) = ((r.top() as usize).saturating_sub(skip), (r.bottom() as usize).saturating_sub(skip)); (r.left() as usize, r.right() as usize, top, bottom) };
+    for p in panes.iter_mut() {
+        let (l, r, t, b) = cut(p.frame);
+        p.frame = rect((l, if r == drawn.0 { shown.0 } else { r.min(shown.0) }), (t, if b + skip == drawn.1 { shown.1 } else { b.min(shown.1) }));
+        let (l, r, t, b) = cut(p.text);
+        p.text = rect((l.min(shown.0), r.min(shown.0)), (t.min(shown.1), b.min(shown.1)));
+    }
+    panes.retain(|p| !p.text.is_empty());
+}
