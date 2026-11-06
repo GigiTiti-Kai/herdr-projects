@@ -98,7 +98,7 @@ fn an_existing_space_keeps_the_humans_panes_and_adds_a_coordinator_tab() {
 fn the_coordinator_is_a_tab_named_coordinator_in_the_home_space_found_there_started_again_there_never_a_space_of_its_own() {
     let w = coord_world();
     let api = api(&w);
-    let mine = api.workspace_create(&home_dir(), "main coordinator", &[]).unwrap().at("root_pane").clone(); // the human's home space, with their own tab
+    let mine = api.workspace_create(&home_dir(), "main coordinator", &[]).unwrap().at("root_pane").clone(); // the home space already there, with a tab of the human's
     w.script(json!({ "coordinator": [{ "said": "One." }, { "said": "Two." }, { "said": "Three." }, { "said": "Four." }] }));
     tell(&w, "one");
     let first = get(&w);
@@ -163,7 +163,7 @@ fn the_home_space_under_another_label_is_still_found_and_a_tab_that_is_there_is_
     w.script(json!({ "coordinator": [{ "said": "One." }] }));
     tell(&w, "one");
     let first = get(&w);
-    // herdr labels a space after its first tab's folder: the human went somewhere else in it
+    // the human renamed the home space
     w.patch(|st| { st["workspaces"][0]["label"] = json!("tmp"); for p in st["panes"].as_array_mut().unwrap() { if p.at("agent").is_object() { p["agent"] = Value::Null; } } });
     restart(&w.socket).unwrap(); drain();
     assert_eq!(labels(&w), vec!["tmp"]); assert_eq!(tabs(&w), vec!["w1 1", "w1 Coordinator"]); assert_eq!(get(&w).s("space"), "w1");
