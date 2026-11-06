@@ -98,6 +98,8 @@ impl Herdr {
         Ok(self.call(a)?.at("move_result").clone())
     }
     pub fn pane_close(&self, id: &str) -> Option<Value> { self.call(args(&["pane", "close", id])).ok() }
+    /// A pane's own label, shown in its border while its tab is split.
+    pub fn pane_rename(&self, id: &str, label: &str) -> Option<Value> { self.call(args(&["pane", "rename", id, label])).ok() }
     /// Run a command in the pane, at its shell: typed and entered.
     pub fn pane_run(&self, id: &str, command: &str) -> HRes<Value> { self.when_at_prompt(id, || self.call(args(&["pane", "run", id, command]))) }
     /// End the program in the pane's foreground, so the pane is at its shell again. True once herdr sees no agent there.

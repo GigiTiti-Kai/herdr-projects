@@ -72,6 +72,7 @@ fn yours_beside_reviewer(w: &World, id: &str, then: impl Fn(&str) + 'static) -> 
     mine
 }
 fn splits(w: &World) -> usize { calls(w).iter().filter(|c| c.starts_with("pane split")).count() }
+mod pane; // set to `pane`: split off beside your panes in a tab of yours
 mod space; // the space it goes to: one you opened yourself, never the one herdr opened, else one the board opens
 
 #[test]

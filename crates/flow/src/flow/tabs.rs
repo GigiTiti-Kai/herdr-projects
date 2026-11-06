@@ -4,8 +4,11 @@
 //! planner of its own (`plan.agent`) has the tab `Planner`. Checked on herdr 0.9.3: `tab create --no-focus` leaves the
 //! focus where it is; closing a tab's last pane closes the tab; a tab's id is not given out again.
 use crate::err::Res;
+use crate::herdr::cli::session_name;
 use crate::herdr::Herdr;
 use crate::json::*;
+use crate::store::files::{data_dir, pid_alive, read_json};
+use std::path::PathBuf;
 
 pub const AGENT_TAB: &str = "Agent";
 /// The number is the review round: the one in the row's `R#2`.
@@ -22,7 +25,13 @@ pub fn agent_tab(t: Option<&Obj>) -> String {
     let letter = if t.b("letter") { t.t("letter") } else { t.at("picked").t("letter") };
     crate::hosted::label(t, &format!("{AGENT_TAB}{}{}", if letter.is_empty() { String::new() } else { format!(" {letter}") }, if t.b("on") { format!(" ({})", t.s("agent")) } else { String::new() }))
 }
-pub fn name_agent_tab(api: &Herdr, tab: &str, t: Option<&Obj>) { name_tab(api, tab, &agent_tab(t)); }
+/// Name what the agent has: its tab, or, split off beside your panes (`workspace.place` = `pane`), its pane: the tab is yours.
+pub fn name_agents(api: &Herdr, tab: &str, t: &Obj, label: &str) { if crate::hosted::shared(t) { api.pane_rename(t.at("link").s("pane"), label); } else { name_tab(api, tab, label); } }
+pub fn name_agent_tab(api: &Herdr, tab: &str, t: Option<&Obj>) { match t { Some(o) => name_agents(api, tab, o, &agent_tab(t)), None => name_tab(api, tab, &agent_tab(None)) } }
+/// Where a board running in a pane of herdr session `socket` writes that down.
+pub fn board_note(socket: &str) -> PathBuf { data_dir().join(format!("board-pane-{}.json", session_name(socket))) }
+/// The pane the board of that session runs in now, "" when it runs in none.
+pub fn board_pane(socket: &str) -> String { read_json(&board_note(socket)).filter(|n| pid_alive(n.i("pid"))).map(|n| n.t("pane")).unwrap_or_default() }
 /// A tab's ids: { tab, pane, terminal }.
 pub struct Opened { pub tab: String, pub pane: String, pub terminal: String }
 /// A tab of its own in the task's space, with one pane at its shell.

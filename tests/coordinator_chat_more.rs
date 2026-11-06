@@ -75,6 +75,7 @@ fn sent_with_tab_every_task_the_coordinator_adds_from_that_message_gets_an_agent
     let end_turn = || w.patch(|st| { let seq = st.i("seq") + 1; st["seq"] = json!(seq); for p in st["panes"].as_array_mut().unwrap() { if p.at("agent").is_object() { p["agent"]["status"] = json!("done"); p["agent"]["seq"] = json!(seq); p["agent"]["completion"] = json!(seq); } } });
     let pane_env = |p: Option<&str>| unsafe { match p { Some(p) => std::env::set_var("HERDR_PANE_ID", p), None => std::env::remove_var("HERDR_PANE_ID") } };
     unsafe { std::env::set_var("HERDR_PROJECTS_HANDLED_MS", "0") };
+    sw::clock::set(Some(sw::clock::now())); // a clock of its own: with no wait, the wall clock stepping back undoes "dealt with"
     // --delegate: the message itself says so, under the words. The Coordinator is now in that message's turn.
     w.script(json!({ "coordinator": [{ "status": "working" }] }));
     send(&w.root, "a login page, and dark mode", true, "", &w.socket).unwrap(); drain();

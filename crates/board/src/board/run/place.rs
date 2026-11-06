@@ -4,13 +4,13 @@
 //! board itself, the key goes back to where you came from. The board's own tab is named `herdr-projects` while it
 //! runs, and gets its old name back when it closes.
 use super::say::say;
+use crate::flow::tabs::board_note as note_file;
 use crate::herdr::cli::{current_socket, session_name};
 use crate::herdr::Herdr;
 use crate::json::*;
 use crate::store::files::{data_dir, pid_alive, read_json, write_json};
 use crate::store::settings::lookup::setting;
 
-fn note_file(socket: &str) -> std::path::PathBuf { data_dir().join(format!("board-pane-{}.json", session_name(socket))) }
 fn popup_file(socket: &str) -> std::path::PathBuf { data_dir().join(format!("board-popup-{}.json", session_name(socket))) }
 fn env(k: &str) -> String { std::env::var(k).unwrap_or_default() }
 /// The popup is no pane and has no id: this stands for it where a board is named.

@@ -12,6 +12,9 @@ herdr-projects set workspace.place tab --repo my-app
 herdr-projects delegate 12 --workspace.place tab
 ```
 
+To see the repo's agents all at once instead, set it to `pane`: each agent's pane is split off beside yours in a tab
+you have there ([a pane beside yours](pane-beside-yours.md)).
+
 ## Which space
 
 A space of the task's repo that no task owns: the one you are looking at, else the one named after the repo (herdr names
