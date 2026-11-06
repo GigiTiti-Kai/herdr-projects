@@ -6,6 +6,8 @@ use common::*;
 
 /// An error on the message line, whole however long.
 mod error;
+/// A red message under a task, whole at every width.
+mod red_row;
 
 fn pinned(s: &mut Board, rows: usize, what: &str) -> (usize, usize) {
     s.rows = rows;

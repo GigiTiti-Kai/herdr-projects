@@ -282,6 +282,11 @@ is on it, or it waits for you.
   ([list headings](list-headings.md)), so line 2 starts under the task's name as everywhere.
 - Line 2 has the row's whole width, so it is rarely cut. One longer than the window is cut at its end with `…`, never
   wrapped (on a narrow screen it wraps: below).
+- **A red message wraps at every width, whole**, on as many lines as it needs under the row's name, however wide the
+  window: it is what the task waits for you about, so it is never left for the panel. The list counts those lines, as
+  it counts a wrapped name, so the arrows, the scroll and the highlight work as for any row. Only a low window limits
+  it: a row you are not on keeps its message to half of the list's lines (two at least) and ends it in `…`, and the
+  selected row takes what the list has, leaving a line for what is not shown; beyond that its panel has the whole of it.
 - **Line 2 is there from the start**, so a row does not grow, and nothing under it moves, when its words arrive. It is
   never empty and never a bare `…`: a task with no words of its own says something true and quiet (`Just started`,
   `Yours: no agent on it` for a task you marked as your own, `Not reviewed` for finished work nobody reviewed, or the
@@ -490,8 +495,9 @@ not say which task it is. So under 80 columns:
 ```
 
 - **A live task's name takes up to two lines, and so does what it says.** Each is cut with `…` only after its second
-  line. What fits one line takes one: a row is three lines at least and five at most, with the line of the bar and the
-  time always last.
+  line; a red message takes all it needs, as on a wide screen (above), and the time then has a line of its own when
+  the message's last line leaves it no room. What fits one line takes one: but for a red message, a row is three lines at least and five at most, with the line of
+  the bar and the time always last.
 - **The selected task shows its whole name**, on as many lines as it needs, whichever group it is in (the third to-do
   above). It gives up the tags beside its name for that. Move on, and it is one line again.
 - **Done and to-do rows stay one line, without their time** (`5h`): the name has that room, and the tags (`R#`, `PR#`)
@@ -503,7 +509,7 @@ not say which task it is. So under 80 columns:
 - The highlight covers every line of the selected row, the arrows still go task by task, and the list counts each row at
   the height it has: what gives way in a list taller than the window, and the scroll, work as above.
 
-From 80 columns on, nothing wraps and every row is as it was.
+From 80 columns on, nothing wraps but a red message, and every other row is as it was.
 
 **Why 80 columns.** At 80, a name of 40 cells (what a name keeps before a column goes) sits beside every column at its
 widest: the mark (3), the name (40), the bar (8), the percent (4, `100%`), the minutes left (4), `R#12` (4), `PR#123` (6),
