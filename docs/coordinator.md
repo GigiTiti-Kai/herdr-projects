@@ -85,7 +85,7 @@ whole conversation, its dialogs, slash commands and menus, **go into it** in Her
 
 ## What it is
 
-- An ordinary Herdr agent, in a tab named `Coordinator`, in your home space (`~`).
+- An ordinary Herdr agent, in a tab named `Coordinator`, in your home space (`main coordinator`).
 - It runs in a folder of its own inside the board's data folder. `HERDR_PROJECTS_COORDINATOR_DIR` names another; use
   that folder for nothing else, since the board writes the Coordinator's rules there.
 - It starts with the same arguments as any working agent: all its tools, nothing held back.
@@ -135,21 +135,24 @@ same file), and when you start the program in that folder by hand.
 
 ## Where it lives in Herdr
 
-It has no space of its own in the sidebar. It is a tab named `Coordinator` in the home space, the one Herdr labels
-`~`: a whole tab, never a pane inside one of yours. In the sidebar's list of agents it is named `Coordinator`, with its
-state as shown above the board's box (`Coordinator · idle`) and its latest message under it
+It is a tab named `Coordinator` in the home space, the space the board labels `main coordinator`, with the machine
+coordinator's tab beside it: a whole tab, never a pane inside one of yours. In the sidebar's list of agents it is named
+`Coordinator`, with its state as shown above the board's box (`Coordinator · idle`) and its latest message under it
 ([Herdr's sidebar](sidebar.md)).
 
 - **Found or started from anywhere.** A message from the board in a pane, from the board in Herdr's popup, or from a
   shell (`coordinator tell`) goes to the running Coordinator. If none runs (its program exited, its tab or the home
   space was closed, Herdr restarted), the message starts it again in the same conversation, in a `Coordinator` tab of
-  the home space. There is never a second one, and no space is made for it.
-- **No home space on this machine?** One is made (at your home folder, as Herdr would), then the tab is added.
+  the home space. There is never a second one.
+- **No home space on this machine?** One is made, labelled `main coordinator`, then the tab is added. Herdr closes a
+  space with its last tab, so stopping the only coordinator there closes the space too, and the next start makes it
+  again under the same label.
 - **Nothing you look at changes.** The tab, and a home space that had to be made, open without focus: you stay where
   you are, and the board and every other tab keep their size and layout.
-- **Which space is home.** The one labelled `~`. Herdr labels a space after the folder its first tab is in, so the
-  label changes when you `cd` elsewhere in that tab. The board remembers the space it last put the tab in, and uses
-  that when no space is labelled `~`. A task's space is never taken for it.
+- **Which space is home.** The one labelled `main coordinator`. The board sets that label itself and it stays when you
+  `cd` elsewhere. A space labelled `~` is yours: the board leaves it alone. The board remembers the space it last put
+  the tab in, and uses that when no space is labelled `main coordinator`: a home space you renamed is still found, and
+  a tab already in a `~` space comes back there until that space closes. A task's space is never taken for it.
 - **Rename its tab if you like.** The board finds the Coordinator by its pane, as it does a task's agent and reviewers
   ([a task's tabs](tabs.md)). If the board lost track of it (its saved state is gone), it looks for the pane in the
   Coordinator's own folder, in whatever space that is: a Coordinator running there gets your message, in its current

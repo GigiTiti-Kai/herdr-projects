@@ -47,7 +47,7 @@ fn the_box_talks_to_one_long_lived_coordinator_started_once_with_nothing_held_ba
     assert!(has(&s.text(), &format!(r"\n╭─  {host}  · Machine coordinator ─*╮\n(?:│ +│\n)?│ +build a login page +│\n│ +│\n│ +❯ Send message to the machine coordinator +│\n(?:│ +│\n)?╰─+╯\n")), "{}", s.text());
     drain();
     let st = w.state();
-    assert_eq!(st.arr("workspaces").iter().map(|x| x.t("label")).collect::<Vec<_>>(), vec!["~"]);
+    assert_eq!(st.arr("workspaces").iter().map(|x| x.t("label")).collect::<Vec<_>>(), vec!["main coordinator"]);
     assert_eq!(st.arr("tabs").iter().map(|x| x.t("label")).collect::<Vec<_>>(), vec!["Coordinator"]);
     let a = agents(&w);
     assert_eq!(a.len(), 1);
