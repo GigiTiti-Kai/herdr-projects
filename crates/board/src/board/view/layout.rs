@@ -79,6 +79,7 @@ pub fn screen(s: &mut State, t: &Theme, width: usize, rows: usize) -> Screen {
 }
 fn draw_at(s: &mut State, t: &Theme, width: usize, rows: usize) -> Screen {
     s.width = width;
+    s.panes.clear();
     let rows_n = rows.max(1);
     let r = s.current().cloned();
     if !s.paste_text.is_empty() { return Screen { lines: pad(super::paste::paste_lines(s, width, rows_n), rows_n).into_iter().map(|l| l.cut(width)).collect(), cursor: None }; }
@@ -108,7 +109,8 @@ fn draw_at(s: &mut State, t: &Theme, width: usize, rows: usize) -> Screen {
     let said: Vec<Inked> = broke.iter().map(|b| failed(b, width)).chain(said).collect();
     // The text box grows with a draft that wraps, up to half the window: a longer draft scrolls inside it.
     let box_rows = (rows_n as i64 - 4 - head_n as i64 - if super::textbox::airy(s) { 2 } else { 0 } - if selected_job.is_some() { 1 } else { 0 }).min((rows_n / 2).max(5) as i64).max(1) as usize;
-    let (mut input, mut cursor) = super::guard::part(|| if s.ask.is_some() { (super::ask::ask_lines(s, width, rows_n), None) } else if (framed || super::chat_title::title(s, r.as_ref()).is_some()) && width >= 8 { chat_box(s, width, box_rows, r.as_ref(), &[]) } else { box_lines(s, width, box_rows, r.as_ref()) })
+    let boxed = s.ask.is_none() && (framed || super::chat_title::title(s, r.as_ref()).is_some()) && width >= 8;
+    let (mut input, mut cursor) = super::guard::part(|| if s.ask.is_some() { (super::ask::ask_lines(s, width, rows_n), None) } else if boxed { chat_box(s, width, box_rows, r.as_ref(), &[]) } else { box_lines(s, width, box_rows, r.as_ref()) })
         .unwrap_or_else(|why| (vec![Inked::of("─".repeat(width), Ink::Rule), failed(&format!("The text box could not be shown: {why}"), width), Inked::of("─".repeat(width), Ink::Rule)], None));
     // The message takes the lines it needs: with its box up to two thirds of the window, and only rows the list can
     // spare. Under the whole task and the menu it keeps to a third. A longer one scrolls.
@@ -127,6 +129,7 @@ fn draw_at(s: &mut State, t: &Theme, width: usize, rows: usize) -> Screen {
         message_n = message.len();
         if message_n > 0 { let (l, c) = chat_box(s, width, draft_rows.max(1) as usize, r.as_ref(), &message); input = l; cursor = c; }
     }
+    let picks_n = picks.len();
     if !picks.is_empty() { cursor = cursor.map(|(l, c)| (l + picks.len(), c)); input = picks.into_iter().chain(input).collect(); }
     // A question has no hints: its box ends on the window's last line, with no empty hint line under it.
     let hint_n = usize::from(s.ask.is_none());
@@ -158,6 +161,7 @@ fn draw_at(s: &mut State, t: &Theme, width: usize, rows: usize) -> Screen {
     s.chat_rows = if message_n > 0 { Some((chat_top, chat_top + chat.len() + input.len())) } else { None };
     s.list_at = None;
     let shown_job = s.job().cloned();
+    let mut side_list = None;
     let top: Vec<Inked> = if s.menu.is_some() { super::menu::menu_lines(s, t, width, h) }
         else if let (Some(a), true) = (&auto, s.auto_open) { super::panel::auto::auto_full(s, t, a, width, h) }
         else if crate::board::update::edit::mine_open(s) { super::panel::page::mine_full(s, t, width, h) }
@@ -167,6 +171,7 @@ fn draw_at(s: &mut State, t: &Theme, width: usize, rows: usize) -> Screen {
             // The task panel on the right, while you have it open, on herdr's sidebar colour when the theme gives it one.
             let pane_w = 38.max(70.min(width * 38 / 100));
             let list_w = width.saturating_sub(pane_w + 3);
+            side_list = Some(list_w);
             let left = list_part(s, t, list_w, h, width, held.len());
             let right: Vec<Inked> = super::guard::part(|| if let Some(x) = r.clone().or(shown_job.clone()) { super::panel::panel(s, t, &x, pane_w, false, h) } else if let Some(a) = &auto { super::panel::auto::auto_panel(s, t, a, pane_w, false).0 } else if let Some(c) = crate::board::update::pilot::selected(s) { super::panel::coord::coord_panel(s, &c, pane_w, false) } else { vec![Inked::new(), Inked::plain(" ").add(Inked::of("Nothing selected.", Ink::Muted))] })
                 .unwrap_or_else(|why| std::iter::once(Inked::new()).chain(Inked::of(format!("✗ The task panel could not be shown: {why}"), Ink::Red).wrap(pane_w.saturating_sub(2).max(10)).into_iter().map(|l| Inked::plain(" ").add(l))).collect());
@@ -176,6 +181,8 @@ fn draw_at(s: &mut State, t: &Theme, width: usize, rows: usize) -> Screen {
         Ok((hint_list, chat_key)) => { s.chat_key_shown = chat_key.is_some(); if hint_n > 0 { bottom.push(hint_line(hint_list, chat_key.as_ref(), width)); } }
         Err(why) => bottom.push(failed(&format!("The hints could not be shown: {why}"), width)),
     }
+    let box_top = held.len() + h + input_at + picks_n;
+    s.panes = super::panes::of(width, rows_n, (held.len(), held.len() + h), side_list, boxed.then(|| (box_top, box_top + input.len() - picks_n, super::textbox::pad(width))));
     let mut out = held.clone();
     out.extend(pad(top, h));
     let input_line = out.len() + input_at;
