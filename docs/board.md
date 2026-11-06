@@ -284,9 +284,10 @@ is on it, or it waits for you.
   wrapped (on a narrow screen it wraps: below).
 - **A red message wraps at every width, whole**, on as many lines as it needs under the row's name, however wide the
   window: it is what the task waits for you about, so it is never left for the panel. The list counts those lines, as
-  it counts a wrapped name, so the arrows, the scroll and the highlight work as for any row. Only a low window limits
-  it: a row you are not on keeps its message to half of the list's lines (two at least) and ends it in `…`, and the
-  selected row takes what the list has, leaving a line for what is not shown; beyond that its panel has the whole of it.
+  it counts a wrapped name, so the arrows, the scroll and the highlight work as for any row. So that one message never
+  pushes the other rows off the list, a row you are not on keeps its message to half of the list's lines (two at least)
+  and ends it in `…` beyond that; select the row and it takes what the list has, leaving a line for what is not shown.
+  A message longer than that is whole in the task's panel.
 - **Line 2 is there from the start**, so a row does not grow, and nothing under it moves, when its words arrive. It is
   never empty and never a bare `…`: a task with no words of its own says something true and quiet (`Just started`,
   `Yours: no agent on it` for a task you marked as your own, `Not reviewed` for finished work nobody reviewed, or the

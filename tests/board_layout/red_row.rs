@@ -3,6 +3,7 @@
 use crate::common;
 use common::board::{open, Board};
 use common::*;
+use sw::json::*;
 use sw::actions::filing::{report, Report};
 
 const END: &str = "最後の一文字まで読める。";
@@ -24,7 +25,7 @@ fn asked(rows: usize) -> (World, Board, String) {
 
 #[test]
 fn a_long_red_message_shows_whole_at_every_width_and_the_rows_around_it_stay_whole() {
-    let (_w, mut s, _id) = asked(60);
+    let (_w, mut s, id) = asked(60);
     s.press(&["down", "down"]); // off the row: this is how it stands in the list, not only under the cursor
     for cols in [200, 160, 120, 100, 80, 79, 60, 44] {
         let lines = s.screen(cols);
@@ -34,6 +35,10 @@ fn a_long_red_message_shows_whole_at_every_width_and_the_rows_around_it_stay_who
         assert!(!lines.iter().any(|l| l.ends_with('…')), "{cols} columns, nothing cut:\n{}", lines.join("\n"));
         assert!(lines.iter().any(|l| l.contains("Long question")), "{cols} columns, the name stays");
         assert!(lines.iter().any(|l| l.contains("Task number 1")), "{cols} columns, the next row stays");
+        let r = s.s.items.iter().find(|r| r.s("id") == id).unwrap().clone();
+        let at = s.s.rows.iter().position(|x| sw::board::update::list::step_id(x).as_deref() == Some(id.as_str())).unwrap();
+        let width = s.s.list_width - sw::board::update::depth::indents(&s.s.rows, s.s.list_width)[at];
+        assert_eq!(sw::board::view::row_wrap::row_height(&s.s, &r, width, cols < 80), s.s.list_ids.iter().filter(|x| **x == id).count(), "{cols} columns: the height the fold counts with is the height drawn");
     }
 }
 
