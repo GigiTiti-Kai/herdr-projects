@@ -55,8 +55,9 @@ Only merging and removing a task ask. Nothing else does.
   its row.
 - On the web Board neither answer to a merge or a remove is the filled button.
 
-A result stays on screen until your next key press. An error stays until `Esc` dismisses it, with `(esc dismisses)` after
-it.
+A result stays on screen until your next key press, in at most three lines. An error stays until `Esc` dismisses it, with
+`(esc dismisses)` after it, and wraps to show all of it, however long: only a window too short for it cuts it, from its
+end, as the text box and the hints under it stay whole.
 
 ### Work whose review failed is never merged by a plain yes
 
