@@ -40,7 +40,7 @@ fn a_machine_coordinator_is_named_after_its_machine_and_kept_beside_the_coordina
     w.script(json!({ "coordinator": [{ "said": "This machine has one repo." }, { "said": "Added proj/1." }, { "said": "Still one repo." }, { "said": "Back again." }] }));
     tell(&w, &m, "what is on this machine?");
     // a tab named after it in the home space, its own agent, its own folder with its own rules; the Coordinator untouched
-    assert_eq!(labels(&w), vec!["~"]); assert_eq!(tabs(&w), vec![format!("w1 {name}")]);
+    assert_eq!(labels(&w), vec!["main coordinator"]); assert_eq!(tabs(&w), vec![format!("w1 {name}")]);
     let p = agent(&w, "sw-coordinator-machine");
     assert_eq!(prompts(&p), vec!["what is on this machine?"]);
     assert_eq!(p.s("cwd"), state::home(&m).display().to_string());
