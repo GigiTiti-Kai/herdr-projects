@@ -193,7 +193,7 @@ fn to_heading(s: &mut State) -> bool {
     true
 }
 fn lay_rows(s: &mut State) -> Vec<Row> {
-    s.fold_sel = s.sel.clone();
+    s.fold_sel = s.sel.clone(); s.list_tight = false; // the rows are measured whole
     // Under Coordinators only the coordinators' rows: each machine's and its projects' (shows.rs).
     if super::shows::coords(s) { let rows = super::shows::coord_rows(s); s.steps = rows.iter().filter_map(step_id).collect(); return rows; }
     if super::pinned::nothing(s) { s.steps.clear(); return vec![]; } // Pinned with nothing pinned says how to pin something
@@ -276,6 +276,7 @@ fn lay_rows(s: &mut State) -> Vec<Row> {
     let mut todos = groups.iter().map(|(_, recs)| recs.iter().filter(|r| is_todo(r)).count()).max().unwrap_or(0);
     let live = rows.iter().any(|r| matches!(r, Row::Rec(o) if is_live(o)));
     while live && todos > 1 && over(&rows, s) { todos -= 1; rows = lay(todos, s); }
+    s.list_tight = heights.tight(&rows, s);
     rows
 }
 /// A row the arrow keys stop on: a task, an automation or a heading.

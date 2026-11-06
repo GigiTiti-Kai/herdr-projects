@@ -74,6 +74,50 @@ fn you_move_and_scroll_past_a_long_red_message_and_the_selected_row_stays_whole_
     }
 }
 
+/// A question of 1828 bytes and four to-dos, as a reviewer's board had them.
+fn big(rows: usize) -> (World, Board, String) {
+    let w = world();
+    for n in 1..=4 { w.add(&format!("Task number {n}")); }
+    let id = w.add("Long question");
+    asks(&id, &format!("{}END-OF-MESSAGE", "確認してほしいことが長く続いている文章です。".repeat(27)));
+    let mut s = open(&w.root, rows); s.s.side = false; s.load();
+    (w, s, id)
+}
+
+#[test]
+fn off_the_row_the_message_is_whole_whenever_it_and_the_other_tasks_fit_the_window() {
+    let (_w, mut s, _id) = big(30);
+    let lines = s.screen(100);
+    let says = lines.join("\n");
+    assert!(says.contains("END-OF-MESSAGE") && !says.contains('…'), "{says}");
+    assert_eq!(lines.iter().filter(|l| l.contains("Task number")).count(), 4, "{says}");
+}
+
+#[test]
+fn a_list_longer_than_the_window_folds_its_to_dos_before_it_cuts_the_message() {
+    let (_w, mut s, _id) = asked(24);
+    let lines = s.screen(100).join("\n");
+    assert!(lines.contains("最後の一文字") && lines.contains("more to do"), "{lines}");
+    assert!(!lines.contains('…'), "{lines}");
+}
+
+#[test]
+fn a_low_window_shows_the_question_and_a_task_from_the_start_and_on_every_step_down() {
+    let (_w, mut s, id) = big(14);
+    s.s.sel = s.s.steps[0].clone(); // the machine's row, where a new board opens
+    for step in 0..2 {
+        let says = s.screen(60).join("\n");
+        assert!(says.contains("Long question") && says.contains('…'), "step {step}, the question, cut:\n{says}");
+        assert!(says.contains("Task number"), "step {step}, a task under it:\n{says}");
+        s.press(&["down"]);
+    }
+    assert_eq!(s.s.sel, id);
+    let on = s.screen(60).join("\n");
+    assert!(on.contains("Long question") && on.contains("more"), "on the row, it takes the list and says what is not shown:\n{on}");
+    s.press(&["down", "down"]);
+    assert!(s.screen(60).join("\n").contains("Task number"));
+}
+
 #[test]
 fn the_wheel_scrolls_a_long_red_message_by_its_whole_row() {
     let (_w, mut s, id) = asked(24);
@@ -108,10 +152,10 @@ fn in_a_low_window_the_row_you_are_not_on_gives_way_and_the_selected_one_never_r
         assert_eq!(on.len(), 14);
         assert!(s.s.list_ids.iter().filter(|x| **x == id).count() < s.s.list_room, "{cols}: a line stays for what is not shown:\n{}", on.join("\n"));
         assert!(on.iter().any(|l| l.contains("Long question")), "{cols}: its name shows:\n{}", on.join("\n"));
-        assert!(on.iter().any(|l| l.ends_with('…')), "{cols}: a cut says so:\n{}", on.join("\n"));
-        // Off the row, it gives up half the list.
+        assert!(on.iter().any(|l| l.contains('…')), "{cols}: a cut says so:\n{}", on.join("\n"));
+        // Off the row, it leaves the rest of the list its lines.
         s.press(&["down"]);
         let off = s.screen(cols);
-        assert!(s.s.list_ids.iter().filter(|x| **x == id).count() <= (s.s.list_room / 2).max(2) + 2, "{cols}, its name, its share and its time:\n{}", off.join("\n"));
+        assert!(s.s.list_ids.iter().filter(|x| **x == id).count() <= s.s.list_room.saturating_sub(7).max(1) + 1, "{cols}, its name, its share and its time:\n{}", off.join("\n"));
     }
 }
