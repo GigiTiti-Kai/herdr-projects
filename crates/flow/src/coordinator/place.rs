@@ -1,7 +1,7 @@
 //! Where a coordinator lives in herdr: a tab of its own, named after it. The top-level Coordinator's (`Coordinator`)
-//! and the machine coordinator's are in the home space (`~`); a project coordinator's is in its repo's own space. A
-//! top-level one still in the space of its own it had before is moved over. Checked on herdr 0.9.3: a space is labelled after the folder of
-//! its first tab's pane, so the space the tab was last put in is remembered; `pane move --new-tab` carries a running
+//! and the machine coordinator's are in the home space (`main coordinator`); a project coordinator's is in its repo's own space. A
+//! top-level one still in the space of its own it had before is moved over. Checked on herdr 0.9.3: a space made with no label is labelled after the folder of
+//! its first tab's pane, so the home space is always made with its label; `pane move --new-tab` carries a running
 //! agent over as it is, gives the pane a new id, and closes the space it left when that was its last pane.
 use super::co::Co;
 use super::state::{change, get, home, pumping};
@@ -13,13 +13,14 @@ use crate::json::*;
 use crate::store::files::user_home;
 
 pub const COORDINATOR_TAB: &str = "Coordinator";
-pub const HOME_SPACE: &str = "~";
+/// Never exactly `Coordinator`: that label marks the old space of its own (`open_tab`).
+pub const HOME_SPACE: &str = "main coordinator";
 /// `space` (the home space it was last in) is kept: it is how that space is found again under another label.
 pub fn nowhere(c: &mut Obj) { for k in ["workspace", "tab", "pane", "terminal", "agent", "paneWas"] { c.put(k, Value::Null); } }
-/// The home space's id: the one labelled `~`, else the one the tab was last in, else a new one. Never a task's space.
+/// The home space's id: the one labelled `HOME_SPACE`, else the one the tab was last in, else a new one. Never a task's space.
 pub fn home_space(api: &Herdr, c: Option<&Obj>) -> Res<String> {
     if let Some(space) = find_home_space(api, c)? { return Ok(space); }
-    Ok(api.workspace_create(&user_home().display().to_string(), "", &[])?.at("workspace").t("workspace_id"))
+    Ok(api.workspace_create(&user_home().display().to_string(), HOME_SPACE, &[])?.at("workspace").t("workspace_id"))
 }
 fn find_home_space(api: &Herdr, c: Option<&Obj>) -> Res<Option<String>> {
     let list: Vec<Value> = api.workspaces()?.into_iter().filter(|w| !w.at("worktree").is_object()).collect();

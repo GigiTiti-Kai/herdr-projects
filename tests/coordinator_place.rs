@@ -3,7 +3,7 @@
 use crate::common;
 use common::*;
 use serde_json::{json, Value};
-use sw::coordinator::{co::{Co, Level}, place::{close_place, open_tab}};
+use sw::coordinator::{co::{Co, Level}, place::{close_place, home_space, open_tab}};
 use sw::coordinator::{look::look, pump::{active, tick}, requests::{restart, send, stop, tab_turn}, state};
 use sw::herdr::Herdr;
 use sw::json::*;
@@ -56,7 +56,7 @@ fn a_new_coordinator_space_uses_its_first_tab_with_its_folder_and_environment() 
         let env = vec![("COORDINATOR_TEST".into(), "present".into())];
         let pane = open_tab(&api, &co, &env).unwrap();
         assert_eq!(tabs(&w), vec![format!("w1 {}", co.name())]);
-        assert_eq!(labels(&w), vec![if co.repo().is_some() { "proj" } else { "~" }]);
+        assert_eq!(labels(&w), vec![if co.repo().is_some() { "proj" } else { "main coordinator" }]);
         assert_eq!(pane.s("pane_id"), "w1:p1");
         let stored = w.state().arr("panes")[0].clone();
         assert_eq!(stored.s("cwd"), state::home(&co).display().to_string());
@@ -81,7 +81,7 @@ fn an_existing_space_keeps_the_humans_panes_and_adds_a_coordinator_tab() {
         let co = Co { socket: w.socket.clone(), level };
         let api = api(&w);
         let cwd = if co.repo().is_some() { w.root_str() } else { home_dir() };
-        let mine = api.workspace_create(&cwd, "", &[]).unwrap().at("root_pane").clone();
+        let mine = api.workspace_create(&cwd, if co.repo().is_some() { "" } else { "main coordinator" }, &[]).unwrap().at("root_pane").clone();
         api.pane_split(mine.s("pane_id"), &cwd, "right", &[]).unwrap();
         let before = w.state().arr("panes").to_vec();
         let pane = open_tab(&api, &co, &[]).unwrap();
@@ -98,12 +98,12 @@ fn an_existing_space_keeps_the_humans_panes_and_adds_a_coordinator_tab() {
 fn the_coordinator_is_a_tab_named_coordinator_in_the_home_space_found_there_started_again_there_never_a_space_of_its_own() {
     let w = coord_world();
     let api = api(&w);
-    let mine = api.workspace_create(&home_dir(), "", &[]).unwrap().at("root_pane").clone(); // the human's home space, with their own tab
+    let mine = api.workspace_create(&home_dir(), "main coordinator", &[]).unwrap().at("root_pane").clone(); // the home space already there, with a tab of the human's
     w.script(json!({ "coordinator": [{ "said": "One." }, { "said": "Two." }, { "said": "Three." }, { "said": "Four." }] }));
     tell(&w, "one");
     let first = get(&w);
     // in the home space that was there: no space was made for it, its tab is beside the human's, in its own folder
-    assert_eq!(labels(&w), vec!["~"]); assert_eq!(tabs(&w), vec!["w1 1", "w1 Coordinator"]);
+    assert_eq!(labels(&w), vec!["main coordinator"]); assert_eq!(tabs(&w), vec!["w1 1", "w1 Coordinator"]);
     assert_eq!(calls_of(&w, "^workspace create").len(), 1); // the human's own
     let tc = calls_of(&w, "^tab create");
     assert!(tc[0].starts_with(&format!("tab create --workspace w1 --cwd {} --label Coordinator ", coord_home(&w))), "{}", tc[0]); assert!(tc[0].ends_with(" --no-focus"));
@@ -119,29 +119,51 @@ fn the_coordinator_is_a_tab_named_coordinator_in_the_home_space_found_there_star
     api.tab_close(first.s("tab"));
     assert_eq!(look(&w.socket).state, "exited");
     tell(&w, "three");
-    assert_eq!(labels(&w), vec!["~"]); assert_eq!(tabs(&w), vec!["w1 1", "w1 Coordinator"]); assert_eq!(agents(&w).len(), 1);
+    assert_eq!(labels(&w), vec!["main coordinator"]); assert_eq!(tabs(&w), vec!["w1 1", "w1 Coordinator"]); assert_eq!(agents(&w).len(), 1);
     assert_eq!(resumed(&w), first.s("session")); assert_ne!(get(&w).s("tab"), first.s("tab"));
     // the whole home space was closed: it is made again, with its first tab at the coordinator's folder
     api.workspace_close("w1").unwrap();
     tell(&w, "four");
-    assert_eq!(labels(&w), vec!["~"]); assert_eq!(tabs(&w), vec!["w2 Coordinator"]); assert_eq!(agents(&w).len(), 1); assert_eq!(resumed(&w), first.s("session"));
+    assert_eq!(labels(&w), vec!["main coordinator"]); assert_eq!(tabs(&w), vec!["w2 Coordinator"]); assert_eq!(agents(&w).len(), 1); assert_eq!(resumed(&w), first.s("session"));
     let made = calls_of(&w, "^workspace create").last().unwrap().clone();
-    assert!(made.starts_with(&format!("workspace create --cwd {} --label ~ ", coord_home(&w))) && made.ends_with(" --no-focus"), "{made}");
+    assert!(made.starts_with(&format!("workspace create --cwd {} --label main coordinator ", coord_home(&w))) && made.ends_with(" --no-focus"), "{made}");
     assert!(w.state().arr("focus").is_empty());
     // stop closes its tab, leaving no unused shell behind
     stop(&w.socket).unwrap(); drain();
     assert!(tabs(&w).is_empty()); assert_eq!(agents(&w).len(), 0);
 }
 
+/// The words themselves, not `HOME_SPACE`: this label is what the human reads.
+#[test]
+fn the_home_space_made_again_either_way_is_labelled_main_coordinator_and_a_humans_tilde_space_is_left_alone() {
+    let w = coord_world();
+    let api = api(&w);
+    let mine = api.workspace_create(&home_dir(), "", &[]).unwrap().at("root_pane").clone();
+    let (top, machine) = (Co { socket: w.socket.clone(), level: Level::Top }, Co::machine(&w.socket));
+    // through space_for, for the Coordinator, with the machine coordinator beside it in the same space
+    open_tab(&api, &top, &[]).unwrap(); open_tab(&api, &machine, &[]).unwrap();
+    assert_eq!(labels(&w), vec!["~", "main coordinator"]);
+    assert_eq!(tabs(&w), vec!["w1 1".to_string(), "w2 Coordinator".to_string(), format!("w2 {}", machine.name())]);
+    // the space is gone with its last tab: made again under the same label
+    api.workspace_close("w2").unwrap();
+    open_tab(&api, &top, &[]).unwrap();
+    assert_eq!(labels(&w), vec!["~", "main coordinator"]); assert_eq!(get(&w).s("space"), "w3");
+    // through home_space, as moving a Coordinator over does; found by its label the next time
+    api.workspace_close("w3").unwrap();
+    assert_eq!(home_space(&api, None).unwrap(), "w4"); assert_eq!(home_space(&api, None).unwrap(), "w4");
+    assert_eq!(labels(&w), vec!["~", "main coordinator"]);
+    assert_eq!(w.state().arr("panes").iter().filter(|p| p.s("workspace_id") == "w1").map(|p| p.t("pane_id")).collect::<Vec<_>>(), vec![mine.t("pane_id")]);
+}
+
 #[test]
 fn the_home_space_under_another_label_is_still_found_and_a_tab_that_is_there_is_taken_up_not_doubled() {
     let w = coord_world();
     let api = api(&w);
-    api.workspace_create(&home_dir(), "", &[]).unwrap();
+    api.workspace_create(&home_dir(), "main coordinator", &[]).unwrap();
     w.script(json!({ "coordinator": [{ "said": "One." }] }));
     tell(&w, "one");
     let first = get(&w);
-    // herdr labels a space after its first tab's folder: the human went somewhere else in it
+    // the human renamed the home space
     w.patch(|st| { st["workspaces"][0]["label"] = json!("tmp"); for p in st["panes"].as_array_mut().unwrap() { if p.at("agent").is_object() { p["agent"] = Value::Null; } } });
     restart(&w.socket).unwrap(); drain();
     assert_eq!(labels(&w), vec!["tmp"]); assert_eq!(tabs(&w), vec!["w1 1", "w1 Coordinator"]); assert_eq!(get(&w).s("space"), "w1");
@@ -151,7 +173,7 @@ fn the_home_space_under_another_label_is_still_found_and_a_tab_that_is_there_is_
     tell(&w, "two");
     assert_eq!(get(&w).s("pane"), now.s("pane")); assert_eq!(calls_of(&w, "^agent start").len(), 2); assert_eq!(agents(&w).len(), 1); assert_eq!(tabs(&w), vec!["w1 1", "w1 Coordinator"]);
     assert_ne!(now.s("tab"), first.s("tab"));
-    // the whole state file is lost, and the home space is not labelled ~: the running one is still found, by its folder
+    // the whole state file is lost, and the home space is not labelled main coordinator: the running one is still found, by its folder
     let (starts, made) = (calls_of(&w, "^agent start").len(), calls_of(&w, "^(tab|workspace) create").len());
     forget(&w);
     tell(&w, "again");
@@ -168,7 +190,7 @@ fn the_home_space_under_another_label_is_still_found_and_a_tab_that_is_there_is_
     assert_ne!(get(&w).s("pane"), theirs.s("pane_id")); assert!(api.pane_get(theirs.s("pane_id")).unwrap().at("agent").is_null()); assert_eq!(agents(&w).len(), 1);
     assert_eq!(tabs(&w), vec!["w1 1", "w1 Coordinator", "w1 Coordinator"]);
     // lost while it still ran in the old space of its own: found there, not doubled, and moved over like any other
-    old_layout(&w); w.patch(|st| st["workspaces"][0]["label"] = json!("~"));
+    old_layout(&w); w.patch(|st| st["workspaces"][0]["label"] = json!("main coordinator"));
     forget(&w);
     let before = calls_of(&w, "^agent start").len();
     tell(&w, "four");
@@ -180,16 +202,16 @@ fn the_home_space_under_another_label_is_still_found_and_a_tab_that_is_there_is_
 #[test]
 fn moving_over_a_coordinator_in_the_old_space_of_its_own_is_moved_into_the_tab_as_it_runs_and_the_old_space_is_gone() {
     let w = coord_world();
-    api(&w).workspace_create(&home_dir(), "", &[]).unwrap();
+    api(&w).workspace_create(&home_dir(), "main coordinator", &[]).unwrap();
     w.script(json!({ "coordinator": [{ "said": "One." }, { "status": "working" }] }));
     tell(&w, "one");
     let first = get(&w);
     let pid = agents(&w)[0].at("agent").i("pid");
     old_layout(&w);
-    assert_eq!(labels(&w), vec!["~", "Coordinator"]);
+    assert_eq!(labels(&w), vec!["main coordinator", "Coordinator"]);
     // whoever ticks (the keeper, an open board) moves it: the same program, not started again, nothing focused
     unstamp("coordinator-move-default"); tick(&w.socket);
-    assert_eq!(labels(&w), vec!["~"]); assert_eq!(tabs(&w), vec!["w1 1", "w1 Coordinator"]);
+    assert_eq!(labels(&w), vec!["main coordinator"]); assert_eq!(tabs(&w), vec!["w1 1", "w1 Coordinator"]);
     assert!(calls_of(&w, "^pane move")[0].starts_with("pane move w9:p1 --new-tab --workspace w1 --label Coordinator --no-focus"), "{:?}", calls_of(&w, "^pane move"));
     assert_eq!(calls_of(&w, "^agent start").len(), 1); assert_eq!(agents(&w)[0].at("agent").i("pid"), pid); assert!(w.state().arr("focus").is_empty());
     let now = get(&w);
@@ -211,16 +233,16 @@ fn moving_over_with_no_home_space_on_a_message_and_on_a_herdr_that_will_not_move
     let words = |w: &World| tabs(w).iter().map(|x| x.split(' ').nth(1).unwrap_or("").to_string()).collect::<Vec<_>>();
     // no home space on this machine: the message that finds the old one makes it, then moves the Coordinator in
     old_layout(&w);
-    w.patch(|st| { st["workspaces"].as_array_mut().unwrap().retain(|x| x.s("label") != "~"); st["panes"].as_array_mut().unwrap().retain(|p| p.s("workspace_id") != "w1"); st["tabs"].as_array_mut().unwrap().retain(|t| t.s("workspace_id") != "w1"); });
+    w.patch(|st| { st["workspaces"].as_array_mut().unwrap().retain(|x| x.s("label") != "main coordinator"); st["panes"].as_array_mut().unwrap().retain(|p| p.s("workspace_id") != "w1"); st["tabs"].as_array_mut().unwrap().retain(|t| t.s("workspace_id") != "w1"); });
     tell(&w, "two");
-    assert_eq!(labels(&w), vec!["~"]); assert_eq!(words(&w), vec!["1", "Coordinator"]);
+    assert_eq!(labels(&w), vec!["main coordinator"]); assert_eq!(words(&w), vec!["1", "Coordinator"]);
     assert_eq!(calls_of(&w, "^agent start").len(), 1); assert_eq!(prompts_of(&w), vec!["one", "two"]);
     // herdr refuses the move: the old space is closed and it starts again in its tab, where it left off
     old_layout(&w);
     w.patch(|st| st["moveFails"] = json!(true));
-    unstamp("coordinator-move-default"); tick(&w.socket); assert_eq!(labels(&w), vec!["~", "Coordinator"]); // the tick only moves; it never ends a running program
+    unstamp("coordinator-move-default"); tick(&w.socket); assert_eq!(labels(&w), vec!["main coordinator", "Coordinator"]); // the tick only moves; it never ends a running program
     tell(&w, "three");
-    assert_eq!(labels(&w), vec!["~"]); assert_eq!(words(&w), vec!["1", "Coordinator"]);
+    assert_eq!(labels(&w), vec!["main coordinator"]); assert_eq!(words(&w), vec!["1", "Coordinator"]);
     assert_eq!(agents(&w).len(), 1); assert_eq!(resumed(&w), first.s("session")); assert!(get(&w).at("workspace").is_null());
     assert_eq!(prompts_of(&w), vec!["three"]); assert!(w.state().arr("focus").is_empty());
     // the same with panes of the human's in the old space, a split beside it and a tab: only the Coordinator's pane is
@@ -231,7 +253,7 @@ fn moving_over_with_no_home_space_on_a_message_and_on_a_herdr_that_will_not_move
     let tab = api.tab_create("w9", &w.root_str(), "", &[]).unwrap().at("root_pane").clone();
     tell(&w, "four");
     assert!(api.pane_get(beside.s("pane_id")).is_some()); assert!(api.pane_get(tab.s("pane_id")).is_some()); assert!(api.pane_get("w9:p1").is_none());
-    assert_eq!(labels(&w), vec!["~", "Coordinator"]); assert!(calls_of(&w, "^workspace close").is_empty());
+    assert_eq!(labels(&w), vec!["main coordinator", "Coordinator"]); assert!(calls_of(&w, "^workspace close").is_empty());
     assert_eq!(agents(&w).len(), 1); assert_eq!(resumed(&w), first.s("session")); assert!(get(&w).at("workspace").is_null());
     assert_eq!(api.pane_get(get(&w).s("pane")).unwrap().s("workspace_id"), get(&w).s("space"));
     // stop and restart from the old layout close its pane alone too

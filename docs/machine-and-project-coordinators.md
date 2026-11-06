@@ -5,7 +5,7 @@ row each are their coordinator. There is no main Coordinator besides: the top ro
 
 | Row | Its agent | Named | Lives in Herdr |
 |---|---|---|---|
-| `All machines`, the top row with every machine shown | the coordinator of all machines: this machine's top-level one, which sees every machine | `the coordinator of all machines` | a `Coordinator` tab in the home space (`~`) ([the coordinator of all machines](coordinator.md)) |
+| `All machines`, the top row with every machine shown | the coordinator of all machines: this machine's top-level one, which sees every machine | `the coordinator of all machines` | a `Coordinator` tab in the home space (`main coordinator`) ([the coordinator of all machines](coordinator.md)) |
 | A machine's row | its machine coordinator | after the machine: `vm-str's coordinator` | a tab of that name in that machine's home space |
 | A project's row (a repo's heading) | its project coordinator | after the repo: `gtm's coordinator`, `~'s coordinator` for the home folder | a tab of that name in the repo's own space |
 | A task's row | its agent | `GTM-14's agent` | its own tab |

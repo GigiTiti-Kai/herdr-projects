@@ -1,4 +1,4 @@
-//! The fake herdr's panes: their processes, layout, splits, moves, the commands run at their shell (an agent started
+//! The fake herdr's panes: their processes, layout, splits, moves, labels, the commands run at their shell (an agent started
 //! in a read-only mount stays in the pane), what they show, and what the board reports on them.
 use super::herdr::{arr, fail, ok, out, FakeHerdr as F, Out};
 use serde_json::{json, Value};
@@ -75,6 +75,7 @@ pub fn pane(st: &mut Value, verb: &str, arg2: &str, argv: &[String], flag: &dyn 
             ok(json!({ "type": "pane_move", "move_result": { "changed": true, "closed_workspace_id": if emptied { json!(from) } else { Value::Null }, "created_tab": F::tab_out(st, &t), "pane": F::pane_out(&q) } }))
         }
         "close" => { arr(st, "panes").remove(pi); F::drop_empty(st); ok(json!({ "type": "ok" })) }
+        "rename" => { st["panes"][pi]["label"] = json!(argv[3..].join(" ")); ok(json!({ "type": "pane_info", "pane": F::pane_out(&st["panes"][pi].clone()) })) }
         // A command run at the pane's shell. One that starts an agent program in a read-only mount
         // (`env HERDR_PROJECTS_AGENT=<name> bwrap … -- <kind> <args>`, or `… sandbox-exec -p <profile> <kind> <args>`) leaves
         // that agent in the pane.

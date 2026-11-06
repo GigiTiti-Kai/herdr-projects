@@ -135,7 +135,7 @@ fn delegate_steps(id: &str, g: &mut Guard, mut t: Task) -> Res<()> {
             t.put("root", root2.display().to_string()); t.put("startedOnce", true);
             let owns = !t.b("attemptOf");
             link_pane(t, &pane, &ws, owns);
-            crate::hosted::mark(t, res.b("hosted"));
+            crate::hosted::mark(t, &res);
             if res.at("tab").b("tab_id") { t.obj_mut("link").put("tab", res.at("tab").at("tab_id").clone()); }
         })?;
         if copy { copy_includes(&root, Path::new(t.s("worktree")), &list_of(&setting("workspace.include", Some(&t)))); }
@@ -202,8 +202,8 @@ fn restart_steps(id: &str, g: &mut Guard, mut t: Task) -> Res<()> {
     }
     if pane.is_none() {
         let ws = if t.at("link").b("workspace") { api.workspace_get(t.at("link").s("workspace")) } else { None };
-        let mut hosted = false;
-        if crate::hosted::is(&t) { pane = crate::hosted::reopen(&api, &root, &t)?.map(|r| r.at("root_pane").clone()); hosted = pane.is_some(); } // never a split of your pane
+        let mut placed = Value::Null;
+        if crate::hosted::is(&t) { if let Some(r) = crate::hosted::reopen(&api, &root, &t)? { pane = Some(r.at("root_pane").clone()); placed = r; } } // placed as at its start: a tab, or a pane beside yours
         else if ws.is_some() && t.b("attemptOf") { pane = crate::attempts::place::reopen_place(&api, &t)?; } // an attempt: a tab of its own again
         else if let Some(ws) = &ws { if let Some(first) = api.panes(Some(ws.s("workspace_id")))?.into_iter().next() { pane = Some(api.pane_split(first.s("pane_id"), &cwd_of(&t).display().to_string(), "right", &board_env())?); } }
         if pane.is_none() {
@@ -212,7 +212,7 @@ fn restart_steps(id: &str, g: &mut Guard, mut t: Task) -> Res<()> {
             pane = Some(root_pane(&api, &res)?);
         }
         let p = pane.clone().unwrap();
-        t = g.set(|t| { let owns = !t.b("attemptOf"); link_pane(t, &p, "", owns); crate::hosted::mark(t, hosted); })?;
+        t = g.set(|t| { let owns = !t.b("attemptOf"); link_pane(t, &p, "", owns); crate::hosted::mark(t, &placed); })?;
     }
     t = agent_now(g, t)?;
     // A start that was asked for and never got as far as its agent (its setup failed): this is that start.
@@ -236,7 +236,7 @@ pub fn reopen(id: &str, restart: bool) -> Res<(Value, bool, Task)> {
             let root = folder_of(t.s("id"));
             let res = match crate::hosted::reopen(&api, &root, &t)? { Some(r) => r, None => flow::spaces::opening_worktree(&api, &root, || api.worktree_open(&root.display().to_string(), t.s("worktree"), &flow::sidebar::space_label(&t)))? };
             let p = root_pane(&api, &res)?;
-            t = update_wait(t.s("id"), 2000, |t| { link_pane(t, &p, "", true); crate::hosted::mark(t, res.b("hosted")); Ok(Change::Write) })?;
+            t = update_wait(t.s("id"), 2000, |t| { link_pane(t, &p, "", true); crate::hosted::mark(t, &res); Ok(Change::Write) })?;
             flow::tabs::name_agent_tab(&api, p.s("tab_id"), Some(&t));
             p
         }

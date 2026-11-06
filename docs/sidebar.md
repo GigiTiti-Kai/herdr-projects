@@ -108,9 +108,9 @@ entry: its space, its tab, its name.
 
 ## What Herdr 0.9.3 cannot do here
 
-- **The Coordinator's first row reads `~ · Coordinator`**, not `Coordinator` alone. It lives in a tab of the home space,
-  and a sidebar row can hide a value only by the value itself: hiding `~` would hide it for every agent of yours in the
-  home space.
+- **The Coordinator's first row reads `main coordinator · Coordinator`**, not `Coordinator` alone. It lives in a tab of
+  the home space, and a sidebar row can hide a value only by the value itself: hiding `main coordinator` would hide it
+  for every agent in the home space.
 - **No marks of the board's own.** The row's `?`, `!`, `◑`, `◇`, `◷` and `◆` cannot be drawn: an entry's icon is Herdr's
   state icon, which only Herdr's own five states have. The words carry it.
 - **No colour by status.** Herdr can colour a value by rules on its text, set in your config. The plugin's rows only dim
