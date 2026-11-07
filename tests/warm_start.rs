@@ -211,7 +211,24 @@ fn real_programs_a_task_gets_the_cache_s_variables_unless_it_is_off_or_yours() {
     assert!(cache_vars(&base, &[("RUSTC_WRAPPER", &bin)]).contains("SCCACHE_DIR="), "the board's own, handed on, is no wrapper of yours");
     assert_eq!(cache_vars(&base, &[("HERDR_PROJECTS_NO_CACHE", "1")]), "");
     assert_eq!(cache_vars(&base, &[("RUSTC_WRAPPER", "/usr/bin/mine")]), "");
+    // the way the board asks: the script carried in the program, for a folder with a Cargo.toml
+    let (had, wrapper, repo) = (std::env::var_os("XDG_CACHE_HOME"), std::env::var_os("RUSTC_WRAPPER"), base.join("repo"));
+    std::fs::create_dir_all(&repo).unwrap();
+    std::fs::write(repo.join("Cargo.toml"), "[package]\n").unwrap();
+    unsafe { std::env::set_var("XDG_CACHE_HOME", &base); std::env::remove_var("RUSTC_WRAPPER"); std::env::remove_var("HERDR_PROJECTS_NO_CACHE") };
+    let given = sw::build_cache::env(&repo);
+    for (k, v) in [("XDG_CACHE_HOME", had), ("RUSTC_WRAPPER", wrapper)] { match v { Some(v) => unsafe { std::env::set_var(k, v) }, None => unsafe { std::env::remove_var(k) } } }
+    assert!(given.contains(&("RUSTC_WRAPPER".to_string(), bin.clone())) && given.len() == 7, "{given:?}");
     let _ = std::fs::remove_dir_all(&base);
+}
+
+#[test]
+fn a_repo_with_no_profiles_of_its_own_builds_smaller_and_one_with_them_as_it_chose() {
+    let vars = vec![("RUSTC_WRAPPER".to_string(), "/x/sccache".to_string())];
+    let names = |v: Vec<(String, String)>| v.into_iter().map(|(k, _)| k).collect::<Vec<_>>();
+    assert_eq!(names(sw::build_cache::with_smaller(vars.clone(), "[package]\nname = \"a\"\n")), ["RUSTC_WRAPPER", "CARGO_INCREMENTAL", "CARGO_PROFILE_DEV_DEBUG"]);
+    assert_eq!(names(sw::build_cache::with_smaller(vars, "[profile.quick]\ninherits = \"dev\"\n")), ["RUSTC_WRAPPER"]);
+    assert!(sw::build_cache::with_smaller(vec![], "[package]\n").is_empty(), "with the cache off, nothing");
 }
 
 #[test]

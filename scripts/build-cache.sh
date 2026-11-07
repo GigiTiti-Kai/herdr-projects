@@ -44,7 +44,7 @@ bc_use() {
 # out. One at a time (a folder as the lock; one left by a start that was killed goes after a minute), it asks for the
 # counts, which only a running server answers (its log says `request_stats`; with none it prints zeros all the same),
 # and starts one when none did; a start that fails is tried again. It stays up (a task's build may come hours after
-# the board started it), in the cache's folder, so that it holds no task's folder.
+# the board started it), and off the temporary folder of the task that happened to start it, which goes with that task.
 bc_running() { SCCACHE_LOG=sccache::commands=debug "$bc_bin" --show-stats 2>&1 >/dev/null | grep -q request_stats; }
 bc_serve() {
   bc_lock="$bc_dir/sccache.lock"
@@ -55,7 +55,7 @@ bc_serve() {
   done
   bc_ok=1
   for bc_try in 1 2 3 4 5; do
-    { bc_running || (cd "$bc_dir" && TMPDIR=/tmp SCCACHE_IDLE_TIMEOUT=0 "$bc_bin" --start-server >/dev/null 2>&1); } && { bc_ok=0; break; }
+    { bc_running || TMPDIR=/tmp SCCACHE_IDLE_TIMEOUT=0 "$bc_bin" --start-server >/dev/null 2>&1; } && { bc_ok=0; break; }
     sleep 1
   done
   rmdir "$bc_lock" 2>/dev/null || true
