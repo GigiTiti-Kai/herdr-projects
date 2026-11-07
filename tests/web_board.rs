@@ -30,6 +30,7 @@ fn the_web_board_shows_the_terminal_boards_list_and_one_task_whole() {
     let term = open(&w.root, 40);
     let mut want: Vec<Vec<String>> = vec![];
     for r in &term.s.rows { match r { sw::board::state::Row::Head { name, .. } => want.push(vec![name.clone()]), sw::board::state::Row::Rec(o) => want.last_mut().unwrap().push(o.t("id")), _ => {} } }
+    sw::clock::set(Some(sw::clock::now())); // "0s ago" may not turn "1s ago" between the two looks below
     let s = web(&w, "board", json!({}));
     let got: Vec<Vec<String>> = s.at("list").arr("groups").iter().map(|g| std::iter::once(g.t("name")).chain(g.arr("rows").iter().map(|r| r.t("id"))).collect()).collect();
     assert_eq!(got, want);

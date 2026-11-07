@@ -195,6 +195,10 @@ pub fn tidy(id: &str, delete_branch: &str) {
     let same = move |c: &Task| c.s("stage") == "done" && !c.b("archivedAt") && *c.at("armedAt") == armed;
     let prev = if t.at("tidy").is_object() && !t.at("tidy").b("fresh") { Some(t.at("tidy").clone()) } else { None };
     if !t.at("tidy").is_object() { let _ = update_wait(id, 10000, |c| { if !same(c) || c.at("tidy").is_object() { return Ok(Change::Keep); } let m = flow::spaces::tidy_mark(c, delete_branch, ""); c.put("tidy", m.unwrap_or(Value::Null)); Ok(Change::Write) }); }
+    // A record-only closeout first, when it is on (closeout.rs): until it is through nothing is closed.
+    let g = super::closeout::gate(&t);
+    if g != super::closeout::Gate::Go { super::closeout::hold(id, &same, &g); return; }
+    let Some(t) = super::closeout::through(id) else { return };
     let still = || get(id).map(|c| same(&c)).unwrap_or(false);
     let first = if t.at("tidy").b("fresh") { Some(t.at("tidy").t("tip")) } else { None };
     let kept = cleanup_with(&t, Opts { delete_branch, keep_unmerged: delete_branch != "always", still: Some(&still), since: prev.clone(), first });
@@ -212,7 +216,7 @@ pub fn tidy(id: &str, delete_branch: &str) {
         if !kept.ends.left.is_empty() { t.put("stillRunning", kept.ends.left.clone()); }
         t.put("tidy", if kept.retry { json!({ "deleteBranch": delete_branch, "tip": kept.tip, "comp": kept.comp, "still": if kept.still.is_null() { Value::Null } else { kept.still.clone() }, "eventSeq": kept.event_seq, "quietFrom": quiet_from, "msg": msg, "inUse": kept.in_use, "ends": ends }) } else { Value::Null });
         if !kept.kept.is_empty() { t.put("kept", kept.kept.clone()); } else {
-            flow::task::clear_notes(t); left = true; t.del("kept"); t.put("worktree", Value::Null); t.put("cleaned", now());
+            flow::task::clear_notes(t); left = true; t.del("kept"); t.put("worktree", Value::Null); t.put("cleaned", now()); if t.at("closeout").is_object() { t.obj_mut("closeout").put("phase", "pane_closed"); }
             let s = t.at("link").at("socket").clone(); t.put("link", json!({ "socket": s }));
         }
         let end = if msg.ends_with('.') { "" } else { "." };

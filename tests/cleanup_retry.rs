@@ -7,6 +7,8 @@ use serde_json::{json, Value};
 use std::path::Path;
 use sw::json::*;
 use sw::store::tasks::{update, Change};
+/// The record-only closeout that goes first when `workspace.closeout` is on.
+mod closeout;
 
 fn open(w: &World, t: &Obj) -> bool { w.state().arr("workspaces").iter().any(|x| x.s("workspace_id") == t.at("link").s("workspace")) }
 fn kept(t: &Obj) -> String { t.arr("kept").first().map(text).unwrap_or_default() }
