@@ -13,20 +13,29 @@ the board first types this into its working agent, once, as a turn of its own:
 reviewed, pushed or merged again, and an approval or a question of another task is not touched. Only the worker's own
 pane gets it: no reviewer, Watcher or plan writer.
 
-The space is closed only once Agent Memory's queue (`$XDG_STATE_HOME/agent-memory/queue.sqlite3`, read only, with
-`sqlite3`) holds a job accepted since then for that agent's session, filed from the task's worktree, and not given up
-on. Until then the task's line says what it waits for, and the clean-up is tried again by itself.
+Each step is proved apart, on its own pass, and nothing is ever typed twice:
 
-What it keeps on the task (`closeout`): `phase` (`checkpointing` once sent, `saved` once accepted), when it was sent,
-the session, the branch tip and the job. A record for another session or tip, or a turn of the agent after the save,
-proves nothing: it is looked at again, and the closeout goes in again. The same session and tip is never sent twice.
+1. **Saved.** Agent Memory's queue (`$XDG_STATE_HOME/agent-memory/queue.sqlite3`, read only, with `sqlite3`) holds a
+   job accepted since the closeout was sent, for that agent's session, filed from the task's worktree, and not given up
+   on. It is looked up again on every pass until the space is closed: a job given up on since proves nothing.
+2. **Exit, decided now.** Right before, the agent is at rest, nothing runs under it, the session and branch tip are the
+   ones it was sent for, and no new input reached it. Then `/exit` is typed, once.
+3. **The agent gone.** Herdr sees no agent in the pane any more, and nothing runs at its shell.
+4. **The space closed.** The clean-up as ever ([when a task is done](how-work-gets-done.md#when-a-task-is-done)).
+
+What it keeps on the task (`closeout`): `phase` (`checkpointing`, `saved`, `closing`, `agent_exited`, `pane_closed`),
+when it was sent and when `/exit` was, the session, the branch tip and the job. Until it is through, the task's line says
+what it waits for, and the clean-up is tried again by itself.
 
 **What cannot be proved closes nothing and types nothing more.** The space and worktree stay, and the task says why,
 starting with `closeout 未確認`:
 
+- new input after it was sent: a turn beyond the closeout's own, another session, the branch moved;
 - no accepted job within `workspace.closeoutWait` (10 minutes), or a queue that cannot be read;
-- its agent is not plainly at rest (a dialog, or a status Herdr cannot place): nothing is typed at all;
-- its agent's session is not known.
+- its turn still under way, herdr not answering, or the agent still there after `/exit`, past that same wait;
+- its agent not plainly at rest (a dialog, or a status Herdr cannot place), or not in its pane before it was told to
+  exit (a crash is never a finished closeout);
+- its agent's session not known.
 
-Such a task is no longer tried again by itself: archive it to close its space. Herdr not answering, a turn under way or
-a command still running under the agent only make it wait. Archiving a task does not go through the closeout.
+Such a task is no longer tried again by itself: archive it to close its space. Archiving a task does not go through
+the closeout.
