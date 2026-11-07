@@ -63,6 +63,7 @@ fn on_the_closeout_goes_in_once_and_the_space_closes_only_once_its_record_was_ac
     assert!(c.s("msg").contains("Closeout sent"), "{}", c.s("msg"));
     assert!(open(&w, &c) && Path::new(c.s("worktree")).exists() && c.b("tidy"));
     assert_eq!(c.i("reviewRounds"), t.i("reviewRounds")); assert_eq!(c.at("mergedAt"), t.at("mergedAt"));
+    assert_ne!(c.at("last").at("comp"), c.at("closeout").at("comp0"), "the closeout turn's end was seen by the board, and changed nothing");
     // no job yet, a job from another folder, one from before it was sent: not sent again, nothing closed
     assert_eq!(pass(&w, &id), 1);
     *jobs.borrow_mut() = Ok(vec![job("else", "/elsewhere", sw::clock::now()), job("old", c.s("worktree"), c.at("closeout").i("sentAt") - 1)]);
@@ -110,6 +111,18 @@ fn what_cannot_be_proved_keeps_the_space_with_the_reason_and_types_nothing_more(
     assert_eq!(prompts(&w, &p).len(), before);
     assert!(c.s("msg").contains("closeout 未確認: its agent is blocked"), "{}", c.s("msg"));
     assert!(open(&w, &c) && !c.b("tidy"));
+    // a turn of yours after the closeout's own, before its record came: what is accepted proves nothing, it goes in again
+    let y = merged(&w, 5);
+    let yid = y.t("id");
+    assert_eq!(pass(&w, &yid), 1);
+    assert!(task(&yid).at("closeout").has("comp1"));
+    sw::herdr::Herdr::new(None).agent_prompt(y.at("link").s("pane"), "one more thing").unwrap();
+    settle(&yid);
+    queue(Rc::new(std::cell::RefCell::new(Ok(vec![job("y", y.s("worktree"), sw::clock::now())]))));
+    assert_eq!(pass(&w, &yid), 1);
+    assert_eq!(closeouts(&w, &y), 2);
+    assert!(open(&w, &task(&yid)) && task(&yid).s("stage") == "done");
+    queue(Rc::new(std::cell::RefCell::new(Err("no Agent Memory queue".into()))));
     // the session changed since it was sent: that record proves nothing, and the closeout goes in again
     let n = merged(&w, 4);
     let nid = n.t("id");

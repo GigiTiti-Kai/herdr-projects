@@ -3,8 +3,9 @@
 //! of its own that the finish line never takes for one (the task stays done: hook.rs acts on no turn of a done task),
 //! and lets the clean-up go on only once Agent Memory's queue holds a job accepted for that same session, from that
 //! worktree, at that branch tip, since it was sent (memory_queue.rs). Its record is the task's `closeout`: `phase`
-//! (`checkpointing` once sent, `saved` once accepted), `sentAt`, `session`, `tip`, `job`, `comp`. A record for another
-//! session or tip, or a turn of the agent after the save, is no proof: it is looked at again, and sent again. What
+//! (`checkpointing` once sent, `saved` once accepted), `sentAt`, `session`, `tip`, `job`, `comp`, `events` (eventSeq).
+//! A record for another session or tip, or a turn of the agent beyond the closeout's own, is no proof: it is looked at
+//! again, and sent again. What
 //! cannot be told (herdr did not answer, a dialog, no accepted job before `workspace.closeoutWait`) closes nothing and
 //! types nothing more: the space is kept, with the reason. Only the worker's own pane: no reviewer, watcher or planner.
 use crate::clock::now;
@@ -24,6 +25,7 @@ pub enum Gate { Go, Wait(String), Held(String) }
 pub const WORDS: &str = "記録だけの session-close。ship・push・merge・PR・再 review・削除はしない。自分が所有し現在の権限で止められる背景処理（監視・cron・接続）だけ止めてから報告。他者・共有・所有不明のものは止めず、巻き込む可能性があれば残して理由付きで保留";
 /// What is typed: the skill's own command for the agent's program (Codex names skills with `$`).
 pub fn prompt(agent: &str) -> String { format!("{} {WORDS}", if agent.starts_with("codex") { "$session-close" } else { "/session-close" }) }
+const SLACK_MS: i64 = 5000;
 pub fn on(t: &Task) -> bool { setting("workspace.closeout", Some(t)) == json!(true) }
 
 pub fn gate(t: &Task) -> Gate {
@@ -39,15 +41,22 @@ pub fn gate(t: &Task) -> Gate {
     let rec = t.at("closeout");
     let same = rec.is_object() && rec.s("session") == t.s("session") && rec.s("tip") == tip && rec.s("worktree") == t.s("worktree");
     let status = a.s("agent_status");
-    if same && rec.s("phase") == "saved" && *rec.at("comp") == completion(&a) { return Gate::Go; }
-    if same && rec.s("phase") == "checkpointing" {
+    // New input, and what was saved proves nothing: a turn's end beyond the closeout's own, filed by the agent's hook
+    // (`events`) or counted by herdr (`comp1`, the count once the closeout's turn ended).
+    // shortcut: without the hook, a turn of yours that ends before the board's first look after the closeout is not
+    // told from the closeout's own; the hook's count is what tells it then.
+    let cur = completion(&a);
+    let more = (rec.has("comp1") && *rec.at("comp1") != cur) || t.i("eventSeq") - rec.i("events") > if rec.s("phase") == "saved" { 0 } else { 1 };
+    if same && !more && rec.s("phase") == "saved" && *rec.at("comp") == completion(&a) { return Gate::Go; }
+    if same && !more && rec.s("phase") == "checkpointing" {
         if status == "working" { return Gate::Wait("Closeout under way: waiting for its record".into()); }
+        if !rec.has("comp1") && cur != *rec.at("comp0") { let c1 = cur.clone(); let _ = update_wait(id, 10000, |c| { c.obj_mut("closeout").put("comp1", c1.clone()); Ok(Change::Write) }); }
         let late = now() - rec.i("sentAt") > ms(setting("workspace.closeoutWait", Some(t)).as_str().unwrap_or("10m")).max(1);
         let why = match jobs_of(t.s("session")) {
             Ok(jobs) => match accepted(&jobs, t.s("worktree"), rec.i("sentAt")) {
                 Some(j) => {
-                    let (job, comp) = (j.id, completion(&a));
-                    let _ = update_wait(id, 10000, |c| { c.obj_mut("closeout").put("phase", "saved"); c.obj_mut("closeout").put("job", job.clone()); c.obj_mut("closeout").put("comp", comp.clone()); Ok(Change::Write) });
+                    let (job, comp, events) = (j.id, completion(&a), t.i("eventSeq"));
+                    let _ = update_wait(id, 10000, |c| { let r = c.obj_mut("closeout"); r.put("phase", "saved"); r.put("job", job.clone()); r.put("comp", comp.clone()); r.put("events", events); Ok(Change::Write) });
                     return Gate::Go;
                 }
                 None => "Agent Memory has no accepted job for its session".to_string(),
@@ -62,10 +71,11 @@ pub fn gate(t: &Task) -> Gate {
     if t.s("session").is_empty() { return Gate::Held("closeout 未確認: its agent's session is not known, so its record could not be proved".into()); }
     if !h(t).pane_childless(pane, a.s("agent")) { return Gate::Wait("Closeout waits: a command still runs under its agent".into()); }
     let text = prompt(t.s("agent"));
+    let sent = now() - SLACK_MS; // taken before it goes in, a little early: the clock here can step back a second or two
     match hand(&h(t), pane, &text) {
         Ok(mark) => {
             note_sent(id, mark, &text, false);
-            let r = json!({ "phase": "checkpointing", "sentAt": now(), "session": t.s("session"), "tip": tip, "worktree": t.s("worktree") });
+            let r = json!({ "phase": "checkpointing", "sentAt": sent, "comp0": cur, "events": t.i("eventSeq"), "session": t.s("session"), "tip": tip, "worktree": t.s("worktree") });
             let _ = update_wait(id, 10000, |c| { c.put("closeout", r.clone()); Ok(Change::Write) });
             Gate::Wait("Closeout sent: waiting for Agent Memory to accept it".into())
         }
