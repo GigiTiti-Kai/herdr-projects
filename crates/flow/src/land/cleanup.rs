@@ -195,6 +195,10 @@ pub fn tidy(id: &str, delete_branch: &str) {
     let same = move |c: &Task| c.s("stage") == "done" && !c.b("archivedAt") && *c.at("armedAt") == armed;
     let prev = if t.at("tidy").is_object() && !t.at("tidy").b("fresh") { Some(t.at("tidy").clone()) } else { None };
     if !t.at("tidy").is_object() { let _ = update_wait(id, 10000, |c| { if !same(c) || c.at("tidy").is_object() { return Ok(Change::Keep); } let m = flow::spaces::tidy_mark(c, delete_branch, ""); c.put("tidy", m.unwrap_or(Value::Null)); Ok(Change::Write) }); }
+    // A record-only closeout first, when it is on (closeout.rs): until it is through nothing is closed.
+    let g = super::closeout::gate(&t);
+    if g != super::closeout::Gate::Go { super::closeout::hold(id, &same, &g); return; }
+    let Some(t) = super::closeout::through(id) else { return };
     let still = || get(id).map(|c| same(&c)).unwrap_or(false);
     let first = if t.at("tidy").b("fresh") { Some(t.at("tidy").t("tip")) } else { None };
     let kept = cleanup_with(&t, Opts { delete_branch, keep_unmerged: delete_branch != "always", still: Some(&still), since: prev.clone(), first });

@@ -15,6 +15,7 @@ pub mod http;
 pub mod json;
 pub mod login_env;
 pub mod memory;
+pub mod memory_queue;
 pub mod opener;
 pub mod research;
 pub mod status_words;
