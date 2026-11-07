@@ -1,7 +1,8 @@
 //! [real programs] A new worktree's warm start (`scripts/warm-start.sh`): the build a worktree of the main line keeps,
 //! a later worktree copies, with only what changed since built again; what was built with the other folder's path in
 //! it built again too; nothing kept off the main line, from a changed folder or older than what is kept. The builds
-//! are stand-ins (files laid out as cargo lays them out): the script is what is tested, not cargo.
+//! are stand-ins (files laid out as cargo lays them out): the script is what is tested, not cargo. Also what shares
+//! a build between tasks besides: the hard links of a kept build, and the build cache's variables for a task.
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, SystemTime};
@@ -154,4 +155,83 @@ fn real_programs_no_build_is_kept_off_the_main_line_from_a_changed_folder_or_old
     assert!(b.changed("dirty", "src/a.rs") > long_ago(), "a file changed in the folder is built again");
     assert!(b.changed("dirty", "src/b.rs") < long_ago());
     assert_eq!(b.kept(), Some(second));
+}
+
+#[test]
+fn real_programs_a_kept_build_is_linked_but_for_what_cargo_writes_in_place() {
+    use std::os::unix::fs::MetadataExt;
+    let _env = crate::common::env_kept();
+    let b = Bench::new("link");
+    for f in ["deps/liba-1.rlib", "deps/liba-1.rmeta", "deps/libm-1.so", "incremental/a-1/s-1/dep-graph.bin", "incremental/a-1/s-1.lock", "deps/a-1.d", ".fingerprint/a-1/lib-a", "deps/prog-1"] {
+        b.write("repo", &format!("target/quick/{f}"), f);
+    }
+    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("scripts/warm-start.sh");
+    let o = Command::new("/bin/sh").arg("-c").arg(format!(". '{}'; ws_link target/quick target/copy", script.display())).current_dir(b.dir("repo")).output().unwrap();
+    assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+    let inode = |d: &str, f: &str| std::fs::metadata(b.dir("repo").join("target").join(d).join(f)).unwrap().ino();
+    for f in ["deps/liba-1.rlib", "deps/liba-1.rmeta", "deps/libm-1.so", "incremental/a-1/s-1/dep-graph.bin"] { assert_eq!(inode("quick", f), inode("copy", f), "{f} is shared"); }
+    for f in ["incremental/a-1/s-1.lock", "deps/a-1.d", ".fingerprint/a-1/lib-a", "deps/prog-1"] {
+        assert_ne!(inode("quick", f), inode("copy", f), "{f} is its own");
+        assert_eq!(std::fs::read_to_string(b.dir("repo").join("target/copy").join(f)).unwrap(), f);
+    }
+}
+
+// The build cache a task in any Rust repo is given (crates/core/src/build_cache.rs, `--env` of scripts/build-cache.sh);
+// its sccache is a stand-in: the script is what is tested.
+
+fn cache_bench(name: &str) -> PathBuf {
+    let base = std::env::temp_dir().join(format!("sw-build-cache-{}-{name}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&base);
+    let bin = base.join("herdr-projects/sccache-0.18.0/sccache");
+    std::fs::create_dir_all(bin.parent().unwrap()).unwrap();
+    // It answers as a running server does (bc_running), so none is started.
+    std::fs::write(&bin, "#!/bin/sh\necho request_stats >&2\n").unwrap();
+    std::fs::set_permissions(&bin, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+    base
+}
+fn cache_vars(base: &Path, more: &[(&str, &str)]) -> String {
+    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("scripts/build-cache.sh");
+    let mut c = Command::new("sh");
+    c.arg(script).arg("--env").env("XDG_CACHE_HOME", base).env_remove("RUSTC_WRAPPER").env_remove("HERDR_PROJECTS_NO_CACHE").env_remove("SCCACHE_CACHE_SIZE");
+    for (k, v) in more { c.env(k, v); }
+    String::from_utf8_lossy(&c.output().unwrap().stdout).into_owned()
+}
+
+#[test]
+fn real_programs_a_task_gets_the_cache_s_variables_unless_it_is_off_or_yours() {
+    let _env = crate::common::env_kept();
+    let base = cache_bench("vars");
+    let bin = base.join("herdr-projects/sccache-0.18.0/sccache").display().to_string();
+    let got = sw::build_cache::parse(&cache_vars(&base, &[]));
+    let of = |k: &str| got.iter().find(|(n, _)| n == k).map(|(_, v)| v.clone()).unwrap_or_default();
+    assert_eq!(got.len(), 5, "{got:?}");
+    assert_eq!(of("RUSTC_WRAPPER"), bin);
+    assert_eq!(of("SCCACHE_CACHE_SIZE"), "10G");
+    assert_eq!(of("SCCACHE_DIR"), base.join("herdr-projects/sccache").display().to_string());
+    assert!(cache_vars(&base, &[("RUSTC_WRAPPER", &bin)]).contains("SCCACHE_DIR="), "the board's own, handed on, is no wrapper of yours");
+    assert_eq!(cache_vars(&base, &[("HERDR_PROJECTS_NO_CACHE", "1")]), "");
+    assert_eq!(cache_vars(&base, &[("RUSTC_WRAPPER", "/usr/bin/mine")]), "");
+    // the way the board asks: the script carried in the program, for a folder with a Cargo.toml
+    let (had, wrapper, repo) = (std::env::var_os("XDG_CACHE_HOME"), std::env::var_os("RUSTC_WRAPPER"), base.join("repo"));
+    std::fs::create_dir_all(&repo).unwrap();
+    std::fs::write(repo.join("Cargo.toml"), "[package]\n").unwrap();
+    unsafe { std::env::set_var("XDG_CACHE_HOME", &base); std::env::remove_var("RUSTC_WRAPPER"); std::env::remove_var("HERDR_PROJECTS_NO_CACHE") };
+    let given = sw::build_cache::env(&repo);
+    for (k, v) in [("XDG_CACHE_HOME", had), ("RUSTC_WRAPPER", wrapper)] { match v { Some(v) => unsafe { std::env::set_var(k, v) }, None => unsafe { std::env::remove_var(k) } } }
+    assert!(given.contains(&("RUSTC_WRAPPER".to_string(), bin.clone())) && given.len() == 7, "{given:?}");
+    let _ = std::fs::remove_dir_all(&base);
+}
+
+#[test]
+fn a_repo_with_no_profiles_of_its_own_builds_smaller_and_one_with_them_as_it_chose() {
+    let vars = vec![("RUSTC_WRAPPER".to_string(), "/x/sccache".to_string())];
+    let names = |v: Vec<(String, String)>| v.into_iter().map(|(k, _)| k).collect::<Vec<_>>();
+    assert_eq!(names(sw::build_cache::with_smaller(vars.clone(), "[package]\nname = \"a\"\n")), ["RUSTC_WRAPPER", "CARGO_INCREMENTAL", "CARGO_PROFILE_DEV_DEBUG"]);
+    assert_eq!(names(sw::build_cache::with_smaller(vars, "[profile.quick]\ninherits = \"dev\"\n")), ["RUSTC_WRAPPER"]);
+    assert!(sw::build_cache::with_smaller(vec![], "[package]\n").is_empty(), "with the cache off, nothing");
+}
+
+#[test]
+fn a_folder_with_no_rust_in_it_gets_nothing_and_runs_nothing() {
+    assert!(sw::build_cache::env(Path::new("/nonexistent/folder")).is_empty());
 }

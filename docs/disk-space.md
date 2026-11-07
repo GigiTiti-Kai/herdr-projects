@@ -58,7 +58,8 @@ what it removed (`herdr-projects sweep --dry` only says what would go). What sti
 - the board's task folders whose task was removed;
 - the build output (`target/`, `node_modules/`, `.next/`, and only what git ignores) of a worktree a done or archived
   task kept, once nothing changed on the task for `board.oldBuilds` days (7; `0`: never);
-- old warm builds in `~/.cache/herdr-projects` that nothing uses.
+- old warm builds in `~/.cache/herdr-projects` that nothing uses ([the build cache](build-cache.md) beside them stays:
+  a limit keeps that small).
 
 **What it never touches:** a task at work, its worktree and its folders; your repos and your home folder; a loose folder
 in `/tmp` the board did not make; a folder that changed in the last hour; a folder your environment points into (a `PATH` entry in an old scratchpad keeps that one); and anything

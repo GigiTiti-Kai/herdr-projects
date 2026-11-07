@@ -53,7 +53,8 @@ pub fn pipeline(id: &str, g: &mut Guard, text: &str, keep_intent: bool, reason: 
     let (folder, root) = (cwd_of(&t), folder_of(t.s("id")));
     let prev_main = t.t("syncedTo"); // main as it was brought in before this turn's sync
     let tree = if flow::task::is_agent_task(&t) && t.b("worktree") && Path::new(t.s("worktree")).exists() { t.t("worktree") } else { String::new() };
-    let env = vec![("HERDR_PROJECTS_ID".to_string(), t.t("id")), ("HERDR_PROJECTS_WORKTREE".into(), folder.display().to_string()), ("HERDR_PROJECTS_REPO".into(), root.display().to_string())];
+    let mut env = vec![("HERDR_PROJECTS_ID".to_string(), t.t("id")), ("HERDR_PROJECTS_WORKTREE".into(), folder.display().to_string()), ("HERDR_PROJECTS_REPO".into(), root.display().to_string())];
+    env.extend(crate::build_cache::env(&folder));
     // The settings of this step, read now: where it is checked. The review reads its own when it starts.
     let ch = work(Some(&t));
     let (check, setup) = (command_of(ch.at("check.command")), command_of(ch.at("workspace.setup")));

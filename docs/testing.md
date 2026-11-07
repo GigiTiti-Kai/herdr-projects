@@ -143,16 +143,16 @@ cache: [sccache](https://github.com/mozilla/sccache), one pinned version checked
 
 - The workspace setup (`scripts/setup.sh`, `workspace.setup` in `.herdr-projects.json`) installs it with
   `scripts/build-cache.sh` and builds through it. The check compiles through it when it is there.
-- It lives in `~/.cache/herdr-projects` with its cache (2 GB at most, oldest dropped first) and one server for every
-  worktree (a socket there, so another sccache of yours is left alone). The check starts the server only when none
+- It lives in `~/.cache/herdr-projects` with its cache (10 GB at most, oldest dropped first: where it is, its limit and
+  how to empty it are in [the build cache](build-cache.md)) and one server for every worktree of every Rust repo (a
+  socket there, so another sccache of yours is left alone). The check starts the server only when none
   answers, one start at a time: `sccache --start-server` starts another beside a running one and takes the socket from
   it, which had given every check a server of its own. That is outside every worktree, so removing a worktree
   (`workspace.cleanup`) frees that worktree's `target/` and nothing shared.
 - Where it is not installed (CI, which keeps its own cache; another platform; no network), builds go on as before, each
   worktree alone.
 - `HERDR_PROJECTS_NO_CACHE=1` turns it off. A `RUSTC_WRAPPER` of your own wins.
-- **Is it hit?** `sh scripts/build-cache.sh --stats`: the counts of its server since it started (it stops after ten idle
-  minutes, and its counts with it). Each build compiles in its own process (`SCCACHE_CLIENT_SIDE`), so `Compile
+- **Is it hit?** `sh scripts/build-cache.sh --stats`: the counts of its server since it started. Each build compiles in its own process (`SCCACHE_CLIENT_SIDE`), so `Compile
   requests` stays 0 however much is hit: read `Cache hits (Rust)` against `Cache misses (Rust)`. A fresh build of the
   program in an empty `target/` measured 101 hits and 15 misses (the program's own crates, and the compiler macros).
 - **Nothing that changes from run to run goes in a `CARGO_` variable.** Cargo hands the compiler every variable whose
@@ -184,8 +184,10 @@ line (`target/quick`), and only what changed since is built again.
 - **Where:** `~/.cache/herdr-projects/warm/<repo>/`, one folder each, with `current` naming the newest. A new one is made
   beside the old and then named, so worktrees set up at the same moment each copy a whole build. An old one goes 30
   minutes after it stopped being current.
-- **The copy** is a clone where the file system can (APFS, Btrfs, XFS: no extra space), a plain copy elsewhere (ext4:
-  about 500 MB a kept build); never hard links, since cargo writes into some of its files in place.
+- **The copy** is a clone where the file system can (APFS, Btrfs, XFS: no extra space). Elsewhere (ext4) the compiler's
+  output is hard-linked (libraries and its incremental notes, which rustc only ever replaces) and only what cargo writes
+  in place, and the linked programs, is really copied; a plain copy where that fails too. [The build
+  cache](build-cache.md) has what that saves.
 - **Timestamps:** cargo judges what is out of date by when files changed, and every file of a fresh worktree is new. The
   files whose content is the kept build's commit's get an old time, so cargo takes them as built; the rest (changed on
   the main line since, or in the folder) keep theirs and are built again.

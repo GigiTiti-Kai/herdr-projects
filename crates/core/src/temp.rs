@@ -44,12 +44,13 @@ pub fn leave_task_env() {
     for k in TASK { unsafe { std::env::remove_var(k) } }
 }
 /// The environment of a program the board starts for the task: every name programs read their temporary folder from,
-/// then the task's id and its report folder.
+/// the task's id and its report folder, then the build cache all Rust repos share (build_cache.rs).
 pub fn env(t: &Obj) -> Vec<(String, String)> {
     let d = of(t).display().to_string();
     let mut all: Vec<(String, String)> = NAMES.iter().map(|k| (k.to_string(), d.clone())).collect();
     all.push((TASK[0].into(), t.t("id")));
     all.push((TASK[1].into(), crate::research::report_folder(t).display().to_string()));
+    all.extend(crate::build_cache::env(&crate::store::repos::cwd_of(t)));
     all
 }
 /// The board's own folders and the task's temporary folder (made now), for a tab or a space opened for the task.

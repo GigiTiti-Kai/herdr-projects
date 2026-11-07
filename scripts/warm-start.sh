@@ -6,8 +6,8 @@
 #
 # The kept builds live in ~/.cache/herdr-projects/warm/<repo>/, one folder each (`seed-…`: `target/quick`, the
 # commit it was built from, the compiler, the folder it was built in) and `current` naming the newest. A copy is a
-# clone where the file system can (APFS, Btrfs, XFS), a plain copy elsewhere; never hard links, as cargo writes into
-# some of its files in place. Cargo decides what is out of date by the times files were changed, and every file of a
+# clone where the file system can (APFS, Btrfs, XFS); elsewhere (ext4) the compiler's output is hard-linked, so that a
+# new worktree writes next to nothing, and only what cargo writes in place is really copied (`ws_link`). Cargo decides what is out of date by the times files were changed, and every file of a
 # fresh worktree is new: the files whose content is the kept build's commit's are given an old time, so cargo takes
 # them as built; every other file (changed since, or by you) keeps its own and is built again.
 ws_old=200001010000
@@ -16,9 +16,18 @@ ws_dir() {
   ws_root="${XDG_CACHE_HOME:-$HOME/.cache}/herdr-projects/warm/$(printf '%s' "$ws_git" | cksum | cut -d' ' -f1)"
 }
 ws_rustc() { rustc -vV 2>/dev/null | tr -d '\r'; }
-# A copy of a folder that keeps every file's time: a clone where it can be, else a plain copy.
+# Every file a hard link, then a file of its own for all but what rustc only ever replaces, never writes into: the
+# libraries and its notes in incremental/ (it hard-links those itself from one build to the next). The linked ones stay
+# safe when either side builds again; cargo's fingerprints, dep-info and the linked programs are copied.
+ws_link() {
+  cp -al "$1" "$2" 2>/dev/null || return 1
+  find "$2" -type f ! -name '*.rlib' ! -name '*.rmeta' ! -name '*.so' \
+    ! \( -path '*/incremental/*' ! -name '*.lock' \) -exec sh -c 'for f; do cp -p "$f" "$f.own" && mv -f "$f.own" "$f" || exit 1; done' sh {} +
+}
+# A copy of a folder that keeps every file's time: a clone where it can be, else hard links (ws_link), else a plain copy.
 ws_copy() {
-  cp -pR --reflink=auto "$1" "$2" 2>/dev/null && return 0; rm -rf "$2"
+  cp -pR --reflink=always "$1" "$2" 2>/dev/null && return 0; rm -rf "$2"
+  ws_link "$1" "$2" && return 0; rm -rf "$2"
   cp -cpR "$1" "$2" 2>/dev/null && return 0; rm -rf "$2"
   cp -pR "$1" "$2"
 }

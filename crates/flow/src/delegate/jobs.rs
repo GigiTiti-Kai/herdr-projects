@@ -146,7 +146,8 @@ fn delegate_steps(id: &str, g: &mut Guard, mut t: Task) -> Res<()> {
         let setup = command_of(&setting("workspace.setup", Some(&t)));
         if !setup.is_empty() {
             t = g.set(|t| { t.put("stage", "setup"); t.put("msg", format!("Setting up: {setup}")); })?;
-            let env = vec![("HERDR_PROJECTS_ID".to_string(), t.t("id")), ("HERDR_PROJECTS_WORKTREE".into(), cwd_of(&t).display().to_string()), ("HERDR_PROJECTS_REPO".into(), root.display().to_string())];
+            let mut env = vec![("HERDR_PROJECTS_ID".to_string(), t.t("id")), ("HERDR_PROJECTS_WORKTREE".into(), cwd_of(&t).display().to_string()), ("HERDR_PROJECTS_REPO".into(), root.display().to_string())];
+            env.extend(crate::build_cache::env(&cwd_of(&t)));
             let alive = || g.check().is_ok();
             let out = sh(&setup, &cwd_of(&t), &env, 15.0, Some(&alive), None);
             if out.aborted { return Ok(()); }
