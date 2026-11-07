@@ -38,10 +38,10 @@ fn parse(line: &str) -> Option<Job> {
     let at = chrono::DateTime::parse_from_rfc3339(f.get(2)?).ok()?.timestamp_millis();
     Some(Job { id: f[0].into(), status: f[1].into(), accepted: at, cwd: f.get(3)?.to_string() })
 }
-/// The job that proves a closeout sent at `sent` (ms) was accepted: the same session (asked), from `cwd`, accepted at
-/// or after `sent`, and not given up on. The newest such.
+/// The job that proves a closeout sent at `sent` (ms) was accepted: the same session (asked), from `cwd`, accepted
+/// after `sent` (a job of the same millisecond may be from before it), and not given up on. The newest such.
 pub fn accepted(jobs: &[Job], cwd: &str, sent: i64) -> Option<Job> {
-    jobs.iter().rev().find(|j| j.accepted >= sent && j.cwd.trim_end_matches('/') == cwd.trim_end_matches('/') && !["discarded", "superseded", "corrupt_acknowledged"].contains(&j.status.as_str())).cloned()
+    jobs.iter().rev().find(|j| j.accepted > sent && j.cwd.trim_end_matches('/') == cwd.trim_end_matches('/') && !["discarded", "superseded", "corrupt_acknowledged"].contains(&j.status.as_str())).cloned()
 }
 
 #[cfg(test)]

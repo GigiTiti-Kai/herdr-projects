@@ -174,7 +174,8 @@ fn run(f: &F, pi: usize, prompt: &str, step: Value) {
                 write(&m.join("review").join("verdict.json"), &v.to_string());
             }
         }
-    } else if step.b("said") {
+    }
+    if step.b("said") { // its saved conversation: what a coordinator, or a worker, said in this turn
         let st = f.st.borrow();
         let args: Vec<String> = st["panes"][pi]["agent"].arr("args").iter().map(text).collect();
         if let (Some(at), Some(home)) = (args.iter().position(|a| a == "--session-id" || a == "--resume"), std::env::var_os("CLAUDE_CONFIG_DIR")) {

@@ -90,6 +90,19 @@ impl Herdr {
     /// command is at work, in the program's group (on the terminal, a file or `/dev/null`) or in a group of its own
     /// (what, in words: busy.rs).
     pub fn pane_childless(&self, id: &str, agent: &str) -> bool { super::busy::beside_agent(self, id, agent, false).is_empty() }
+    /// The processes in the pane's foreground but its shell (the agent's own program, while it runs), or None when herdr
+    /// does not say.
+    pub fn front_pids(&self, id: &str) -> Option<Vec<i64>> {
+        let i = self.process_info(id)?;
+        let shell = i.i("shell_pid");
+        Some(i.arr("foreground_processes").iter().map(|p| p.i("pid")).filter(|p| *p > 1 && *p != shell).collect())
+    }
+    /// Have these processes ended: none of them in the pane's foreground any more, and none alive on this machine (a
+    /// test's herdr answers for the first only). Herdr not saying is not ended.
+    pub fn pids_gone(&self, id: &str, pids: &[i64]) -> bool {
+        let Some(front) = self.process_info(id).map(|i| i.arr("foreground_processes").iter().map(|p| p.i("pid")).collect::<Vec<_>>()) else { return false };
+        pids.iter().all(|p| !front.contains(p) && (super::cli::fake().is_some() || unsafe { libc::kill(*p as i32, 0) } != 0))
+    }
     /// A pane, with whatever runs in it, into a new tab of another space. Never focused.
     pub fn pane_move(&self, id: &str, workspace: &str, label: &str) -> HRes<Value> {
         let mut a = args(&["pane", "move", id, "--new-tab", "--workspace", workspace]);

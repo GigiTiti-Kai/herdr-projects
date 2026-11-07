@@ -20,15 +20,15 @@ pub fn pane(st: &mut Value, verb: &str, arg2: &str, argv: &[String], flag: &dyn 
             let shell = 4194400;
             // The agent is pid 1, with a process under it. `tool`: a command in a group of its own (not listed); in its own
             // group: `helper`, one wired to it (an MCP server); `child`, a command that is not; `wrapped`, the
-            // agent's own program under an npm wrapper. `shell`: the pane's shell is that real process; `infoFails`: herdr
+            // agent's own program under an npm wrapper. `frontPid`: that process in its foreground, whatever else. `shell`: the pane's shell is that real process; `infoFails`: herdr
             // does not answer for this pane
             let under = ["tool", "helper", "child", "wrapped"].iter().any(|k| p.b(k));
-            let fg = if st.b("pids") && p.at("agent").is_object() { p.at("agent").i("pid") } else if under { 1 } else if p.b("busy") { shell + 1 } else { shell };
-            let mut front = vec![json!({ "pid": fg, "name": if p.b("wrapped") { "node" } else if under { "agent" } else if p.b("busy") { "sleep" } else { "bash" } })];
+            let fg = if p.b("frontPid") { p.i("frontPid") } else if st.b("pids") && p.at("agent").is_object() { p.at("agent").i("pid") } else if under { 1 } else if p.b("busy") { shell + 1 } else { shell };
+            let mut front = vec![json!({ "pid": fg, "name": if p.b("frontPid") { "agent" } else if p.b("wrapped") { "node" } else if under { "agent" } else if p.b("busy") { "sleep" } else { "bash" } })];
             if p.b("helper") { front.push(json!({ "pid": 2, "name": "mcp-server" })); }
             if p.b("child") { front.push(json!({ "pid": 3, "name": "sleep" })); }
             if p.b("wrapped") { front.push(json!({ "pid": 3, "name": p.at("agent").at("kind") })); }
-            let group = if p.b("busy") { shell + 1 } else if under { fg } else { shell };
+            let group = if p.b("frontPid") { fg } else if p.b("busy") { shell + 1 } else if under { fg } else { shell };
             return ok(json!({ "type": "pane_process_info", "process_info": { "pane_id": p.at("pane_id"), "shell_pid": if p.b("job") { 1 } else if p.b("shell") { p.i("shell") } else { shell }, "foreground_process_group_id": group, "foreground_processes": front } }));
         }
         "layout" => {
