@@ -4,7 +4,8 @@
 # nothing shared). `sh scripts/build-cache.sh` installs it (the workspace setup does); `. scripts/build-cache.sh` in a
 # script that runs cargo (scripts/check.sh, scripts/setup.sh) compiles through it when it is installed, and changes
 # nothing when it is not (CI, offline, another platform); `sh scripts/build-cache.sh --stats` shows how often it was hit
-# since its server started. How and why: docs/testing.md.
+# since its server started; `--env` installs it, starts its server and prints its variables, for the board to give a
+# task in any Rust repo (crates/core/src/build_cache.rs carries this file). How and why: docs/build-cache.md.
 bc_version=0.18.0
 bc_dir="${XDG_CACHE_HOME:-$HOME/.cache}/herdr-projects"
 bc_bin="$bc_dir/sccache-$bc_version/sccache"
@@ -19,7 +20,7 @@ bc_install() {
   esac
   name="sccache-v$bc_version-$t"; url="https://github.com/mozilla/sccache/releases/download/v$bc_version/$name.tar.gz"
   tmp=$(mktemp -d) || return 0
-  if command -v curl >/dev/null 2>&1; then curl -fsSL -o "$tmp/a.tgz" "$url"; else wget -qO "$tmp/a.tgz" "$url"; fi || {
+  if command -v curl >/dev/null 2>&1; then curl -fsSL --max-time 120 -o "$tmp/a.tgz" "$url"; else wget -T 120 -qO "$tmp/a.tgz" "$url"; fi || {
     rm -rf "$tmp"; echo "Could not download the shared build cache ($url): this worktree builds on its own." >&2; return 0; }
   got=$( (sha256sum "$tmp/a.tgz" 2>/dev/null || shasum -a 256 "$tmp/a.tgz") | cut -d' ' -f1)
   if [ "$got" = "$sum" ] && tar -xzf "$tmp/a.tgz" -C "$tmp" "$name/sccache" && mkdir -p "${bc_bin%/*}"; then
@@ -28,11 +29,11 @@ bc_install() {
   rm -rf "$tmp"; return 0
 }
 # One server (on a socket of its own, so another sccache of yours is left alone), one cache and one size limit for
-# every worktree. A RUSTC_WRAPPER you set yourself wins; HERDR_PROJECTS_NO_CACHE=1 turns the cache off.
+# every worktree of every Rust repo. A RUSTC_WRAPPER you set yourself wins; HERDR_PROJECTS_NO_CACHE=1 turns the cache off.
 bc_use() {
-  [ -x "$bc_bin" ] && [ -z "$RUSTC_WRAPPER" ] && [ -z "$HERDR_PROJECTS_NO_CACHE" ] || return 0
+  [ -x "$bc_bin" ] && { [ -z "$RUSTC_WRAPPER" ] || [ "$RUSTC_WRAPPER" = "$bc_bin" ]; } && [ -z "$HERDR_PROJECTS_NO_CACHE" ] || return 0
   RUSTC_WRAPPER="$bc_bin"; SCCACHE_DIR="$bc_dir/sccache"; SCCACHE_SERVER_UDS="$bc_dir/sccache.sock"
-  SCCACHE_CACHE_SIZE="${SCCACHE_CACHE_SIZE:-2G}"; SCCACHE_CLIENT_SIDE=1 # compiles in the build's own process, not the server's
+  SCCACHE_CACHE_SIZE="${SCCACHE_CACHE_SIZE:-10G}"; SCCACHE_CLIENT_SIDE=1 # compiles in the build's own process, not the server's
   export RUSTC_WRAPPER SCCACHE_DIR SCCACHE_SERVER_UDS SCCACHE_CACHE_SIZE SCCACHE_CLIENT_SIDE
   bc_serve || { unset RUSTC_WRAPPER; echo "The shared build cache did not start: this build runs on its own." >&2; }
 }
@@ -42,7 +43,8 @@ bc_use() {
 # from it, so every check had a server of its own, with counts of its own, and the old ones ran on until they idled
 # out. One at a time (a folder as the lock; one left by a start that was killed goes after a minute), it asks for the
 # counts, which only a running server answers (its log says `request_stats`; with none it prints zeros all the same),
-# and starts one when none did; a start that fails is tried again.
+# and starts one when none did; a start that fails is tried again. It stays up (a task's build may come hours after
+# the board started it), in the cache's folder, so that it holds no task's folder.
 bc_running() { SCCACHE_LOG=sccache::commands=debug "$bc_bin" --show-stats 2>&1 >/dev/null | grep -q request_stats; }
 bc_serve() {
   bc_lock="$bc_dir/sccache.lock"
@@ -53,7 +55,7 @@ bc_serve() {
   done
   bc_ok=1
   for bc_try in 1 2 3 4 5; do
-    { bc_running || "$bc_bin" --start-server >/dev/null 2>&1; } && { bc_ok=0; break; }
+    { bc_running || (cd "$bc_dir" && TMPDIR=/tmp SCCACHE_IDLE_TIMEOUT=0 "$bc_bin" --start-server >/dev/null 2>&1); } && { bc_ok=0; break; }
     sleep 1
   done
   rmdir "$bc_lock" 2>/dev/null || true
@@ -65,4 +67,10 @@ bc_stats() {
   [ -x "$bc_bin" ] || { echo "The shared build cache is not installed: sh scripts/build-cache.sh" >&2; return 1; }
   bc_use && "$bc_bin" --show-stats
 }
-case "$0" in *build-cache.sh) if [ "$1" = --stats ]; then bc_stats; else bc_install; fi ;; *) bc_use ;; esac
+# What a task's agent, its reviewers and its check are given: nothing where the cache is off or another wrapper is set.
+bc_env() {
+  bc_install >&2; bc_use
+  [ "$RUSTC_WRAPPER" = "$bc_bin" ] || return 0
+  for v in RUSTC_WRAPPER SCCACHE_DIR SCCACHE_SERVER_UDS SCCACHE_CACHE_SIZE SCCACHE_CLIENT_SIDE; do eval "echo \"$v=\$$v\""; done
+}
+case "$0" in *build-cache.sh) case "$1" in --stats) bc_stats ;; --env) bc_env ;; *) bc_install ;; esac ;; *) bc_use ;; esac
