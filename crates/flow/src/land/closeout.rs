@@ -76,7 +76,7 @@ pub fn gate(t: &Task) -> Gate {
         Ok(mark) => {
             note_sent(id, mark, &text, false);
             let r = json!({ "phase": "checkpointing", "sentAt": sent, "comp0": cur, "events": t.i("eventSeq"), "session": t.s("session"), "tip": tip, "worktree": t.s("worktree") });
-            let _ = update_wait(id, 10000, |c| { c.put("closeout", r.clone()); Ok(Change::Write) });
+            let _ = update_wait(id, 10000, |c| { let was = c.at("closeout").at("was").clone(); let mut r = r.clone(); if was.is_string() { r["was"] = was; } c.put("closeout", r); Ok(Change::Write) }); // the line before the first hold stays
             Gate::Wait("Closeout sent: waiting for Agent Memory to accept it".into())
         }
         Err(e) => Gate::Held(format!("closeout 未確認: it could not be typed in ({})", e.message)),

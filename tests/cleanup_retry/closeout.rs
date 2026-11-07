@@ -122,6 +122,10 @@ fn what_cannot_be_proved_keeps_the_space_with_the_reason_and_types_nothing_more(
     assert_eq!(pass(&w, &yid), 1);
     assert_eq!(closeouts(&w, &y), 2);
     assert!(open(&w, &task(&yid)) && task(&yid).s("stage") == "done");
+    queue(Rc::new(std::cell::RefCell::new(Ok(vec![job("y2", y.s("worktree"), sw::clock::now())]))));
+    assert_eq!(pass(&w, &yid), 1);
+    assert!(task(&yid).b("cleaned"));
+    assert_eq!(task(&yid).s("msg"), "Merged into main.", "sent twice, its line as it was all the same");
     queue(Rc::new(std::cell::RefCell::new(Err("no Agent Memory queue".into()))));
     // the session changed since it was sent: that record proves nothing, and the closeout goes in again
     let n = merged(&w, 4);
