@@ -28,7 +28,7 @@ fn a_retracted_or_quoted_exit_decision_another_terminal_or_session_or_a_draft_ty
     held(&task(s.s("id")), "another session than its own is in its pane");
     assert_eq!(exits(&w, &s), 0);
     // words of yours waiting unsent: never sent along with the closeout
-    let d = merged_with(&w, 24, SAFE, |t| pane(&w, t, |p| p["agent"]["box"] = json!("UNFINISHED DRAFT: do not submit")));
+    let d = merged_with(&w, 24, SAFE, |t| pane(&w, t, |p| { p["agent"]["box"] = json!("UNFINISHED DRAFT: do not submit"); p["agent"]["screen"] = json!("Done.\n╭──\n│ ❯ UNFINISHED DRAFT: do not submit │\n╰──"); }));
     assert_eq!(closeouts(&w, &d), 0);
     assert!(!prompts(&w, d.at("link").s("pane")).iter().any(|p| p.contains("UNFINISHED DRAFT")));
     held(&task(d.s("id")), "words wait unsent in its input box");
