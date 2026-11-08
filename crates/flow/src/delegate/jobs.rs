@@ -77,6 +77,7 @@ fn delegate_steps(id: &str, g: &mut Guard, mut t: Task) -> Res<()> {
     // The step goes on: its worktree read-only again, where a stop made it writable.
     if plan::open(&t) && !t.at("plan").b("locked") { plan::lock::set_locked(id, true); t = g.check()?; }
     // 1. A place to work, unless the task still has a live pane from an earlier run.
+    if crate::land::park::kept_from_foreign(&t) { return Ok(()); }
     let live_pane = if t.at("link").b("pane") { api.pane_get(t.at("link").s("pane")) } else { None };
     if live_pane.is_some() && api.agent_get(t.at("link").s("pane"))?.is_some() { // delegate again on a task whose agent is still there: just continue it
         t = g.set(|t| { let _ = r::starts_as(t); })?;
@@ -189,6 +190,7 @@ pub fn restart_job(id: &str) {
     release(id, false);
 }
 fn restart_steps(id: &str, g: &mut Guard, mut t: Task) -> Res<()> {
+    if crate::land::park::kept_from_foreign(&t) { return Ok(()); } // another agent in a parked task's pane: nothing of it is touched
     let api = flow::task::h(&t);
     let root = folder_of(t.s("id"));
     let mut pane = if t.at("link").b("pane") { api.pane_get(t.at("link").s("pane")) } else { None };

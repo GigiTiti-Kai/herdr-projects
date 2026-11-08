@@ -22,6 +22,7 @@ const FRESH: &[&str] = &[
     "startedOnce",
     "startedAgentAt",
     "cleaned",
+    "closeout",
     "worktree",
     "branch",
     "from",

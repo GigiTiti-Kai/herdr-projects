@@ -125,6 +125,17 @@ pub fn refuse_foreign(t: &Obj) -> Res<()> {
         Err(e) => crate::fail!("{} is parked, and herdr did not say which agent is in its pane ({}): nothing was sent.", t.s("id"), e.code),
     }
 }
+/// A start or restart that finds another agent than a parked task's own in its pane (or herdr not saying which): the
+/// task says so and stops, its waiting words kept, and nothing is typed or pressed in that pane. true: so.
+pub fn kept_from_foreign(t: &Obj) -> bool {
+    let Err(e) = refuse_foreign(t) else { return false };
+    let _ = update_wait(t.s("id"), 10000, |c| {
+        c.put("stage", "failed"); c.put("msg", e.msg.clone()); c.put("turnOpen", false); c.put("expectedWake", Value::Null);
+        c.put("failure", json!({ "stage": "agent", "title": "Another agent is in its pane", "detail": e.msg, "agentCanFix": false, "at": crate::clock::now() }));
+        Ok(Change::Write)
+    });
+    true
+}
 /// Its agent is back in its own conversation: the park is over (a reopen puts its line back as before it: jobs.rs).
 pub fn resumed(id: &str) {
     let _ = update_wait(id, 10000, |c| {
