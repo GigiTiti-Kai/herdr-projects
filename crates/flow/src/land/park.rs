@@ -20,13 +20,13 @@ pub const STAGES: [&str; 2] = ["approval", "asks"];
 pub fn on(t: Option<&Task>) -> bool { setting("workspace.park", t) == json!(true) }
 fn rec(t: &Obj) -> &Value { t.at("closeout") }
 /// Its agent is closed out and gone, its park proved.
-pub fn parked(t: &Obj) -> bool { rec(t).b("park") && rec(t).b("parked") }
+pub fn parked(t: &Obj) -> bool { rec(t).b("park") && rec(t).b("parked") && rec(t).s("phase") != "pane_closed" } // closed: that round is over
 /// A park under way, or done, on a task that still waits for you: its turns are its own.
 pub fn parking(t: &Obj) -> bool { rec(t).b("park") && !rec(t).b("held") && STAGES.contains(&t.s("stage")) }
 /// Under way and not yet through: nothing else is typed into its agent.
 pub fn busy(t: &Obj) -> bool { parking(t) && !parked(t) }
 /// A park's record that proves no exit (held, or left behind by a task that moved on): it counts for nothing.
-pub fn unfinished(t: &Obj) -> bool { rec(t).b("park") && (!parked(t) || rec(t).b("held")) }
+pub fn unfinished(t: &Obj) -> bool { rec(t).b("park") && (!rec(t).b("parked") || rec(t).b("held")) }
 pub fn drop_record(id: &str) { let _ = update_wait(id, 10000, |c| { if !c.at("closeout").b("park") { return Ok(Change::Keep); } c.put("closeout", Value::Null); Ok(Change::Write) }); }
 /// Refused while a park is under way: what would be typed into its agent, or change what it waits on.
 pub fn refuse_busy(t: &Obj) -> Res<()> {
@@ -41,6 +41,7 @@ pub fn park(id: &str) -> Res<(Task, String)> {
     if !on(Some(&t)) { crate::fail!("Parking is off: herdr-projects set workspace.park true (only for the tasks you choose to park)."); }
     if !STAGES.contains(&t.s("stage")) { crate::fail!("{id} waits for nothing of yours: only a task that waits for your approval or your answer is parked."); }
     if t.b("archivedAt") || !crate::flow::task::is_agent_task(&t) || !t.at("link").b("pane") { crate::fail!("{id} has no agent of its own to park."); }
+    if crate::plan::planner(&t) { crate::fail!("{id}'s agent is its plan writer: only a worker is parked."); }
     if runner_alive(&t) { crate::fail!("{id} is busy. Try again in a moment."); }
     if !pending_text(&id).is_empty() { crate::fail!("Words wait to go to {id}'s agent: nothing was parked."); }
     if rec(&t).is_object() { crate::fail!("{id} has a closeout record already ({}): nothing was parked.", if parked(&t) { "parked" } else { rec(&t).s("phase") }); }
@@ -57,7 +58,10 @@ pub fn park(id: &str) -> Res<(Task, String)> {
 pub fn drive(id: &str) {
     let Some(t) = get(id) else { return };
     if !busy(&t) { return; }
-    let g = match who_of(&t) { Some(w) => step(&w, rec(&t), &|p, whole| save_to(id, p, whole)), None => hold_why("its worktree cannot be read, so whether its work moved cannot be told") };
+    let g = if rec(&t).b("blocked") {
+        // Its agent said it cannot exit: held once its turn is over (so that turn stays the closeout's own).
+        match crate::flow::task::h(&t).agent_get(t.at("link").s("pane")) { Ok(Some(a)) if a.s("agent_status") == "working" => Gate::Wait("Closeout not through yet: its agent reported it cannot exit, and its turn is under way".into()), _ => hold_why(format!("its agent reported: {}", rec(&t).s("blocked"))) }
+    } else { match who_of(&t) { Some(w) => step(&w, rec(&t), &|p, whole| save_to(id, p, whole)), None => hold_why("its worktree cannot be read, so whether its work moved cannot be told") } };
     if matches!(g, Gate::Wait(_)) && rec(&t).s("phase").is_empty() && get(id).map(|c| c.at("closeout").s("phase") == "checkpointing").unwrap_or(false) { crate::store::said_by::note_board(id, &prompt(t.s("agent"))); }
     // Held for anything but new input: the closeout's own turns stay its own, not turns of yours for the hook to find later.
     let own = match &g { Gate::Held(why) => !["new input", "session changed", "another session", "moved"].iter().any(|n| why.contains(n)), _ => false };
@@ -81,12 +85,43 @@ pub fn park_pass(tasks: &[Task], socket: &str) {
         else if unfinished(t) && !STAGES.contains(&t.s("stage")) { drop_record(t.s("id")); }
     }
 }
+/// Its own agent reports itself blocked during the closeout: the task keeps what it waits on, and the park is held
+/// with those words (`drive`). Some: so taken; None: no park under way.
+pub fn reported(t: &Obj, words: &str) -> Option<Task> {
+    if !busy(t) { return None; }
+    let r = update_wait(t.s("id"), 10000, |c| { if !busy(c) { return Ok(Change::Keep); } c.obj_mut("closeout").put("blocked", words); Ok(Change::Write) }).ok();
+    drive(t.s("id"));
+    r.and_then(|_| get(t.s("id")))
+}
 /// Before an agent is started on a parked task: only its own conversation again, never a fresh one or another.
 pub fn may_start(t: &Obj, resume: Option<&str>) -> Res<()> {
-    if parked(t) && !rec(t).b("held") && resume != Some(rec(t).s("session")) {
-        crate::fail!("{} was parked, and its conversation cannot be resumed: nothing was started (a fresh one is never started in its place). Its worktree, stage and waiting words are as they were; archive it, or delegate it again after: herdr-projects park {} --forget", t.s("id"), t.s("id"));
+    if parked(t) && !rec(t).b("held") && (resume != Some(rec(t).s("session")) || !std::path::Path::new(t.s("worktree")).is_dir()) {
+        crate::fail!("{} was parked, and {}: nothing was started (a fresh one is never started in its place). Its stage and waiting words are as they were; archive it, or delegate it again after: herdr-projects park {} --forget", t.s("id"), why_not(t, resume.is_some()), t.s("id"));
     }
     Ok(())
+}
+/// Why a parked task's agent cannot come back. `resumable`: its program still has its conversation.
+pub fn why_not(t: &Obj, resumable: bool) -> &'static str {
+    if !std::path::Path::new(t.s("worktree")).is_dir() { "its worktree is gone" } else if !resumable { "its conversation cannot be resumed" } else { "another conversation would be started" }
+}
+/// A reopen that did not bring a parked task's agent back: its line says why, not that it can be resumed.
+pub fn not_back(id: &str, resumable: bool) {
+    let _ = update_wait(id, 10000, |c| {
+        if !parked(c) { return Ok(Change::Keep); }
+        let was = c.at("closeout").t("was");
+        c.put("msg", format!("{was}{}Parked, and not brought back: {} (nothing was started; herdr-projects park {} --forget to give it up).", if was.is_empty() { "" } else if was.ends_with('.') { " " } else { ". " }, why_not(c, resumable), c.s("id")));
+        Ok(Change::Write)
+    });
+}
+/// Before anything is typed into a parked task's pane: an agent there now is its own conversation, or nothing goes in.
+pub fn refuse_foreign(t: &Obj) -> Res<()> {
+    if !parked(t) { return Ok(()); }
+    match crate::flow::task::h(t).agent_get(t.at("link").s("pane")) {
+        Ok(None) => Ok(()),
+        Ok(Some(a)) if a.at("agent_session").s("value") == rec(t).s("session") && !rec(t).s("session").is_empty() => Ok(()),
+        Ok(Some(_)) => crate::fail!("{} is parked, and another agent than its own is in its pane: nothing was sent.", t.s("id")),
+        Err(e) => crate::fail!("{} is parked, and herdr did not say which agent is in its pane ({}): nothing was sent.", t.s("id"), e.code),
+    }
 }
 /// Its agent is back in its own conversation: the park is over (a reopen puts its line back as before it: jobs.rs).
 pub fn resumed(id: &str) {

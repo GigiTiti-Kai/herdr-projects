@@ -129,3 +129,22 @@ fn a_crash_before_its_exit_holds_it_and_herdr_not_answering_only_waits() {
     assert!(!started(&since(&w, n)), "a crash is not brought back by itself");
     set_fake(None);
 }
+
+#[test]
+fn its_agent_reporting_it_cannot_exit_holds_the_park_with_the_approval_kept_and_your_report_waits() {
+    let w = world();
+    on();
+    let t = waiting(&w, 16, false, SAFE);
+    let id = t.t("id");
+    sw::land::park::park(&id).unwrap();
+    let mine = sw::actions::filing::Report { state: "blocked".into(), kind: "question".into(), msg: "Mine".into(), ..Default::default() };
+    assert!(sw::actions::filing::report(&id, mine).unwrap_err().msg.contains("being parked"));
+    sw::actions::filing::report(&id, sw::actions::filing::Report { state: "blocked".into(), kind: "question".into(), msg: "A shared monitor runs".into(), own: "agent", ..Default::default() }).unwrap();
+    on_pane(&w, t.at("link").s("pane"));
+    settle(&id);
+    let c = task(&id);
+    assert!(c.at("closeout").b("held") && c.s("msg").contains("its agent reported: A shared monitor runs") && c.s("msg").starts_with(t.s("msg")), "{}", c.s("msg"));
+    kept(&t, &c);
+    assert_eq!(exits(&w, &t), 0);
+    set_fake(None);
+}

@@ -51,6 +51,8 @@ pub fn report(id: &str, r: Report) -> Res<Task> {
         crate::fail!("{} is your own task, so you cannot mark it {}. Your task finishes when you end your turn; the board then checks, reviews and merges it. To wait for the human instead, report it blocked.", cur.s("id"), r.state);
     }
     if !r.title.is_empty() && r.state.is_empty() { return rename(cur.s("id"), &r.title); }
+    if r.own == "agent" && r.state == "blocked" { if let Some(t) = crate::land::park::reported(&cur, &r.msg) { return Ok(t); } }
+    crate::land::park::refuse_busy(&cur)?; // a park's closeout leaves what the task waits on as it was
     if !["idle", "working", "blocked", "done", "error"].contains(&r.state.as_str()) { crate::fail!("state must be one of: idle, working, blocked, done, error"); }
     // "Mark it idle" on a task whose agent is working means "stop it".
     if r.state == "idle" && flow::task::is_agent_task(&cur) && is_agent_stage(cur.s("stage")) { return stop(cur.s("id")).map(|s| s.task); }

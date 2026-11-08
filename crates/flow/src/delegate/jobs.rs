@@ -243,11 +243,13 @@ pub fn reopen(id: &str, restart: bool) -> Res<(Value, bool, Task)> {
         }
     };
     let mut has_agent = api.agent_get(pane.s("pane_id"))?.is_some();
+    let parked = crate::land::park::parked(&t);
     if !has_agent && restart && resumable(&t) && !marker_alive(t.at("runner")) {
         // Too little memory: its space now, and its agent by a runner that waits for room (memory_wait.rs).
         if crate::memory_wait::low().is_some() { crate::runner::spawn_runner("reopen", t.s("id"), &[]); }
         else { has_agent = start_quietly(t.s("id"), &mut Guard::free(t.s("id")), &t); }
     }
+    if parked && restart && !has_agent && !marker_alive(t.at("runner")) && crate::memory_wait::low().is_none() { crate::land::park::not_back(t.s("id"), resumable(&t)); }
     Ok((pane, has_agent, get(t.s("id")).unwrap_or(t)))
 }
 /// Its exited agent started again in the same conversation, nothing sent to it: the task stands as it stood.

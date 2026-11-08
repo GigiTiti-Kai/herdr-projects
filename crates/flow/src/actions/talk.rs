@@ -39,7 +39,7 @@ pub fn tell(id: &str, text: &str, keep_intent: bool) -> Res<Said> { tell_as(id, 
 pub fn tell_as(id: &str, text: &str, keep_intent: bool, chat: bool) -> Res<Said> {
     let cur = find(id)?;
     assert_unarchived(&cur)?;
-    crate::land::park::refuse_busy(&cur)?;
+    crate::land::park::refuse_busy(&cur)?; crate::land::park::refuse_foreign(&cur)?;
     let cid = cur.t("id");
     let typed = text.trim();
     if typed.is_empty() { crate::fail!("Nothing to send."); }

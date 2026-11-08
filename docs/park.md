@@ -14,7 +14,9 @@ agent, and keeps everything else:
 
 While it is under way, the closeout's own turns are never taken for yours (no review goes stale, no approval is
 asked again), and nothing else goes in: a reply, an approval, a review sent back, a fix, or the board's own turns
-(a check, a conflict) are refused or wait until it is parked or held.
+(a check, a conflict) are refused or wait until it is parked or held, and so is a report of yours. Its own agent
+reporting itself blocked (it cannot exit) holds the park with those words; the task keeps what it waits on.
+Only a worker is parked: a plan writer asking you something is refused.
 
 Once it is parked:
 
@@ -22,9 +24,11 @@ Once it is parked:
   gone and types nothing more. A conflict found then has no agent to go to: you are asked.
 - **Going into the task, a reply, a review sent back, a fix, a restart** bring its agent back the way an exited agent
   comes back, in its own conversation (`--resume`). A reply or a fix then works as ever: the task is at work again.
-  A conversation that cannot be resumed starts nothing, never a fresh one: the task says why, and the words wait.
+  A conversation that cannot be resumed, or a worktree gone, starts nothing, never a fresh one: the task says why
+  (going into it too), and the words wait. Another agent than its own in its pane gets nothing: a reply is refused.
   Then archive it, or give up the conversation with `herdr-projects park <id> --forget` and delegate it again.
 - The board's own turns (a check failure, a pull request repair) type nothing.
+- Once its space is closed after the merge, that round is over: a new round starts as ever.
 
 **What cannot be proved is held**, as for a closeout (`closeout 未確認: …`): the task is then an ordinary one again,
 with nothing more typed. It still waits for you as it did, its closeout's own turns not taken for yours; held for new
