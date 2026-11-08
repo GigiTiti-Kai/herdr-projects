@@ -142,17 +142,20 @@ fn an_indented_example_a_session_changing_during_the_last_read_a_draft_of_any_sh
     assert_eq!(exits(&w, &b), 0);
     // input boxes not of an empty shape: a draft under an empty first line ending in a lone `>`, words with a middle dot
     // in an unframed box, and the same before /exit
-    for (n, screen) in [(43, "╭──\n│ ❯ │\n│ UNFINISHED DRAFT: do not submit │\n│ > │\n╰──"), (44, "› UNFINISHED · DRAFT\n  gpt-6 · ctx 20%")] {
+    for (n, screen) in [(43, "╭──\n│ ❯ │\n│ UNFINISHED DRAFT: do not submit │\n│ > │\n╰──"), (44, "› UNFINISHED · DRAFT\n  gpt-6 · ctx 20%"), (47, "› Ask Codex to do anything\n UNFINISHED DRAFT: do not submit"), (48, "╭──\n│ ❯ Ask Codex to do anything │\n╰──"), (49, "╭──\n│ ❯ UNFINISHED DRAFT │\n────\n│ > │\n╰──")] {
         let d = merged_with(&w, n, SAFE, |t| pane(&w, t, |p| p["agent"]["screen"] = json!(screen)));
         assert_eq!(closeouts(&w, &d), 0, "{screen}");
         held(&task(d.s("id")), "");
     }
-    let e = merged(&w, 45);
-    pane(&w, &e, |p| p["agent"]["screen"] = json!("╭──\n│ ❯ │\n│ UNFINISHED DRAFT: do not submit │\n│ > │\n╰──"));
-    accepted_now(&e);
-    pass(&w, e.s("id"));
-    assert_eq!(exits(&w, &e), 0);
-    held(&task(e.s("id")), "");
+    for (n, screen) in [(45, "╭──\n│ ❯ │\n│ UNFINISHED DRAFT: do not submit │\n│ > │\n╰──"), (50, "› Ask Codex to do anything\n UNFINISHED DRAFT: do not submit")] {
+        let e = merged(&w, n);
+        pane(&w, &e, |p| p["agent"]["screen"] = json!(screen));
+        accepted_now(&e);
+        pass(&w, e.s("id"));
+        assert_eq!(exits(&w, &e), 0, "{screen}");
+        assert!(!prompts(&w, e.at("link").s("pane")).iter().any(|p| p.contains("UNFINISHED")));
+        held(&task(e.s("id")), "");
+    }
     // after /exit: Claude's /exit tag followed by words of yours is new input
     let t = merged(&w, 46);
     accepted_now(&t);
@@ -166,7 +169,9 @@ fn an_indented_example_a_session_changing_during_the_last_read_a_draft_of_any_sh
     held(&task(t.s("id")), "new input reached its agent after /exit was typed");
     assert!(open(&w, &task(t.s("id"))) && Path::new(t.s("worktree")).exists());
     assert_eq!(sw::land::closeout::draft("╭──\n│ ❯ │\n╰──"), Some(String::new()));
-    assert_eq!(sw::land::closeout::draft("› Ask Codex to do anything\n  gpt · ctx"), Some(String::new()));
+    for not_empty in ["› Ask Codex to do anything\n  gpt · ctx", "› Ask Codex to do anything\n UNFINISHED DRAFT: do not submit", "╭──\n│ ❯ Ask Codex to do anything │\n╰──", "╭──\n│ ❯ draft │\n────\n│ > │\n╰──", "╭──\n│ ❯ > │\n╰──", "╭──\n│ ❯ │\n│ more │\n╰──", "────\n❯\n────"] {
+        assert!(!sw::land::closeout::draft(not_empty).unwrap_or_default().is_empty(), "{not_empty}");
+    }
     assert!(!sw::land::closeout::draft("❯ ").unwrap_or_default().is_empty(), "an unframed empty mark is no known empty shape");
     set_fake(None);
 }

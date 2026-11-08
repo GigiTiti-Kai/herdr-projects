@@ -43,8 +43,9 @@ starting with `closeout 未確認`:
   moved;
 - its reply gives no Exit decision (a last line `safe to Exit`), such as an Exit blocked or taken back;
 - another terminal or another session than its agent's in the pane, as Herdr shows it (or Herdr not saying which);
-- an input box not of a shape known to be empty: a frame or rule above and below one bare prompt mark, or Codex's
-  placeholder (shown only while nothing is typed). Words in it, or a shape not known, type nothing. Every text goes in only on the last look right before it, at the same session and terminal;
+- an input box not of the one shape known to be empty: the screen's last box, framed with its corners, holding one
+  bare prompt mark and nothing else. Words in it, a placeholder, a rule or another shape type nothing. So an agent
+  whose empty box looks otherwise (Codex's unframed one) is never closed out: it waits for you. Every text goes in only on the last look right before it, at the same session and terminal;
 - new input after `/exit` went in (words that only name `/exit`, or follow its tag, included), another terminal in its pane by then, or
   its save no longer accepted then;
 - no accepted job within `workspace.closeoutWait` (10 minutes), or a queue that cannot be read;

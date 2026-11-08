@@ -154,22 +154,23 @@ pub fn safe(said: &str) -> bool {
     let last = last.strip_prefix('`').and_then(|l| l.strip_suffix('`')).unwrap_or(last).trim_end_matches(['.', '。']);
     last == SAFE && said.matches(SAFE).count() == 1 && !["unsafe to exit", "not safe to exit", "never safe to exit", "exit blocked", "exit is blocked", "撤回", "do not exit", "don't exit"].iter().any(|n| low.contains(n))
 }
-/// Whether an agent's input box is empty, read from its screen, told only from the shapes an empty one has: a framed
-/// box (a rule or a frame above and below) holding one prompt mark (`❯`, `>`, `›`) and nothing else, or Codex's
-/// unframed box showing its placeholder (shown only while nothing is typed). Some(""): empty. Some(words): words seen
-/// in it. None: no input box of a known empty shape, which is never taken for an empty one.
-/// shortcut: only Codex's usual placeholder is known; another one holds the closeout (it waits for you).
+/// Whether an agent's input box is empty, read from its screen, told only from the one shape an empty one has: the
+/// screen's last box, a frame with its corners (`╭`/`┌` above, `╰`/`└` below) holding a single line that is one bare
+/// prompt mark (`❯`, `>`, `›`) and nothing else. Some(""): empty. Some(words): anything else, which is never taken for
+/// empty: words of yours, a placeholder (it may be words of yours that look like one), a rule, a box of another shape.
+/// None: no input box seen.
+/// shortcut: a program whose empty box has another shape (Codex's unframed one, a box drawn with rules only) holds the
+/// closeout: it waits for you; a reading of that program's own input state would be needed to do more.
 pub fn draft(screen: &str) -> Option<String> {
     let lines: Vec<&str> = screen.lines().map(str::trim).filter(|l| !l.is_empty()).collect();
     let inner = |l: &str| l.trim_start_matches('│').trim_end_matches('│').trim().to_string();
-    let rule = |l: &str| l.starts_with(['╭', '┌', '╰', '└', '─', '━']);
     let mark = |l: &str| ["❯", ">", "›"].iter().any(|m| inner(l).starts_with(m));
-    let after = |l: &str| inner(l).trim_start_matches(['❯', '>', '›']).trim().to_string();
     let at = lines.iter().rposition(|l| mark(l))?;
-    let empty_framed = at > 0 && rule(lines[at - 1]) && lines.get(at + 1).is_some_and(|l| rule(l)) && after(lines[at]).is_empty();
-    if empty_framed || after(lines[at]) == "Ask Codex to do anything" { return Some(String::new()); }
-    // Not an empty shape: what it holds, from its mark down to its frame's end (or all below, unframed).
-    let words: Vec<String> = std::iter::once(after(lines[at])).chain(lines[at + 1..].iter().take_while(|l| !rule(l)).map(|l| inner(l))).filter(|x| !x.is_empty()).collect();
+    let bare = ["❯", ">", "›"].contains(&inner(lines[at]).as_str());
+    let framed = at > 0 && lines[at - 1].starts_with(['╭', '┌']) && lines.get(at + 1).is_some_and(|l| l.starts_with(['╰', '└']));
+    let last = !lines[at + 1..].iter().skip(1).any(|l| l.starts_with(['╭', '┌', '│']));
+    if bare && framed && last { return Some(String::new()); }
+    let words: Vec<String> = lines[at..].iter().take_while(|l| !l.starts_with(['╰', '└'])).map(|l| inner(l)).filter(|x| !x.is_empty()).collect();
     Some(if words.is_empty() { "(an input box of a shape not known to be empty)".into() } else { words.join("\n") })
 }
 /// Has the pane gone: herdr says there is no such pane. Some(false): it is there; None: herdr did not say.
