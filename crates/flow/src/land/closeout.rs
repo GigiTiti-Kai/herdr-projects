@@ -22,7 +22,6 @@ use crate::store::repos::{cwd_of, folder_of, git_out};
 use crate::store::settings::lookup::setting;
 use crate::store::settings::values::ms;
 use crate::store::tasks::{update_wait, Change, Task};
-use crate::submit::hand;
 use std::path::{Path, PathBuf};
 
 /// Go: clean up (or stop). Wait: look again on the next pass. Held: keep it as it is, say why, and stop trying.
@@ -57,6 +56,8 @@ pub fn step(w: &Who, rec: &Value, save: &dyn Fn(Value, bool) -> bool) -> Gate {
     let a = match api.agent_get(pane) {
         Err(e) => return wait(&format!("herdr did not answer for its agent ({})", e.code)), // an error is not a pane gone
         Ok(None) if phase == "closing" || phase == "agent_exited" => {
+            // The pane is still the one its agent was in: its terminal as at the send.
+            if api.pane_get(pane).map(|p| p.t("terminal_id")) != Some(rec.t("terminal")) || rec.t("terminal").is_empty() { return held("another terminal than its agent's is in its pane, or herdr does not say which"); }
             if !api.pids_gone(pane, &rec.arr("pids").iter().map(|p| p.as_i64().unwrap_or(0)).collect::<Vec<_>>()) { return wait("its agent's process has not ended"); }
             if !api.pane_idle(pane) { return wait("its agent left, but something still runs at its shell"); }
             if let Some(g) = still_saved(w, rec, &wait) { return g; } // nothing new since /exit, and the save still there
@@ -87,9 +88,9 @@ pub fn step(w: &Who, rec: &Value, save: &dyn Fn(Value, bool) -> bool) -> Gate {
         let text = prompt(&w.agent);
         let sent = now(); // taken before it goes in
         if !save(json!({ "phase": "sending", "sentAt": sent, "events": w.events, "session": w.session, "terminal": live_term, "tip": w.tip, "cwd": w.cwd.display().to_string() }), true) { return wait("its record could not be written, so nothing was typed"); }
-        return match hand(api, pane, &text) {
+        return match type_in(w, &live_term, pane, &text) {
             Ok(_) => { save(json!({ "phase": "checkpointing" }), false); Gate::Wait("Closeout sent: waiting for Agent Memory to accept it".into()) }
-            Err(e) => { save(json!({ "phase": "", "failed": e.message }), false); held(format!("it could not be typed in ({})", e.message)) }
+            Err(e) => { save(json!({ "phase": "", "failed": e.clone() }), false); held(format!("nothing was typed: {e}")) }
         };
     }
     // New input since it was sent: what any save proves is out of date, and nothing more is typed.
@@ -111,7 +112,7 @@ pub fn step(w: &Who, rec: &Value, save: &dyn Fn(Value, bool) -> bool) -> Gate {
     if let Some(g) = draft() { return g; }
     let pids = match api.front_pids(pane) { Some(p) if !p.is_empty() => p, _ => return wait("herdr does not say which process is its agent") };
     if !save(json!({ "phase": "exiting", "exitAt": now(), "job": job, "pids": pids }), false) { return wait("its record could not be written, so /exit was not typed"); }
-    if let Err(e) = hand(api, pane, EXIT) { save(json!({ "phase": "saved" }), false); return held(format!("/exit could not be typed in ({})", e.message)); }
+    if let Err(e) = type_in(w, &rec.t("terminal"), pane, EXIT) { save(json!({ "phase": "saved" }), false); return held(format!("/exit was not typed: {e}")); }
     save(json!({ "phase": "closing" }), false);
     Gate::Wait("Closeout saved: its agent was told to exit".into())
 }
@@ -125,23 +126,49 @@ fn accepted_job(w: &Who, rec: &Value) -> Result<String, String> {
 fn still_saved(w: &Who, rec: &Value, wait: &dyn Fn(&str) -> Gate) -> Option<Gate> {
     if w.events - rec.i("events") > 1 { return Some(held("new input reached its agent after /exit was typed")); }
     let Some(turn) = last_turn(w) else { return Some(wait("its saved conversation cannot be read")) };
-    if turn.id != rec.s("turn") && !(turn.asked.contains(EXIT) && turn.began >= rec.i("exitAt")) { return Some(held("new input reached its agent after /exit was typed")); }
+    if turn.id != rec.s("turn") && !(is_exit(&turn.asked) && turn.began >= rec.i("exitAt")) { return Some(held("new input reached its agent after /exit was typed")); }
     accepted_job(w, rec).err().map(|why| wait(&why))
 }
-/// Its reply says it may exit: its last line is `safe to Exit` (as the closeout asks), and nothing in it takes that
-/// back (`unsafe`, `not safe`, an Exit blocked, a retraction).
+/// The prompt that began a turn is `/exit` itself (as typed, or as Claude Code keeps a command it ran), not words
+/// that only name it.
+fn is_exit(asked: &str) -> bool { let a = asked.trim(); a == EXIT || a.starts_with("<command-name>/exit</command-name>") }
+/// The last look right before anything is typed, on the same answer of herdr's the text then goes in on: the same
+/// session and terminal, at rest, nothing waiting unsent in its input box. Err: why nothing was typed.
+fn type_in(w: &Who, term: &str, pane: &str, text: &str) -> Result<(), String> {
+    let a = match w.api.agent_get(pane) { Ok(Some(a)) => a, Ok(None) => return Err("its agent left its pane".into()), Err(e) => return Err(format!("herdr did not answer ({})", e.code)) };
+    if a.at("agent_session").t("value") != w.session || a.t("terminal_id") != term || term.is_empty() { return Err("another session or terminal came into its pane right before".into()); }
+    if !["idle", "done"].contains(&a.s("agent_status")) { return Err(format!("its agent is {} right before", a.s("agent_status"))); }
+    match draft(&read_screen(&w.api, pane, Some(a.s("agent_status")), 40)) { Some(d) if d.is_empty() => {} Some(_) => return Err("words wait unsent in its input box".into()), None => return Err("its input box cannot be read".into()) }
+    match w.api.agent_prompt(pane, text) { Ok(_) => Ok(()), Err(e) if ["agent_prompt_stalled", "timeout"].contains(&e.code.as_str()) => Ok(()), Err(e) => Err(e.message) } // these do not prove nothing went in: never typed twice
+}
+/// Its reply says it may exit: it names the decision once, as its own last line, plain (not quoted, not in a list),
+/// and nothing in it takes that back (`unsafe`, `not safe`, an Exit blocked, a retraction).
 pub fn safe(said: &str) -> bool {
     let low = said.to_lowercase();
-    let last = said.lines().rev().map(|l| l.trim().trim_matches(|c: char| "*_`>-.。!！ ".contains(c))).find(|l| !l.is_empty()).unwrap_or("");
-    last == SAFE && !["unsafe to exit", "not safe to exit", "never safe to exit", "exit blocked", "exit is blocked", "撤回", "do not exit", "don't exit"].iter().any(|n| low.contains(n))
+    let last = said.lines().rev().map(str::trim).find(|l| !l.is_empty()).unwrap_or("");
+    let last = last.strip_prefix('`').and_then(|l| l.strip_suffix('`')).unwrap_or(last).trim_end_matches(['.', '。']);
+    last == SAFE && said.matches(SAFE).count() == 1 && !["unsafe to exit", "not safe to exit", "never safe to exit", "exit blocked", "exit is blocked", "撤回", "do not exit", "don't exit"].iter().any(|n| low.contains(n))
 }
 /// What waits in an agent's input box, read from its screen: the text after the last prompt mark (`❯`, `>`, `›`) at a
-/// line's start, inside its frame. Some(""): empty, or the program's own placeholder. None: no input box seen.
+/// line's start, inside its frame, and on every line below it down to the frame's end or a rule (`╰`, `└`, `─`).
+/// Below an unframed box (Codex), a line is its footer only as the program writes it (`a · b`, `? for shortcuts`):
+/// any other words count as yours. Some(""): empty, or the program's own placeholder. None: no input box seen.
 /// shortcut: only Codex's usual placeholder is known as one; another placeholder holds the closeout (it waits for you).
 pub fn draft(screen: &str) -> Option<String> {
-    let line = screen.lines().rev().map(|l| l.trim().trim_start_matches('│').trim_end_matches('│').trim()).find(|l| ["❯", ">", "›"].iter().any(|m| l.starts_with(m)))?;
-    let text = line.trim_start_matches(['❯', '>', '›']).trim();
-    Some(if ["Ask Codex to do anything"].contains(&text) { String::new() } else { text.to_string() })
+    let lines: Vec<&str> = screen.lines().collect();
+    let strip = |l: &str| l.trim().trim_start_matches('│').trim_end_matches('│').trim().to_string();
+    let at = lines.iter().rposition(|l| ["❯", ">", "›"].iter().any(|m| strip(l).starts_with(m)))?;
+    let first = strip(lines[at]).trim_start_matches(['❯', '>', '›']).trim().to_string();
+    let mut words = vec![if ["Ask Codex to do anything"].contains(&first.as_str()) { String::new() } else { first }];
+    for l in &lines[at + 1..] {
+        let t = l.trim();
+        if t.starts_with(['╰', '└', '─', '━']) { break; }
+        let framed = t.starts_with('│');
+        let x = strip(l);
+        if !framed && (x.contains(" · ") || x.contains("? for shortcuts")) { continue; }
+        words.push(x);
+    }
+    Some(words.into_iter().filter(|w| !w.is_empty()).collect::<Vec<_>>().join("\n"))
 }
 /// Has the pane gone: herdr says there is no such pane. Some(false): it is there; None: herdr did not say.
 pub fn pane_gone(api: &Herdr, pane: &str) -> Option<bool> {
