@@ -20,6 +20,7 @@ use std::path::PathBuf;
 /// "sent": typed, with enter pressed (whether the agent then started on it is looked at again: submit.rs); "queued".
 /// `first`: the text is all a freshly started program is given.
 pub fn deliver(t: &Task, text: &str, wake: Option<Value>, first: bool) -> Res<&'static str> {
+    crate::land::park::refuse_foreign(&get(t.s("id")).unwrap_or_else(|| t.clone()))?; // a parked task: only into its own conversation
     match hand(&h(t), t.at("link").s("pane"), text) {
         Ok(mark) => { note_sent(t.s("id"), mark, text, first); Ok("sent") }
         Err(e) if e.code == "agent_blocked" || e.code == "agent_not_ready" => {

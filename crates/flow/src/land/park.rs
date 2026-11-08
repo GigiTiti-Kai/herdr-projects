@@ -20,9 +20,11 @@ pub const STAGES: [&str; 2] = ["approval", "asks"];
 pub fn on(t: Option<&Task>) -> bool { setting("workspace.park", t) == json!(true) }
 fn rec(t: &Obj) -> &Value { t.at("closeout") }
 /// Its agent is closed out and gone, its park proved.
-pub fn parked(t: &Obj) -> bool { rec(t).b("park") && rec(t).b("parked") && rec(t).s("phase") != "pane_closed" } // closed: that round is over
+/// A park's record of this round: once its space is closed (`pane_closed`) that round is over, and so is the park.
+fn ours(t: &Obj) -> bool { rec(t).b("park") && rec(t).s("phase") != "pane_closed" }
+pub fn parked(t: &Obj) -> bool { ours(t) && rec(t).b("parked") }
 /// A park under way, or done, on a task that still waits for you: its turns are its own.
-pub fn parking(t: &Obj) -> bool { rec(t).b("park") && !rec(t).b("held") && STAGES.contains(&t.s("stage")) }
+pub fn parking(t: &Obj) -> bool { ours(t) && !rec(t).b("held") && STAGES.contains(&t.s("stage")) }
 /// Under way and not yet through: nothing else is typed into its agent.
 pub fn busy(t: &Obj) -> bool { parking(t) && !parked(t) }
 /// A park's record that proves no exit (held, or left behind by a task that moved on): it counts for nothing.

@@ -13,6 +13,8 @@ use sw::store::tasks::{update, Change};
 mod callers;
 /// The reviewer's probes.
 mod reviewer;
+/// The reviewer's round 2 probes.
+mod round2;
 
 pub const SAFE: &str = "Saved: accepted.\nsafe to Exit";
 pub fn world() -> World { let w = world_with(Opts { repo: true, settings: json!({ "review.when": "never" }), ..Default::default() }); sw::clock::set(Some(sw::clock::now())); w }
