@@ -15,6 +15,8 @@ use sw::store::tasks::{update, Change};
 mod guards;
 /// What keeps the space after `/exit` went in.
 mod after_exit;
+/// The reviewer's round 15 probes: a directory git cannot read, a link turned into a file of the same text.
+mod round15;
 
 const SAFE: &str = "Saved: accepted.\nsafe to Exit";
 const LATE: i64 = 11 * 60 * 1000;

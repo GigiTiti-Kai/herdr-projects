@@ -202,18 +202,22 @@ pub fn pane_gone(api: &Herdr, pane: &str) -> Option<bool> {
 fn wait_ms(t: Option<&Task>) -> i64 { ms(setting("workspace.closeoutWait", t).as_str().unwrap_or("10m")) }
 
 /// What is changed in a worktree, by content: its changes to tracked files (the bytes, not only which files) and each
-/// untracked file's contents (a symbolic link's own target), as one digest. None when any of it cannot be read: an
-/// unknown version is never taken for the same one.
+/// untracked file's kind, mode and contents (a symbolic link's own target), as one digest. None when any of it cannot
+/// be read, a warning from git included (it skips a folder it cannot open, and says so only there): an unknown
+/// version is never taken for the same one.
 pub fn changes_of(wt: &std::path::Path) -> Option<String> {
-    let diff = git_out(wt, &["diff", "HEAD", "--binary"]).ok()?;
-    let untracked = git_out(wt, &["ls-files", "--others", "--exclude-standard", "-z"]).ok()?;
+    let clean = |args: &[&str]| { let o = std::process::Command::new("git").args(args).current_dir(wt).stdin(std::process::Stdio::null()).output().ok()?; (o.status.success() && o.stderr.is_empty()).then_some(o.stdout) };
+    let diff = clean(&["diff", "HEAD", "--binary"])?;
+    let untracked = String::from_utf8(clean(&["ls-files", "--others", "--exclude-standard", "-z"])?).ok()?;
     let mut d = sha1_smol::Sha1::new();
-    d.update(diff.as_bytes());
+    d.update(&diff);
     for f in untracked.split('\0').filter(|f| !f.is_empty()) {
+        use std::os::unix::fs::PermissionsExt;
         let p = wt.join(f);
         let meta = std::fs::symlink_metadata(&p).ok()?;
-        let body = if meta.file_type().is_symlink() { std::fs::read_link(&p).ok()?.into_os_string().into_encoded_bytes() } else if meta.is_file() { std::fs::read(&p).ok()? } else { return None };
-        d.update(b"\0"); d.update(f.as_bytes()); d.update(b"\0"); d.update(&(body.len() as u64).to_le_bytes()); d.update(&body);
+        let (kind, body) = if meta.file_type().is_symlink() { ("link", std::fs::read_link(&p).ok()?.into_os_string().into_encoded_bytes()) } else if meta.is_file() { ("file", std::fs::read(&p).ok()?) } else { return None };
+        let head = format!("\0{f}\0{kind} {:o} {}\0", meta.permissions().mode(), body.len());
+        d.update(head.as_bytes()); d.update(&body);
     }
     Some(d.digest().to_string())
 }
