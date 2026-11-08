@@ -163,7 +163,8 @@ pub fn safe(said: &str) -> bool {
 /// closeout: it waits for you; a reading of that program's own input state would be needed to do more.
 pub fn draft(screen: &str) -> Option<String> {
     let lines: Vec<&str> = screen.lines().map(str::trim).filter(|l| !l.is_empty()).collect();
-    let inner = |l: &str| l.trim_start_matches('│').trim_end_matches('│').trim().to_string();
+    // One frame bar off each side, never more: a bar typed in the box is a word of yours.
+    let inner = |l: &str| { let l = l.strip_prefix('│').unwrap_or(l); l.strip_suffix('│').unwrap_or(l).trim().to_string() };
     let mark = |l: &str| ["❯", ">", "›"].iter().any(|m| inner(l).starts_with(m));
     let at = lines.iter().rposition(|l| mark(l))?;
     let bare = ["❯", ">", "›"].contains(&inner(lines[at]).as_str());

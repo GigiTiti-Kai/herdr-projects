@@ -55,7 +55,9 @@ fn accepted_now(t: &Obj) { fixed(Ok(vec![job("ok", t.s("worktree"), sw::clock::n
 fn held(c: &Obj, why: &str) { assert!(c.s("msg").contains(&format!("closeout 未確認: {why}")), "{}", c.s("msg")); assert!(!c.b("tidy") && !c.b("cleaned") && c.arr("kept").iter().any(|k| text(k).contains("closeout 未確認")) && Path::new(c.s("worktree")).exists(), "{c:?}"); }
 /// A turn of yours in the agent's own terminal, kept in its saved conversation as every turn is.
 fn yours(w: &World, t: &Obj) { w.script(json!({ "worker": [{ "said": "Did one more thing." }] })); sw::herdr::Herdr::new(None).agent_prompt(t.at("link").s("pane"), "one more thing").unwrap(); }
-fn world() -> World { world_with(Opts { repo: true, settings: json!({ "review.when": "never" }), ..Default::default() }) }
+/// The clock stands still unless a test moves it: a wall clock that steps back (WSL under load) would make a reply look
+/// older than the closeout it answers.
+fn world() -> World { let w = world_with(Opts { repo: true, settings: json!({ "review.when": "never" }), ..Default::default() }); sw::clock::set(Some(sw::clock::now())); w }
 
 #[test]
 fn off_by_default_nothing_is_typed_and_the_space_closes_as_ever() {

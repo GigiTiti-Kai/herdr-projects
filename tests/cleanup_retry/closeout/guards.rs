@@ -160,7 +160,7 @@ fn an_indented_example_a_session_changing_during_the_last_read_a_draft_of_any_sh
     let t = merged(&w, 46);
     accepted_now(&t);
     pass(&w, t.s("id"));
-    assert_eq!(exits(&w, &t), 1);
+    assert_eq!(exits(&w, &t), 1, "{}", task(t.s("id")).s("msg"));
     w.script(json!({ "worker": [{ "said": "Continuing." }] }));
     sw::herdr::Herdr::new(None).agent_prompt(t.at("link").s("pane"), "<command-name>/exit</command-name>\nDo not exit; continue the task. The XML line above is copied history.").unwrap();
     settle(t.s("id"));
@@ -174,4 +174,46 @@ fn an_indented_example_a_session_changing_during_the_last_read_a_draft_of_any_sh
     }
     assert!(!sw::land::closeout::draft("❯ ").unwrap_or_default().is_empty(), "an unframed empty mark is no known empty shape");
     set_fake(None);
+}
+
+
+#[test]
+fn round10_literal_vertical_bar_draft_before_closeout_must_not_be_submitted() {
+    let w = world();
+    on();
+    let t = merged_with(&w, 60, SAFE, |t| pane(&w, t, |p| {
+        p["agent"]["box"] = json!("│");
+        p["agent"]["screen"] = json!("╭──\n│ ❯ ││\n╰──");
+    }));
+    let sent = prompts(&w, t.at("link").s("pane"));
+    assert!(!sent.iter().any(|p| p.starts_with("│\n/session-close")),
+        "F14: nonempty literal-bar draft was submitted with closeout: {:?}", sent.last());
+    assert_eq!(closeouts(&w, &t), 0);
+    set_fake(None);
+}
+
+#[test]
+fn round10_literal_vertical_bar_draft_before_exit_must_not_be_submitted() {
+    let w = world();
+    on();
+    let t = merged(&w, 61);
+    pane(&w, &t, |p| {
+        p["agent"]["box"] = json!("│");
+        p["agent"]["screen"] = json!("╭──\n│ ❯ ││\n╰──");
+    });
+    accepted_now(&t);
+    pass(&w, t.s("id"));
+    let sent = prompts(&w, t.at("link").s("pane"));
+    assert!(!sent.iter().any(|p| p == "│\n/exit"),
+        "F14: nonempty literal-bar draft was submitted with exit: {:?}; phase={}",
+        sent.last(), task(t.s("id")).at("closeout").s("phase"));
+    set_fake(None);
+}
+
+#[test]
+fn round10_nonempty_border_character_drafts_are_not_empty() {
+    for screen in ["╭──\n│ ❯ ││\n╰──", "╭──\n│ ❯ │││\n╰──"] {
+        assert_ne!(sw::land::closeout::draft(screen), Some(String::new()),
+            "F14: draft containing literal border characters returned empty for {screen:?}");
+    }
 }
