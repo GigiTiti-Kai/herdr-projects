@@ -217,3 +217,68 @@ fn round10_nonempty_border_character_drafts_are_not_empty() {
             "F14: draft containing literal border characters returned empty for {screen:?}");
     }
 }
+
+#[test]
+fn round11_branch_tip_changed_after_exit_must_keep_the_space() {
+    let w = world();
+    on();
+    let t = merged(&w, 70);
+    accepted_now(&t);
+    pass(&w, t.s("id"));
+    assert_eq!(task(t.s("id")).at("closeout").s("phase"), "closing");
+    let wt = Path::new(t.s("worktree"));
+    std::fs::write(wt.join("later.txt"), "work after the accepted snapshot\n").unwrap();
+    git(wt, &["add", "later.txt"]);
+    git(wt, &["commit", "-qm", "new work after exit"]);
+    let new_tip = git(wt, &["rev-parse", "HEAD"]);
+    assert_ne!(new_tip, task(t.s("id")).at("closeout").s("tip"));
+    pane(&w, &t, |p| { p["agent"] = Value::Null; p["frontPid"] = Value::Null; });
+    pass(&w, t.s("id"));
+    let c = task(t.s("id"));
+    assert!(open(&w, &t), "F15: branch changed after /exit but space closed; phase={}, new work kept={}, msg={}", c.at("closeout").s("phase"), wt.join("later.txt").exists(), c.s("msg"));
+    set_fake(None);
+}
+
+#[test]
+fn round11_unsent_shell_input_after_agent_exit_must_keep_the_space() {
+    let w = world();
+    on();
+    let t = merged(&w, 71);
+    accepted_now(&t);
+    pass(&w, t.s("id"));
+    assert_eq!(task(t.s("id")).at("closeout").s("phase"), "closing");
+    pane(&w, &t, |p| {
+        p["agent"] = Value::Null;
+        p["frontPid"] = Value::Null;
+        p["screen"] = json!("user@host:/work$ printf 'UNSENT SHELL DRAFT'");
+    });
+    let api = sw::herdr::Herdr::new(None);
+    assert!(api.pane_idle(t.at("link").s("pane")), "no running command in this fixture");
+    assert!(api.pane_read(t.at("link").s("pane"), "visible", None).unwrap().contains("UNSENT SHELL DRAFT"));
+    pass(&w, t.s("id"));
+    let c = task(t.s("id"));
+    assert!(open(&w, &t), "F16: unsent shell input lost; cleaned={}, phase={}, msg={}", c.b("cleaned"), c.at("closeout").s("phase"), c.s("msg"));
+    set_fake(None);
+}
+
+#[test]
+fn round11_receipt_accepted_after_deadline_must_not_send_exit() {
+    let w = world();
+    on();
+    fixed(Ok(vec![]));
+    let t = merged(&w, 72);
+    assert_eq!(task(t.s("id")).at("closeout").s("phase"), "checkpointing");
+    sw::clock::advance(LATE);
+    fixed(Ok(vec![job("late", t.s("worktree"), sw::clock::now() - 1)]));
+    pass(&w, t.s("id"));
+    let c = task(t.s("id"));
+    assert_eq!(exits(&w, &t), 0, "F17: receipt first accepted after closeoutWait still sent /exit; phase={}, msg={}", c.at("closeout").s("phase"), c.s("msg"));
+    set_fake(None);
+}
+
+#[test]
+fn round11_a_shell_is_empty_only_at_a_bare_prompt() {
+    for (screen, empty) in [("user@host:/w$ ", true), ("root@h:/# ", true), ("~/w ❯ ", true), ("user@host:/w$ printf 'UNSENT'", false), ("echo $", false), ("> ", false), ("", false)] {
+        assert_eq!(sw::land::closeout::shell_empty(screen), empty, "{screen:?}");
+    }
+}

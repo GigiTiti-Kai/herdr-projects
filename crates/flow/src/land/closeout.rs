@@ -60,6 +60,7 @@ pub fn step(w: &Who, rec: &Value, save: &dyn Fn(Value, bool) -> bool) -> Gate {
             if api.pane_get(pane).map(|p| p.t("terminal_id")) != Some(rec.t("terminal")) || rec.t("terminal").is_empty() { return held("another terminal than its agent's is in its pane, or herdr does not say which"); }
             if !api.pids_gone(pane, &rec.arr("pids").iter().map(|p| p.as_i64().unwrap_or(0)).collect::<Vec<_>>()) { return wait("its agent's process has not ended"); }
             if !api.pane_idle(pane) { return wait("its agent left, but something still runs at its shell"); }
+            if !shell_empty(&api.pane_read(pane, "visible", None).unwrap_or_default()) { return held("its agent left, and its shell may hold words typed and not sent (or its prompt cannot be read)"); }
             if let Some(g) = still_saved(w, rec, &wait) { return g; } // nothing new since /exit, and the save still there
             if phase == "closing" { save(json!({ "phase": "agent_exited", "exitedAt": now() }), false); }
             return Gate::Go;
@@ -105,7 +106,7 @@ pub fn step(w: &Who, rec: &Value, save: &dyn Fn(Value, bool) -> bool) -> Gate {
     if rec.has("turn") && rec.s("turn") != turn.id { return held("new input reached its agent after it was sent"); }
     if !rec.has("turn") { save(json!({ "turn": turn.id }), false); }
     if !safe(&turn.said) { return held(format!("its reply gives no Exit decision (a last line `{SAFE}`): {}", crate::store::tasks::one_line(&turn.said, 160))); }
-    let job = match accepted_job(w, rec) { Ok(j) => j, Err(why) => return wait(&why) };
+    let job = match accepted_job(w, rec) { Ok(j) => j, Err(why) if why.starts_with(LATE_JOB) => return held(why), Err(why) => return wait(&why) };
     if phase == "checkpointing" { save(json!({ "phase": "saved", "job": job, "savedAt": now() }), false); }
     // The exit, decided now: at rest, nothing under it, nothing unsent, its processes known (to see them end).
     if !api.pane_childless(pane, a.s("agent")) { return wait("a command still runs under its agent"); }
@@ -117,17 +118,33 @@ pub fn step(w: &Who, rec: &Value, save: &dyn Fn(Value, bool) -> bool) -> Gate {
     Gate::Wait("Closeout saved: its agent was told to exit".into())
 }
 fn last_turn(w: &Who) -> Option<crate::agents::read_turn::Turn> { read_turn_of(&w.agent, (!w.transcript.is_empty()).then(|| Path::new(&w.transcript)), &w.session, &w.cwd, false) }
+/// The job that proves its save, accepted within `workspace.closeoutWait` of the send (one accepted later is past the
+/// wait, and holds it like none).
 fn accepted_job(w: &Who, rec: &Value) -> Result<String, String> {
     let jobs = jobs_of(&w.session)?;
-    accepted(&jobs, &w.cwd.display().to_string(), rec.i("sentAt")).map(|j| j.id).ok_or_else(|| "Agent Memory has no accepted job for its session".to_string())
+    let j = accepted(&jobs, &w.cwd.display().to_string(), rec.i("sentAt")).ok_or_else(|| "Agent Memory has no accepted job for its session".to_string())?;
+    if j.accepted - rec.i("sentAt") > w.wait_ms.max(1) { return Err(format!("{LATE_JOB} (its job came after the wait was over)")); }
+    Ok(j.id)
 }
+const LATE_JOB: &str = "Agent Memory accepted its save too late";
 /// After `/exit` went in: no turn since the closeout's but the exit itself, no turn end beyond, and its save still
 /// accepted. None: so; else what to do.
 fn still_saved(w: &Who, rec: &Value, wait: &dyn Fn(&str) -> Gate) -> Option<Gate> {
+    if rec.s("session") != w.session { return Some(held("its agent's session changed since it was sent")); }
+    if rec.s("tip") != w.tip || rec.s("cwd") != w.cwd.display().to_string() { return Some(held("its branch moved since it was sent")); }
     if w.events - rec.i("events") > 1 { return Some(held("new input reached its agent after /exit was typed")); }
     let Some(turn) = last_turn(w) else { return Some(wait("its saved conversation cannot be read")) };
     if turn.id != rec.s("turn") && !(is_exit(&turn.asked) && turn.began >= rec.i("exitAt")) { return Some(held("new input reached its agent after /exit was typed")); }
-    accepted_job(w, rec).err().map(|why| wait(&why))
+    accepted_job(w, rec).err().map(|why| if why.starts_with(LATE_JOB) { held(why) } else { wait(&why) })
+}
+/// The pane's shell, read from its screen, waits at a bare prompt: its last line ends in the prompt's own mark (`$`,
+/// `#`, `%` right after the prompt's text, or a `❯` of its own), with nothing typed after it.
+/// shortcut: a prompt of another shape (or words that end like one) is told by its last character only; another shape
+/// holds the closeout (the space is kept).
+pub fn shell_empty(screen: &str) -> bool {
+    let Some(last) = screen.lines().map(str::trim_end).rfind(|l| !l.trim().is_empty()) else { return false };
+    let mut c = last.chars().rev();
+    match (c.next(), c.next()) { (Some('$' | '#' | '%'), Some(b)) => !b.is_whitespace(), (Some('❯'), b) => b.is_none_or(char::is_whitespace), _ => false }
 }
 /// The prompt that began a turn is `/exit` itself: as typed, or as Claude Code keeps a command it ran (its name, its
 /// message and its arguments, all empty but `/exit`), and nothing else besides.

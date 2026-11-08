@@ -34,7 +34,7 @@ fn merged_with(w: &World, n: i64, reply: &str, before: impl FnOnce(&Obj)) -> Obj
     assert_eq!(t.s("stage"), "approval", "{}", t.at("failure"));
     assert!(t.b("session"), "its agent's session is known");
     // its agent's process and session as herdr shows them, its input box empty
-    pane(w, &t, |p| { p["frontPid"] = json!(4000 + n); p["agent"]["session"] = json!(t.s("session")); p["agent"]["screen"] = json!("Done.\n╭──\n│ ❯ \n╰──"); });
+    pane(w, &t, |p| { p["frontPid"] = json!(4000 + n); p["agent"]["session"] = json!(t.s("session")); p["agent"]["screen"] = json!("Done.\n╭──\n│ ❯ \n╰──"); p["screen"] = json!("user@host:/work$ "); }); // and its shell's, once it has left
     before(&t);
     sw::actions::finish_line::approve(&id, None, false).unwrap();
     let t = settle(&id);

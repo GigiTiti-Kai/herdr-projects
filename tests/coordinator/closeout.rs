@@ -26,7 +26,7 @@ fn a_stop_waits_for_the_closeout_each_step_proved_and_what_cannot_be_proved_leav
     w.script(json!({ "coordinator": [{ "said": "Hello." }, { "said": "Saved.\nsafe to Exit" }] }));
     send(&w.root, "first", false, "", &w.socket).unwrap(); drain();
     assert_eq!(agents(&w), 1);
-    pane(&w, |p| { p["frontPid"] = json!(5150); p["agent"]["screen"] = json!("╭──\n│ ❯ │\n╰──"); p["agent"]["session"] = json!(session_of(&w)); });
+    pane(&w, |p| { p["frontPid"] = json!(5150); p["screen"] = json!("user@host:~$ "); p["agent"]["screen"] = json!("╭──\n│ ❯ │\n╰──"); p["agent"]["session"] = json!(session_of(&w)); });
     queue(Ok(vec![]));
     stop(&w.socket).unwrap(); drain();
     // sent once; not stopped while its record is not accepted

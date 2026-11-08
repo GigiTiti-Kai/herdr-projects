@@ -25,8 +25,9 @@ Each step is proved apart, on its own pass, and nothing is ever typed twice:
    `safe to Exit` of its own, at the line's start (not indented), said once (a decision taken back, quoted, `unsafe`, `not safe` or an Exit blocked is none). Right before, the agent is at
    rest, nothing runs under it, and the session and branch tip are the ones it was sent for. Its processes are noted,
    and `/exit` is typed, once.
-3. **The agent gone.** Herdr sees no agent in the pane any more, the processes that were the agent have ended, and
-   nothing runs at its shell.
+3. **The agent gone.** Herdr sees no agent in the pane any more, the processes that were the agent have ended,
+   nothing runs at its shell, and its shell waits at a bare prompt (nothing typed after it). Its session, branch tip,
+   last reply and save are looked at again then too.
 4. **The space closed.** The clean-up as ever ([when a task is done](how-work-gets-done.md#when-a-task-is-done)),
    and `pane_closed` only once Herdr says there is no such pane any more (for a coordinator: else it says so).
 
@@ -48,7 +49,8 @@ starting with `closeout 未確認`:
   whose empty box looks otherwise (Codex's unframed one) is never closed out: it waits for you. Every text goes in only on the last look right before it, at the same session and terminal;
 - new input after `/exit` went in (words that only name `/exit`, or follow its tag, included), another terminal in its pane by then, or
   its save no longer accepted then;
-- no accepted job within `workspace.closeoutWait` (10 minutes), or a queue that cannot be read;
+- no job accepted within `workspace.closeoutWait` (10 minutes) of the send (one accepted later counts as none), or a
+  queue that cannot be read;
 - its turn still under way, herdr not answering, its saved conversation not readable, or the agent still there after
   `/exit`, once that same wait has passed since the board first looked (before anything was sent, too);
 - its agent not plainly at rest (a dialog, or a status Herdr cannot place), or not in its pane before it was told to
