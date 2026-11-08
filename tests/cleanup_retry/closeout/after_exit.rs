@@ -167,3 +167,56 @@ fn round13_tracked_dirty_bytes_after_exit_keep_space() { dirty_snapshot(90, true
 fn round13_untracked_dirty_bytes_after_exit_keep_space() { dirty_snapshot(91, false, true); }
 #[test]
 fn round13_tracked_dirty_bytes_before_exit_send_nothing() { dirty_snapshot(92, true, false); }
+
+/// Review round 14, adapted: a version that cannot be read is never taken for the same one. (The reviewer's own
+/// fixture made a dangling link unreadable; links are now read by their target, so a file nobody may read stands in.)
+fn unreadable_snapshot(n: i64, after_exit: bool) {
+    use std::os::unix::fs::PermissionsExt;
+    let w = world();
+    on();
+    fixed(Ok(vec![]));
+    let t = merged_with(&w, n, SAFE, |t| pane(&w, t, |p| p["agent"]["status"] = json!("working")));
+    let wt = Path::new(t.s("worktree"));
+    std::fs::write(wt.join(format!("c{n}.txt")), "saved version\n").unwrap();
+    pane(&w, &t, |p| p["agent"]["status"] = json!("idle"));
+    let unreadable = || { let f = wt.join("unreadable.txt"); std::fs::write(&f, "x").unwrap(); std::fs::set_permissions(&f, std::fs::Permissions::from_mode(0)).unwrap(); };
+    if !after_exit { unreadable(); }
+    pass(&w, t.s("id"));
+    if after_exit {
+        assert_eq!(closeouts(&w, &t), 1);
+        accepted_now(&t);
+        pass(&w, t.s("id"));
+        assert_eq!(task(t.s("id")).at("closeout").s("phase"), "closing");
+        assert_eq!(exits(&w, &t), 1);
+        unreadable();
+        pane(&w, &t, |p| { p["agent"] = Value::Null; p["frontPid"] = Value::Null; });
+        pass(&w, t.s("id"));
+    }
+    assert!(sw::land::closeout::changes_of(wt).is_none(), "an unreadable file: the version is unknown");
+    let c = task(t.s("id"));
+    let _ = std::fs::set_permissions(wt.join("unreadable.txt"), std::fs::Permissions::from_mode(0o644));
+    if !after_exit { assert_eq!((closeouts(&w, &t), exits(&w, &t)), (0, 0), "nothing typed while its version cannot be read"); }
+    held(&c, "its worktree cannot be read");
+    assert!(open(&w, &t));
+    set_fake(None);
+}
+#[test]
+fn round14_git_hash_failure_before_exit_must_hold() { unreadable_snapshot(100, false); }
+#[test]
+fn round14_git_hash_failure_after_exit_must_keep_space() { unreadable_snapshot(101, true); }
+#[test]
+fn round14_a_dangling_link_is_read_by_its_target_and_a_new_edit_still_changes_the_version() {
+    let w = world();
+    let _ = &w;
+    let dir = w.base.join("fp");
+    std::fs::create_dir_all(&dir).unwrap();
+    git(&dir, &["init", "-q"]);
+    std::fs::write(dir.join("a.txt"), "one\n").unwrap();
+    git(&dir, &["add", "a.txt"]);
+    git(&dir, &["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "a"]);
+    std::os::unix::fs::symlink("missing-target", dir.join("link")).unwrap();
+    std::fs::write(dir.join("a.txt"), "two\n").unwrap();
+    let before = sw::land::closeout::changes_of(&dir).expect("a dangling link has a target to read");
+    std::fs::write(dir.join("a.txt"), "three\n").unwrap();
+    assert_ne!(Some(before), sw::land::closeout::changes_of(&dir));
+}

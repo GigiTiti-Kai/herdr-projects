@@ -201,15 +201,21 @@ pub fn pane_gone(api: &Herdr, pane: &str) -> Option<bool> {
 }
 fn wait_ms(t: Option<&Task>) -> i64 { ms(setting("workspace.closeoutWait", t).as_str().unwrap_or("10m")) }
 
-/// What is changed in a worktree, by content: its changes to tracked files (the bytes, not only which files) and the
-/// contents of its untracked ones, as one digest. Empty when git cannot say (then nothing matches it later).
-pub fn changes_of(wt: &std::path::Path) -> String {
-    let (Ok(diff), Ok(untracked)) = (git_out(wt, &["diff", "HEAD", "--binary"]), git_out(wt, &["ls-files", "--others", "--exclude-standard", "-z"])) else { return String::new() };
-    let files: Vec<&str> = untracked.split('\0').filter(|f| !f.is_empty()).collect();
-    let hashes = if files.is_empty() { String::new() } else { match git_out(wt, &[&["hash-object", "--"][..], &files].concat()) { Ok(h) => h, Err(_) => return String::new() } };
+/// What is changed in a worktree, by content: its changes to tracked files (the bytes, not only which files) and each
+/// untracked file's contents (a symbolic link's own target), as one digest. None when any of it cannot be read: an
+/// unknown version is never taken for the same one.
+pub fn changes_of(wt: &std::path::Path) -> Option<String> {
+    let diff = git_out(wt, &["diff", "HEAD", "--binary"]).ok()?;
+    let untracked = git_out(wt, &["ls-files", "--others", "--exclude-standard", "-z"]).ok()?;
     let mut d = sha1_smol::Sha1::new();
-    for part in [diff.as_str(), "\0", untracked.as_str(), "\0", hashes.as_str()] { d.update(part.as_bytes()); }
-    d.digest().to_string()
+    d.update(diff.as_bytes());
+    for f in untracked.split('\0').filter(|f| !f.is_empty()) {
+        let p = wt.join(f);
+        let meta = std::fs::symlink_metadata(&p).ok()?;
+        let body = if meta.file_type().is_symlink() { std::fs::read_link(&p).ok()?.into_os_string().into_encoded_bytes() } else if meta.is_file() { std::fs::read(&p).ok()? } else { return None };
+        d.update(b"\0"); d.update(f.as_bytes()); d.update(b"\0"); d.update(&(body.len() as u64).to_le_bytes()); d.update(&body);
+    }
+    Some(d.digest().to_string())
 }
 /// A done task's worker, before its space is closed.
 pub fn gate(t: &Task) -> Gate {
@@ -218,8 +224,7 @@ pub fn gate(t: &Task) -> Gate {
     // Its work as it stands: the branch, the worktree's own HEAD (detached or not) and what is changed in it.
     let branch = if t.b("branch") { git_out(&folder_of(id), &["rev-parse", "--verify", &format!("refs/heads/{}", t.s("branch"))]).unwrap_or_default() } else { String::new() };
     let wt = std::path::Path::new(t.s("worktree"));
-    let head = git_out(wt, &["rev-parse", "HEAD"]).unwrap_or_default();
-    let changed = changes_of(wt);
+    let (Ok(head), Some(changed)) = (git_out(wt, &["rev-parse", "HEAD"]), changes_of(wt)) else { return held("its worktree cannot be read, so whether its work moved cannot be told; archive the task to close its space") };
     let (tip, work) = (branch, format!("{head} {changed}"));
     let w = Who { work, api: h(t), pane: t.at("link").t("pane"), terminal: t.at("link").t("terminal"), session: t.t("session"), transcript: t.t("transcript"), agent: t.t("agent"), cwd: cwd_of(t), tip, events: t.i("eventSeq"), wait_ms: wait_ms(Some(t)) };
     let save = |patch: Value, whole: bool| update_wait(id, 10000, |c| {

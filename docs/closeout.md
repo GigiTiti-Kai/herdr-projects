@@ -56,7 +56,8 @@ starting with `closeout 未確認`:
   `/exit`, once that same wait has passed since the board first looked (before anything was sent, too);
 - its agent not plainly at rest (a dialog, or a status Herdr cannot place), or not in its pane before it was told to
   exit (a crash is never a finished closeout);
-- its agent's session not known.
+- its agent's session not known, or its worktree that cannot be read (a file nobody may read: its version is
+  unknown, never the same one).
 
 Such a task is no longer tried again by itself: archive it to close its space. Archiving a task does not go through
 the closeout.
