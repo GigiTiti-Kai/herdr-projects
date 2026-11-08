@@ -26,8 +26,9 @@ Each step is proved apart, on its own pass, and nothing is ever typed twice:
    rest, nothing runs under it, and the session and branch tip are the ones it was sent for. Its processes are noted,
    and `/exit` is typed, once.
 3. **The agent gone.** Herdr sees no agent in the pane any more, the processes that were the agent have ended,
-   nothing runs at its shell, and its shell waits at a bare prompt (nothing typed after it). Its session, branch tip,
-   last reply and save are looked at again then too.
+   nothing runs at its shell, and its shell's last line is exactly the prompt it showed before the agent's program
+   was started (so nothing is typed after it; a launch line scrolled away holds it). Its session, branch, worktree
+   HEAD and changes, last reply and save are looked at again then too.
 4. **The space closed.** The clean-up as ever ([when a task is done](how-work-gets-done.md#when-a-task-is-done)),
    and `pane_closed` only once Herdr says there is no such pane any more (for a coordinator: else it says so).
 
@@ -41,7 +42,7 @@ what it waits for, and the clean-up is tried again by itself.
 starting with `closeout 未確認`:
 
 - new input after it was sent: a reply that is not the closeout's, a turn beyond its own, another session, the branch
-  moved;
+  or the worktree's own HEAD moved, or its changes changed;
 - its reply gives no Exit decision (a last line `safe to Exit`), such as an Exit blocked or taken back;
 - another terminal or another session than its agent's in the pane, as Herdr shows it (or Herdr not saying which);
 - an input box not of the one shape known to be empty: the screen's last box, framed with its corners, holding one

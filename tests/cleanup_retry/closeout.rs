@@ -13,6 +13,8 @@ use sw::store::tasks::{update, Change};
 
 /// What it never takes for leave to close.
 mod guards;
+/// What keeps the space after `/exit` went in.
+mod after_exit;
 
 const SAFE: &str = "Saved: accepted.\nsafe to Exit";
 const LATE: i64 = 11 * 60 * 1000;
@@ -34,7 +36,7 @@ fn merged_with(w: &World, n: i64, reply: &str, before: impl FnOnce(&Obj)) -> Obj
     assert_eq!(t.s("stage"), "approval", "{}", t.at("failure"));
     assert!(t.b("session"), "its agent's session is known");
     // its agent's process and session as herdr shows them, its input box empty
-    pane(w, &t, |p| { p["frontPid"] = json!(4000 + n); p["agent"]["session"] = json!(t.s("session")); p["agent"]["screen"] = json!("Done.\n╭──\n│ ❯ \n╰──"); p["screen"] = json!("user@host:/work$ "); }); // and its shell's, once it has left
+    pane(w, &t, |p| { p["frontPid"] = json!(4000 + n); p["agent"]["session"] = json!(t.s("session")); p["agent"]["screen"] = json!("Done.\n╭──\n│ ❯ \n╰──"); p["screen"] = json!("user@host:/work$ claude --session-id x\nBye.\nuser@host:/work$ "); }); // and its shell's, once it has left
     before(&t);
     sw::actions::finish_line::approve(&id, None, false).unwrap();
     let t = settle(&id);
@@ -227,7 +229,7 @@ fn what_is_typed_is_written_down_first_and_a_record_that_cannot_be_written_types
     fixed(Ok(vec![]));
     let t = merged_with(&w, 16, SAFE, |t| pane(&w, t, |p| p["agent"]["status"] = json!("working"))); // nothing sent yet
     let c = task(t.s("id"));
-    let who = || sw::land::closeout::Who { api: sw::herdr::Herdr::new(None), pane: c.at("link").t("pane"), terminal: c.at("link").t("terminal"), session: c.t("session"), transcript: String::new(), agent: c.t("agent"), cwd: c.s("worktree").into(), tip: String::new(), events: 0, wait_ms: 600000 };
+    let who = || sw::land::closeout::Who { api: sw::herdr::Herdr::new(None), pane: c.at("link").t("pane"), terminal: c.at("link").t("terminal"), session: c.t("session"), transcript: String::new(), agent: c.t("agent"), cwd: c.s("worktree").into(), tip: String::new(), work: String::new(), events: 0, wait_ms: 600000 };
     pane(&w, &t, |p| p["agent"]["status"] = json!("idle"));
     let g = sw::land::closeout::step(&who(), &json!({ "waitFrom": sw::clock::now() }), &|_, _| false);
     assert!(matches!(&g, sw::land::closeout::Gate::Wait(m) if m.contains("could not be written")), "{g:?}");

@@ -38,10 +38,11 @@ pub const SAFE: &str = "safe to Exit";
 pub fn on(t: Option<&Task>) -> bool { setting("workspace.closeout", t) == json!(true) }
 pub fn held(why: impl std::fmt::Display) -> Gate { Gate::Held(format!("closeout 未確認: {why}. Nothing more was typed")) }
 
-/// The agent a closeout is for, as its owner knows it. `terminal`: the terminal its agent was started in ("" when not
+/// The agent a closeout is for, as its owner knows it. `tip`: its branch; `work`: its worktree's own HEAD and what is
+/// changed in it. `terminal`: the terminal its agent was started in ("" when not
 /// known: then the one herdr shows at the send is the one every later look must see). `events`: the turn ends its hook
 /// filed (0 without one).
-pub struct Who { pub api: Herdr, pub pane: String, pub terminal: String, pub session: String, pub transcript: String, pub agent: String, pub cwd: PathBuf, pub tip: String, pub events: i64, pub wait_ms: i64 }
+pub struct Who { pub api: Herdr, pub pane: String, pub terminal: String, pub session: String, pub transcript: String, pub agent: String, pub cwd: PathBuf, pub tip: String, pub work: String, pub events: i64, pub wait_ms: i64 }
 /// One look. `rec`: the record so far; `save(patch, whole)`: merge into it, or (`whole`) start it again from the patch,
 /// false when it could not be written. What is typed is written down as on its way first (`sending`, `exiting`): a
 /// record left so (it went in, or not; the record after could not be written) is never sent again.
@@ -60,7 +61,7 @@ pub fn step(w: &Who, rec: &Value, save: &dyn Fn(Value, bool) -> bool) -> Gate {
             if api.pane_get(pane).map(|p| p.t("terminal_id")) != Some(rec.t("terminal")) || rec.t("terminal").is_empty() { return held("another terminal than its agent's is in its pane, or herdr does not say which"); }
             if !api.pids_gone(pane, &rec.arr("pids").iter().map(|p| p.as_i64().unwrap_or(0)).collect::<Vec<_>>()) { return wait("its agent's process has not ended"); }
             if !api.pane_idle(pane) { return wait("its agent left, but something still runs at its shell"); }
-            if !shell_empty(&api.pane_read(pane, "visible", None).unwrap_or_default()) { return held("its agent left, and its shell may hold words typed and not sent (or its prompt cannot be read)"); }
+            if !shell_at_prompt(&api.pane_read(pane, "recent-unwrapped", Some(2000)).unwrap_or_default(), crate::agents::kinds::program(&w.agent)) { return held("its agent left, and its shell may hold words typed and not sent (or its prompt cannot be read)"); }
             if let Some(g) = still_saved(w, rec, &wait) { return g; } // nothing new since /exit, and the save still there
             if phase == "closing" { save(json!({ "phase": "agent_exited", "exitedAt": now() }), false); }
             return Gate::Go;
@@ -88,7 +89,7 @@ pub fn step(w: &Who, rec: &Value, save: &dyn Fn(Value, bool) -> bool) -> Gate {
         if let Some(g) = draft() { return g; }
         let text = prompt(&w.agent);
         let sent = now(); // taken before it goes in
-        if !save(json!({ "phase": "sending", "sentAt": sent, "events": w.events, "session": w.session, "terminal": live_term, "tip": w.tip, "cwd": w.cwd.display().to_string() }), true) { return wait("its record could not be written, so nothing was typed"); }
+        if !save(json!({ "phase": "sending", "sentAt": sent, "events": w.events, "session": w.session, "terminal": live_term, "tip": w.tip, "work": w.work, "cwd": w.cwd.display().to_string() }), true) { return wait("its record could not be written, so nothing was typed"); }
         return match type_in(w, &live_term, pane, &text) {
             Ok(_) => { save(json!({ "phase": "checkpointing" }), false); Gate::Wait("Closeout sent: waiting for Agent Memory to accept it".into()) }
             Err(e) => { save(json!({ "phase": "", "failed": e.clone() }), false); held(format!("nothing was typed: {e}")) }
@@ -96,7 +97,7 @@ pub fn step(w: &Who, rec: &Value, save: &dyn Fn(Value, bool) -> bool) -> Gate {
     }
     // New input since it was sent: what any save proves is out of date, and nothing more is typed.
     if rec.s("session") != w.session { return held("its agent's session changed since it was sent"); }
-    if rec.s("tip") != w.tip || rec.s("cwd") != w.cwd.display().to_string() { return held("its branch moved since it was sent"); }
+    if rec.s("tip") != w.tip || rec.s("work") != w.work || rec.s("cwd") != w.cwd.display().to_string() { return held("its branch moved since it was sent"); }
     if w.events - rec.i("events") > 1 { return held("new input reached its agent after it was sent"); }
     if let Some(g) = busy() { return g; }
     // Its own last reply: the closeout's (begun by its words after it was sent, the same one each look), its Exit decision.
@@ -131,20 +132,23 @@ const LATE_JOB: &str = "Agent Memory accepted its save too late";
 /// accepted. None: so; else what to do.
 fn still_saved(w: &Who, rec: &Value, wait: &dyn Fn(&str) -> Gate) -> Option<Gate> {
     if rec.s("session") != w.session { return Some(held("its agent's session changed since it was sent")); }
-    if rec.s("tip") != w.tip || rec.s("cwd") != w.cwd.display().to_string() { return Some(held("its branch moved since it was sent")); }
+    if rec.s("tip") != w.tip || rec.s("work") != w.work || rec.s("cwd") != w.cwd.display().to_string() { return Some(held("its branch moved since it was sent")); }
     if w.events - rec.i("events") > 1 { return Some(held("new input reached its agent after /exit was typed")); }
     let Some(turn) = last_turn(w) else { return Some(wait("its saved conversation cannot be read")) };
     if turn.id != rec.s("turn") && !(is_exit(&turn.asked) && turn.began >= rec.i("exitAt")) { return Some(held("new input reached its agent after /exit was typed")); }
     accepted_job(w, rec).err().map(|why| if why.starts_with(LATE_JOB) { held(why) } else { wait(&why) })
 }
-/// The pane's shell, read from its screen, waits at a bare prompt: its last line ends in the prompt's own mark (`$`,
-/// `#`, `%` right after the prompt's text, or a `❯` of its own), with nothing typed after it.
-/// shortcut: a prompt of another shape (or words that end like one) is told by its last character only; another shape
-/// holds the closeout (the space is kept).
-pub fn shell_empty(screen: &str) -> bool {
-    let Some(last) = screen.lines().map(str::trim_end).rfind(|l| !l.trim().is_empty()) else { return false };
-    let mut c = last.chars().rev();
-    match (c.next(), c.next()) { (Some('$' | '#' | '%'), Some(b)) => !b.is_whitespace(), (Some('❯'), b) => b.is_none_or(char::is_whitespace), _ => false }
+/// The pane's shell, read from its screen, waits at a bare prompt: its last line is exactly the prompt its shell showed
+/// before an earlier command (for a closeout: the line its agent's program was started from), with nothing after it.
+/// A prompt's shape alone proves nothing: words typed after it may end like one. `program`: the command that earlier
+/// line must start with ("" for any).
+/// shortcut: a prompt that changes from line to line (a clock in it), or a launch line scrolled away, holds the closeout.
+pub fn shell_empty(screen: &str) -> bool { shell_at_prompt(screen, "") }
+pub fn shell_at_prompt(screen: &str, program: &str) -> bool {
+    let lines: Vec<&str> = screen.lines().map(str::trim_end).filter(|l| !l.trim().is_empty()).collect();
+    let Some((last, before)) = lines.split_last() else { return false };
+    let head = format!("{last} ");
+    !last.trim().is_empty() && before.iter().any(|l| l.strip_prefix(&head).is_some_and(|cmd| { let cmd = cmd.trim_start(); !cmd.is_empty() && (program.is_empty() || cmd == program || cmd.starts_with(&format!("{program} "))) }))
 }
 /// The prompt that began a turn is `/exit` itself: as typed, or as Claude Code keeps a command it ran (its name, its
 /// message and its arguments, all empty but `/exit`), and nothing else besides.
@@ -201,8 +205,13 @@ fn wait_ms(t: Option<&Task>) -> i64 { ms(setting("workspace.closeoutWait", t).as
 pub fn gate(t: &Task) -> Gate {
     if !on(Some(t)) || !t.at("link").b("pane") { return Gate::Go; }
     let id = t.s("id");
-    let tip = if t.b("branch") { git_out(&folder_of(id), &["rev-parse", "--verify", &format!("refs/heads/{}", t.s("branch"))]).unwrap_or_default() } else { String::new() };
-    let w = Who { api: h(t), pane: t.at("link").t("pane"), terminal: t.at("link").t("terminal"), session: t.t("session"), transcript: t.t("transcript"), agent: t.t("agent"), cwd: cwd_of(t), tip, events: t.i("eventSeq"), wait_ms: wait_ms(Some(t)) };
+    // Its work as it stands: the branch, the worktree's own HEAD (detached or not) and what is changed in it.
+    let branch = if t.b("branch") { git_out(&folder_of(id), &["rev-parse", "--verify", &format!("refs/heads/{}", t.s("branch"))]).unwrap_or_default() } else { String::new() };
+    let wt = std::path::Path::new(t.s("worktree"));
+    let head = git_out(wt, &["rev-parse", "HEAD"]).unwrap_or_default();
+    let changed = git_out(wt, &["status", "--porcelain=v1", "-uall"]).map(|s| sha1_smol::Sha1::from(s.as_bytes()).digest().to_string()).unwrap_or_default();
+    let (tip, work) = (branch, format!("{head} {changed}"));
+    let w = Who { work, api: h(t), pane: t.at("link").t("pane"), terminal: t.at("link").t("terminal"), session: t.t("session"), transcript: t.t("transcript"), agent: t.t("agent"), cwd: cwd_of(t), tip, events: t.i("eventSeq"), wait_ms: wait_ms(Some(t)) };
     let save = |patch: Value, whole: bool| update_wait(id, 10000, |c| {
         let was = c.at("closeout").at("was").clone(); // the line before the first hold stays
         if whole { c.put("closeout", patch.clone()); if was.is_string() { c.obj_mut("closeout").put("was", was.clone()); } } else { for (k, v) in patch.as_object().cloned().unwrap_or_default() { c.obj_mut("closeout").insert(k, v); } }
