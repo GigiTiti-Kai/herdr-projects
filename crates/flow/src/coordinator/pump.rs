@@ -150,7 +150,7 @@ fn run_pump(co: &Co, taken: &mut HashSet<String>) -> Res<()> {
             match super::closeout::gate(co, &c, w.s("what")) {
                 super::closeout::Gate::Go => {}
                 super::closeout::Gate::Wait(_) => { taken.insert(w.t("at")); break; } // the tick looks again, not this pump at once
-                super::closeout::Gate::Held(why) => { change(co, |c| { if c.at("want").at("at") == w.at("at") { c.put("want", Value::Null); } c.put("error", why.as_str()); c.remove("closeout"); true })?; break; }
+                super::closeout::Gate::Held(why) => { change(co, |c| { if c.at("want").at("at") == w.at("at") { c.put("want", Value::Null); } c.put("error", why.as_str()); true })?; break; } // its record stays: a stop asked again goes on from it, never saving twice
             }
             taken.insert(w.t("at"));
             // Its conversation is known before its terminal goes: a restart reopens it.

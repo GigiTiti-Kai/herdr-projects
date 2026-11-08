@@ -1,7 +1,7 @@
 //! A coordinator's record-only closeout before it is stopped or begun anew (`workspace.closeout`, off unless you turn it
 //! on): the same steps as a worker's (land/closeout.rs), its record (`closeout`) kept with the coordinator's own. A
 //! restart (the same conversation) and an open need none. Until it is through the stop waits; held, it is not carried
-//! out, and the coordinator says why.
+//! out, the coordinator says why, and its record stays: a stop asked again goes on from it, never saving twice.
 use super::co::Co;
 use super::state::{change, home};
 use crate::herdr::Herdr;

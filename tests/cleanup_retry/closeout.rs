@@ -17,6 +17,8 @@ mod guards;
 mod after_exit;
 /// The reviewer's round 15 probes: a directory git cannot read, a link turned into a file of the same text.
 mod round15;
+/// The reviewer's round 16 probes: a tracked file git is told to overlook.
+mod round16;
 
 const SAFE: &str = "Saved: accepted.\nsafe to Exit";
 const LATE: i64 = 11 * 60 * 1000;

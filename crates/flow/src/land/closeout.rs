@@ -201,23 +201,29 @@ pub fn pane_gone(api: &Herdr, pane: &str) -> Option<bool> {
 }
 fn wait_ms(t: Option<&Task>) -> i64 { ms(setting("workspace.closeoutWait", t).as_str().unwrap_or("10m")) }
 
-/// What is changed in a worktree, by content: its changes to tracked files (the bytes, not only which files) and each
-/// untracked file's kind, mode and contents (a symbolic link's own target), as one digest. None when any of it cannot
-/// be read, a warning from git included (it skips a folder it cannot open, and says so only there): an unknown
-/// version is never taken for the same one.
+/// What a worktree holds, by content, read from disk itself: every tracked and untracked file's kind, mode and bytes
+/// (a symbolic link's own target; a tracked file gone is noted as gone), as one digest. Git only lists the paths, so
+/// what it is told to overlook (`assume-unchanged`, `core.fileMode false`) still counts. None when any of it cannot be
+/// read, a warning from git included (it skips a folder it cannot open, and says so only there), or a path is a
+/// folder (a submodule): an unknown version is never taken for the same one.
 pub fn changes_of(wt: &std::path::Path) -> Option<String> {
     let clean = |args: &[&str]| { let o = std::process::Command::new("git").args(args).current_dir(wt).stdin(std::process::Stdio::null()).output().ok()?; (o.status.success() && o.stderr.is_empty()).then_some(o.stdout) };
-    let diff = clean(&["diff", "HEAD", "--binary"])?;
+    let tracked = String::from_utf8(clean(&["ls-files", "--cached", "-z"])?).ok()?;
     let untracked = String::from_utf8(clean(&["ls-files", "--others", "--exclude-standard", "-z"])?).ok()?;
     let mut d = sha1_smol::Sha1::new();
-    d.update(&diff);
-    for f in untracked.split('\0').filter(|f| !f.is_empty()) {
-        use std::os::unix::fs::PermissionsExt;
-        let p = wt.join(f);
-        let meta = std::fs::symlink_metadata(&p).ok()?;
-        let (kind, body) = if meta.file_type().is_symlink() { ("link", std::fs::read_link(&p).ok()?.into_os_string().into_encoded_bytes()) } else if meta.is_file() { ("file", std::fs::read(&p).ok()?) } else { return None };
-        let head = format!("\0{f}\0{kind} {:o} {}\0", meta.permissions().mode(), body.len());
-        d.update(head.as_bytes()); d.update(&body);
+    for (side, list) in [("tracked", &tracked), ("untracked", &untracked)] {
+        for f in list.split('\0').filter(|f| !f.is_empty()) {
+            use std::os::unix::fs::PermissionsExt;
+            let p = wt.join(f);
+            let (kind, mode, body) = match std::fs::symlink_metadata(&p) {
+                Err(e) if side == "tracked" && e.kind() == std::io::ErrorKind::NotFound => ("gone", 0, vec![]),
+                Err(_) => return None,
+                Ok(m) if m.file_type().is_symlink() => ("link", m.permissions().mode(), std::fs::read_link(&p).ok()?.into_os_string().into_encoded_bytes()),
+                Ok(m) if m.is_file() => ("file", m.permissions().mode(), std::fs::read(&p).ok()?),
+                Ok(_) => return None,
+            };
+            d.update(format!("\0{side}\0{f}\0{kind} {mode:o} {}\0", body.len()).as_bytes()); d.update(&body);
+        }
     }
     Some(d.digest().to_string())
 }
