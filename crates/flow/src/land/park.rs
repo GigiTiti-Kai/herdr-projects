@@ -48,6 +48,8 @@ pub fn park(id: &str) -> Res<(Task, String)> {
     update_wait(&id, 10000, |c| { c.put("closeout", json!({ "park": true })); Ok(Change::Write) })?;
     drive(&id);
     let c = get(&id).unwrap_or(t);
+    // Held before anything went in: no park at all, its line as it was.
+    if rec(&c).b("held") && rec(&c).s("phase").is_empty() { let why = c.t("msg"); let _ = forget(&id); crate::fail!("{id} was not parked, and nothing was typed: {}", why.strip_prefix(rec(&c).s("was")).unwrap_or(&why).trim_start_matches(['.', ' '])); }
     let line = c.t("msg");
     Ok((c, line))
 }
@@ -57,12 +59,16 @@ pub fn drive(id: &str) {
     if !busy(&t) { return; }
     let g = match who_of(&t) { Some(w) => step(&w, rec(&t), &|p, whole| save_to(id, p, whole)), None => hold_why("its worktree cannot be read, so whether its work moved cannot be told") };
     if matches!(g, Gate::Wait(_)) && rec(&t).s("phase").is_empty() && get(id).map(|c| c.at("closeout").s("phase") == "checkpointing").unwrap_or(false) { crate::store::said_by::note_board(id, &prompt(t.s("agent"))); }
+    // Held for anything but new input: the closeout's own turns stay its own, not turns of yours for the hook to find later.
+    let own = match &g { Gate::Held(why) => !["new input", "session changed", "another session", "moved"].iter().any(|n| why.contains(n)), _ => false };
+    let seen = if own { t.at("link").b("pane").then(|| crate::flow::task::h(&t).agent_get(t.at("link").s("pane")).ok().flatten()).flatten() } else { None };
     let line = match &g { Gate::Go => "Parked: its agent exited after a record-only closeout; go into the task (or reply) to resume the same conversation".to_string(), Gate::Wait(l) | Gate::Held(l) => l.clone() };
     let _ = update_wait(id, 10000, |c| {
         if !busy(c) { return Ok(Change::Keep); }
         let was = if c.at("closeout").has("was") { c.at("closeout").t("was") } else { c.t("msg") };
         c.obj_mut("closeout").put("was", was.clone());
         match &g { Gate::Go => { c.obj_mut("closeout").put("parked", true); c.obj_mut("closeout").put("parkedAt", crate::clock::now()); } Gate::Held(_) => c.obj_mut("closeout").put("held", true), Gate::Wait(_) => {} }
+        if let Some(a) = &seen { let h = c.obj_mut("handled"); h.put("comp", a.at("completion_seq").clone()); h.put("seq", a.at("state_change_seq").clone()); h.put("term", a.at("terminal_id").clone()); h.put("at", crate::clock::now()); }
         c.put("msg", format!("{was}{}{line}.", if was.is_empty() { "" } else if was.ends_with('.') { " " } else { ". " }));
         Ok(Change::Write)
     });

@@ -136,3 +136,58 @@ fn a_park_asked_twice_or_with_words_waiting_or_not_waiting_for_you_is_refused() 
     assert!(sw::land::park::park(&id).unwrap_err().msg.contains("waits for nothing of yours"));
     set_fake(None);
 }
+
+#[test]
+fn a_park_held_before_anything_went_in_is_no_park_and_one_held_later_leaves_the_approval_as_it_was() {
+    let w = world();
+    on();
+    // words wait unsent in its input box: nothing is typed, no record is left, and it can be asked again
+    let t = waiting(&w, 5, false, SAFE);
+    let id = t.t("id");
+    pane(&w, &t, |p| p["agent"]["screen"] = json!("Done.\n╭──\n│ ❯ half a thought\n╰──"));
+    let e = sw::land::park::park(&id).unwrap_err();
+    assert!(e.msg.contains("not parked, and nothing was typed") && e.msg.contains("words wait unsent"), "{}", e.msg);
+    assert!(!task(&id).at("closeout").is_object() && closeouts(&w, &t) == 0);
+    assert_eq!(task(&id).s("msg"), t.s("msg"));
+    pane(&w, &t, |p| p["agent"]["screen"] = json!("Done.\n╭──\n│ ❯ \n╰──"));
+    sw::land::park::park(&id).unwrap();
+    // no save accepted within the wait: held with its agent still there, and the hook's next look finds no turn of yours
+    set_fake(Some(Rc::new(|_| Ok(vec![]))));
+    on_pane(&w, t.at("link").s("pane"));
+    settle(&id);
+    sw::clock::advance(11 * 60 * 1000);
+    pass(&w, &id);
+    let c = task(&id);
+    assert!(c.at("closeout").b("held") && c.s("msg").contains("closeout 未確認"), "{}", c.s("msg"));
+    on_pane(&w, t.at("link").s("pane"));
+    settle(&id);
+    kept(&t, &task(&id));
+    assert_eq!(exits(&w, &t), 0);
+    set_fake(None);
+}
+
+#[test]
+fn resumed_its_next_looks_keep_what_it_waits_on_and_its_clean_up_is_a_closeout_of_its_own() {
+    let w = world();
+    on();
+    sw::store::settings::change::set_value("workspace.closeout", &json!(true), &sw::store::settings::lookup::Scope::you()).unwrap();
+    let t = parked(&w, 6, false);
+    let id = t.t("id");
+    w.script(json!({ "worker": [{ "said": SAFE }] }));
+    let (_, has, _) = sw::delegate::reopen(&id, true).unwrap();
+    assert!(has);
+    let p = t.at("link").t("pane");
+    pane(&w, &t, |p| { p["frontPid"] = json!(5006); p["agent"]["session"] = json!(t.s("session")); p["agent"]["screen"] = json!("Done.\n╭──\n│ ❯ \n╰──"); });
+    on_pane(&w, &p);
+    settle(&id);
+    let c = task(&id);
+    kept(&obj(json!({ "stage": t.at("stage"), "reviewedHead": t.at("reviewedHead"), "requireApproval": t.at("requireApproval"), "mergeIntent": t.at("mergeIntent"), "kind": t.at("kind"), "reviewRounds": t.at("reviewRounds"), "session": t.at("session"), "armedAt": c.at("armedAt"), "review": t.at("review") })), &c);
+    assert_eq!(c.s("msg"), t.at("closeout").s("was"));
+    // approved and merged: the clean-up's closeout is a new one, typed once, into the agent that came back
+    sw::actions::finish_line::approve(&id, None, false).unwrap();
+    let c = settle(&id);
+    assert_eq!(c.s("stage"), "done", "{}", c.at("failure"));
+    assert_eq!(closeouts(&w, &c), 1, "{:?}", prompts(&w, &p));
+    assert!(!sw::land::park::unfinished(&c));
+    set_fake(None);
+}

@@ -27,7 +27,9 @@ Once it is parked:
 - The board's own turns (a check failure, a pull request repair) type nothing.
 
 **What cannot be proved is held**, as for a closeout (`closeout 未確認: …`): the task is then an ordinary one again,
-still waiting for you, with nothing more typed. An agent gone before it was told to exit is a crash, never a park;
+with nothing more typed. It still waits for you as it did, its closeout's own turns not taken for yours; held for new
+input (a turn of yours, another session, its work moved), that input counts as ever, and the approval is asked again.
+Held before anything went in (a dialog, words in its input box), `park` is refused and leaves nothing behind. An agent gone before it was told to exit is a crash, never a park;
 herdr not answering only waits. A held park, or one the task moved on from, counts for nothing at its clean-up: that
 closeout starts anew.
 
