@@ -8,6 +8,7 @@ pub mod checks;
 pub mod cleanup;
 pub mod cleanup_ends;
 pub mod closes;
+pub mod closeout;
 pub mod direct;
 pub mod expected;
 pub mod in_use;

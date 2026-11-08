@@ -10,6 +10,8 @@ use sw::json::*;
 
 /// tell where herdr cannot be found: queued, not delivered, and said so.
 mod undelivered;
+/// Its record-only closeout before a stop or a fresh start.
+mod closeout;
 
 pub fn coord_world() -> World {
     let w = world_with(Opts { repo: true, settings: json!({ "coordinator.agent": "claude", "review.when": "never" }), ..Default::default() });

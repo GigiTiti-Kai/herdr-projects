@@ -79,12 +79,12 @@ pub fn holds(file: &Path, text: &str, since: i64) -> std::io::Result<bool> {
 pub struct Usage { #[serde(rename = "in")] pub inp: f64, pub out: f64, pub context: f64, pub window: Option<f64> }
 /// What every reader returns. `finished`: a complete assistant message ends the file. `pending`: a tool call or a
 /// partial message does. `interrupted`: the human stopped it. `error`: the program recorded an API, login or limit
-/// error; `passing`: the error is the provider's and waiting may fix it, `reason` says which. `began`: when the turn this
+/// error; `asked`: the words of the prompt that began it; `passing`: the error is the provider's and waiting may fix it, `reason` says which. `began`: when the turn this
 /// ends was started (the time of the last prompt in the part read; 0: none there).
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct Turn {
-    pub id: String, pub pos: i64, pub began: i64, pub said: String, pub stop: String, pub error: String,
+    pub id: String, pub pos: i64, pub began: i64, pub asked: String, pub said: String, pub stop: String, pub error: String,
     pub finished: bool, pub pending: bool, pub interrupted: bool, pub usage: Option<Usage>, pub model: String,
     pub auth: bool, pub passing: bool, pub reason: String,
     #[serde(skip_serializing_if = "Option::is_none")] pub file: Option<PathBuf>,
@@ -118,6 +118,7 @@ pub fn read_claude(file: &Path, bytes: u64) -> Option<Turn> {
     let rows = tail_lines(file, bytes).ok()?;
     enum Last<'a> { Say { id: String, text: String, tool: bool, e: &'a Value }, Error(&'a Value), Interrupt(&'a Value, String), User(&'a Value) }
     let (mut last, mut usage, mut model, mut latest, mut began): (Option<Last>, Option<(f64, f64)>, String, String, i64) = (None, None, String::new(), String::new(), 0);
+    let mut asked = String::new();
     for e in &rows {
         let m = e.at("message");
         if e.s("type") == "assistant" && m.is_object() {
@@ -142,13 +143,13 @@ pub fn read_claude(file: &Path, bytes: u64) -> Option<Turn> {
                 last = Some(Last::Interrupt(e, said));
             } else {
                 last = Some(Last::User(e)); // a real prompt or a tool result: either way the agent has not answered it yet
-                if !text.trim().is_empty() && !e.b("isMeta") && !e.b("isSidechain") { began = when(e.at("timestamp")); }
+                if !text.trim().is_empty() && !e.b("isMeta") && !e.b("isSidechain") { began = when(e.at("timestamp")); asked = text.clone(); }
             }
         }
     }
     let last = last?;
     let e = match &last { Last::Say { e, .. } | Last::Error(e) | Last::Interrupt(e, _) | Last::User(e) => *e };
-    let base = Turn { pos: when(e.at("timestamp")), began, usage: usage.and_then(|(i, o)| usage_of(i, o, &model, None)), model: model.clone(), ..Default::default() };
+    let base = Turn { pos: when(e.at("timestamp")), began, asked, usage: usage.and_then(|(i, o)| usage_of(i, o, &model, None)), model: model.clone(), ..Default::default() };
     Some(match last {
         Last::Error(e) => {
             let text = e.at("message").arr("content").iter().map(|c| c.t("text")).collect::<String>().trim().to_string();
@@ -170,12 +171,13 @@ pub fn read_codex(file: &Path, bytes: u64) -> Option<Turn> {
     #[derive(PartialEq)] enum K { Final, Partial, User, Tool, Error, Done, Interrupt }
     let mut last: Option<(K, &Value, String, String, String)> = None; // kind, entry, id, error text, code
     let (mut said, mut usage, mut model, mut window, mut began) = (String::new(), None::<(f64, f64)>, String::new(), None::<f64>, 0);
+    let mut asked = String::new();
     for e in &rows {
         let p = e.at("payload");
         let (ty, pty) = (e.s("type"), p.s("type"));
         if ty == "turn_context" { if p.b("model") { model = p.t("model"); } }
         else if ty == "response_item" && pty == "message" && p.s("role") == "assistant" { said = p.arr("content").iter().map(|c| c.t("text")).collect(); last = Some((if p.s("phase") == "final_answer" { K::Final } else { K::Partial }, e, String::new(), String::new(), String::new())); }
-        else if ty == "response_item" && pty == "message" && p.s("role") == "user" { last = Some((K::User, e, String::new(), String::new(), String::new())); began = when(e.at("timestamp")); }
+        else if ty == "response_item" && pty == "message" && p.s("role") == "user" { last = Some((K::User, e, String::new(), String::new(), String::new())); began = when(e.at("timestamp")); asked = p.arr("content").iter().map(|c| c.t("text")).collect(); }
         else if ty == "response_item" && pty.contains("call") { last = Some((K::Tool, e, String::new(), String::new(), String::new())); }
         else if ty == "event_msg" && pty == "token_count" && p.at("info").is_object() {
             let i = p.at("info");
@@ -199,7 +201,7 @@ pub fn read_codex(file: &Path, bytes: u64) -> Option<Turn> {
     }
     let (kind, e, id, err, code) = last?;
     let pos = when(e.at("timestamp"));
-    let base = Turn { pos, began, usage: usage.and_then(|(i, o)| usage_of(i, o, &model, window)), model: model.clone(), id: if id.is_empty() { pos.to_string() } else { id }, ..Default::default() };
+    let base = Turn { pos, began, asked, usage: usage.and_then(|(i, o)| usage_of(i, o, &model, window)), model: model.clone(), id: if id.is_empty() { pos.to_string() } else { id }, ..Default::default() };
     Some(match kind {
         K::Error => judge(Turn { said: err.clone(), stop: "error".into(), error: err, ..base }, &code, 0, false),
         K::Interrupt => Turn { said, stop: "interrupted".into(), interrupted: true, ..base },
@@ -211,6 +213,7 @@ pub fn read_pi(file: &Path, bytes: u64) -> Option<Turn> {
     let rows = tail_lines(file, bytes).ok()?;
     let mut last: Option<(bool, &Value)> = None; // (said by the agent, entry)
     let (mut usage, mut model, mut latest, mut began) = (None::<(f64, f64)>, String::new(), String::new(), 0);
+    let mut asked = String::new();
     for e in &rows {
         let m = e.at("message");
         if e.s("type") != "message" || !m.is_object() { continue; }
@@ -220,10 +223,10 @@ pub fn read_pi(file: &Path, bytes: u64) -> Option<Turn> {
             if !tx.is_empty() { latest = tx; }
             if m.at("usage").is_object() { let u = m.at("usage"); usage = Some((u.f("input") + u.f("cacheRead") + u.f("cacheWrite"), u.f("output"))); }
             if m.b("model") { model = m.t("model"); }
-        } else if m.s("role") == "user" || m.s("role") == "toolResult" { last = Some((false, e)); if m.s("role") == "user" { began = when(e.at("timestamp")); } }
+        } else if m.s("role") == "user" || m.s("role") == "toolResult" { last = Some((false, e)); if m.s("role") == "user" { began = when(e.at("timestamp")); asked = texts(m.at("content"), &["text"]); } }
     }
     let (said_by_agent, e) = last?;
-    let base = Turn { pos: when(e.at("timestamp")), began, usage: usage.and_then(|(i, o)| usage_of(i, o, &model, None)), model: model.clone(), id: e.t("id"), ..Default::default() };
+    let base = Turn { pos: when(e.at("timestamp")), began, asked, usage: usage.and_then(|(i, o)| usage_of(i, o, &model, None)), model: model.clone(), id: e.t("id"), ..Default::default() };
     if !said_by_agent { return Some(Turn { pending: true, said: latest, ..base }); }
     let m = e.at("message");
     let text = texts(m.at("content"), &["text"]).trim().to_string();

@@ -146,12 +146,21 @@ fn run_pump(co: &Co, taken: &mut HashSet<String>) -> Res<()> {
     for _ in 0..50 {
         let mut c = get(co).unwrap_or_default();
         if let Some(w) = c.o("want").cloned() {
+            // A record-only closeout first, when it is on (closeout.rs): waiting, the tick looks again; held, not stopped.
+            match super::closeout::gate(co, &c, w.s("what")) {
+                super::closeout::Gate::Go => {}
+                super::closeout::Gate::Wait(_) => { taken.insert(w.t("at")); break; } // the tick looks again, not this pump at once
+                super::closeout::Gate::Held(why) => { change(co, |c| { if c.at("want").at("at") == w.at("at") { c.put("want", Value::Null); } c.put("error", why.as_str()); true })?; break; } // its record stays: a stop asked again goes on from it, never saving twice
+            }
             taken.insert(w.t("at"));
             // Its conversation is known before its terminal goes: a restart reopens it.
             if w.s("what") != "open" { if c.b("run") { active(co, &c); c = get(co).unwrap_or(c); } close_place(&api, &c); }
+            let pane_left = c.b("pane") && super::closeout::pane_gone(&api, c.s("pane")) == Some(true);
             let _ = change(co, |c| {
                 if c.at("want").at("at") == w.at("at") { c.put("want", Value::Null); }
-                if w.s("what") == "open" { return true; }
+                // through, or none: the next stop starts its own; a pane herdr does not say is gone keeps the record, and says so
+                if w.s("what") == "open" { return true; } // its agent goes on as it is: a closeout under way or held stays
+                if c.at("closeout").s("phase") == "agent_exited" && !pane_left { c.put("error", "closeout: its pane was not confirmed closed"); } else { c.remove("closeout"); }
                 nowhere(c);
                 if w.s("what") == "new" { for (k, v) in obj(json!({ "run": null, "pick": w.at("pick"), "session": null, "transcript": null, "seen": null, "intro": false, "last": "", "where": [], "mark": null })) { c.insert(k, v); } }
                 true

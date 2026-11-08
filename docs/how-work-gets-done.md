@@ -357,6 +357,7 @@ chat's, and the task waits for your new yes after the review.
 
 Merged here or on GitHub, finished with nothing to merge, or called done by you: its space leaves Herdr's sidebar by
 itself, and its worktree and branch are removed. `workspace.cleanup false` keeps everything.
+`workspace.closeout true` has its agent save a record first ([a record-only closeout](closeout.md)).
 
 **Work is never lost for it:**
 
