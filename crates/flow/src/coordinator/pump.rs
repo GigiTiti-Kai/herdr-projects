@@ -159,8 +159,8 @@ fn run_pump(co: &Co, taken: &mut HashSet<String>) -> Res<()> {
             let _ = change(co, |c| {
                 if c.at("want").at("at") == w.at("at") { c.put("want", Value::Null); }
                 // through, or none: the next stop starts its own; a pane herdr does not say is gone keeps the record, and says so
+                if w.s("what") == "open" { return true; } // its agent goes on as it is: a closeout under way or held stays
                 if c.at("closeout").s("phase") == "agent_exited" && !pane_left { c.put("error", "closeout: its pane was not confirmed closed"); } else { c.remove("closeout"); }
-                if w.s("what") == "open" { return true; }
                 nowhere(c);
                 if w.s("what") == "new" { for (k, v) in obj(json!({ "run": null, "pick": w.at("pick"), "session": null, "transcript": null, "seen": null, "intro": false, "last": "", "where": [], "mark": null })) { c.insert(k, v); } }
                 true

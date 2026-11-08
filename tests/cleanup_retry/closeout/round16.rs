@@ -40,3 +40,35 @@ fn round16_assume_unchanged_after_exit() { hidden_tracked_edit(true, false); }
 fn round16_tracked_mode_before_exit() { hidden_tracked_edit(false, true); }
 #[test]
 fn round16_tracked_mode_after_exit() { hidden_tracked_edit(true, true); }
+
+
+fn index_only_edit(after_exit: bool) {
+    let w = world(); on(); fixed(Ok(vec![]));
+    let n = 130;
+    let t = merged_with(&w, n, SAFE, |t| pane(&w, t, |p| p["agent"]["status"] = json!("working")));
+    let wt = Path::new(t.s("worktree")); let file = wt.join("c130.txt");
+    let original = std::fs::read(&file).unwrap();
+    let before = sw::land::closeout::changes_of(wt).unwrap();
+    pane(&w, &t, |p| p["agent"]["status"] = json!("idle")); pass(&w, t.s("id"));
+    accepted_now(&t);
+    if after_exit { pass(&w, t.s("id")); assert_eq!(exits(&w, &t), 1); }
+    std::fs::write(&file, "NEW STAGED ARTIFACT NOT IN ACCEPTED SNAPSHOT\n").unwrap();
+    git(wt, &["add", "c130.txt"]);
+    std::fs::write(&file, &original).unwrap();
+    let staged = git(wt, &["show", ":c130.txt"]);
+    assert!(staged.contains("NEW STAGED ARTIFACT"));
+    let after = sw::land::closeout::changes_of(wt).unwrap();
+    let exits_before_cleanup = exits(&w, &t);
+    if after_exit { pane(&w, &t, |p| { p["agent"] = Value::Null; p["frontPid"] = Value::Null; }); }
+    pass(&w, t.s("id"));
+    let c = task(t.s("id"));
+    let space_open = open(&w, &t); let exit_count = exits(&w, &t);
+    eprintln!("ROUND17_INDEX after_exit={after_exit} fingerprint_same={} staged={staged:?} exits_before_cleanup={exits_before_cleanup} exits_after_cleanup={exit_count} space_open={space_open} worktree_exists={} phase={} msg={}", before == after, wt.exists(), c.at("closeout").s("phase"), c.s("msg"));
+    set_fake(None);
+    if after_exit { assert!(space_open, "new staged artifact after accepted save must keep space"); }
+    else { assert_eq!(exit_count, 0, "new staged artifact must invalidate old Exit decision"); }
+}
+#[test]
+fn round17_index_only_before_exit() { index_only_edit(false); }
+#[test]
+fn round17_index_only_after_exit() { index_only_edit(true); }

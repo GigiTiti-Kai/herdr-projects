@@ -108,3 +108,35 @@ fn round16_a_held_stop_retains_the_accepted_closeout_and_does_not_save_twice() {
     set_fake(None);
     assert_eq!(count, 1, "same accepted snapshot must not be saved a second time after a held stop");
 }
+
+#[test]
+fn round17_a_held_stop_open_same_session_stop_does_not_save_twice() {
+    let w = coord_world();
+    sw::store::settings::change::set_value("workspace.closeout", &json!(true), &sw::store::settings::lookup::Scope::you()).unwrap();
+    sw::clock::set(Some(sw::clock::now()));
+    w.script(json!({ "coordinator": [{ "said": "Hello." }, { "said": "Saved.\nsafe to Exit" }, { "said": "Saved again.\nsafe to Exit" }] }));
+    send(&w.root, "first", false, "", &w.socket).unwrap(); drain();
+    pane(&w, |p| { p["frontPid"] = json!(5155); p["agent"]["screen"] = json!("╭──\n│ ❯ │\n╰──"); p["agent"]["session"] = json!(session_of(&w)); });
+    queue(Ok(vec![])); stop(&w.socket).unwrap(); drain();
+    let accepted_session = session_of(&w);
+    let cwd = get(&w).at("closeout").t("cwd");
+    queue(Ok(vec![Job { id: "accepted-snapshot".into(), status: "queued".into(), accepted: sw::clock::now() + 1, cwd }]));
+    pane(&w, |p| p["agent"]["screen"] = json!("╭──\n│ ❯ UNSENT DRAFT │\n╰──"));
+    pump(&w.socket); drain();
+    assert!(get(&w).s("error").contains("words wait unsent"));
+    let held_record = get(&w).at("closeout").clone();
+    assert_eq!(typed(&w).iter().filter(|p| p.as_str() == "/exit").count(), 0);
+    // Only the unsent draft is cleared; same session, same artifact and accepted save. Retry the authorized stop.
+    pane(&w, |p| p["agent"]["screen"] = json!("╭──\n│ ❯ │\n╰──"));
+    sw::clock::advance(5);
+    sw::coordinator::requests::open(&w.socket).unwrap(); drain();
+    assert_eq!(accepted_session, session_of(&w), "open preserves the same conversation");
+    assert_eq!(typed(&w).iter().filter(|p| !p.starts_with("/session-close")).count(), 1, "no new work sent");
+    let after_open_record = get(&w).at("closeout").clone();
+    sw::clock::advance(5); stop(&w.socket).unwrap(); drain();
+    eprintln!("ROUND17_COORDINATOR after_open_record={after_open_record}; same_session={}; agents={}", accepted_session == session_of(&w), agents(&w));
+    let count = typed(&w).iter().filter(|p| p.starts_with("/session-close 記録だけ")).count();
+    eprintln!("ROUND17_COORDINATOR retry: held_record={held_record}; session_unchanged={}; accepted_job=accepted-snapshot; closeouts={count}; phase={}", accepted_session == session_of(&w), get(&w).at("closeout").s("phase"));
+    set_fake(None);
+    assert_eq!(count, 1, "same accepted snapshot must not be saved a second time after a held stop");
+}

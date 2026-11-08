@@ -202,15 +202,18 @@ pub fn pane_gone(api: &Herdr, pane: &str) -> Option<bool> {
 fn wait_ms(t: Option<&Task>) -> i64 { ms(setting("workspace.closeoutWait", t).as_str().unwrap_or("10m")) }
 
 /// What a worktree holds, by content, read from disk itself: every tracked and untracked file's kind, mode and bytes
-/// (a symbolic link's own target; a tracked file gone is noted as gone), as one digest. Git only lists the paths, so
+/// (a symbolic link's own target; a tracked file gone is noted as gone), and its index (what is staged), as one digest. Git only lists the paths, so
 /// what it is told to overlook (`assume-unchanged`, `core.fileMode false`) still counts. None when any of it cannot be
 /// read, a warning from git included (it skips a folder it cannot open, and says so only there), or a path is a
 /// folder (a submodule): an unknown version is never taken for the same one.
 pub fn changes_of(wt: &std::path::Path) -> Option<String> {
     let clean = |args: &[&str]| { let o = std::process::Command::new("git").args(args).current_dir(wt).stdin(std::process::Stdio::null()).output().ok()?; (o.status.success() && o.stderr.is_empty()).then_some(o.stdout) };
-    let tracked = String::from_utf8(clean(&["ls-files", "--cached", "-z"])?).ok()?;
+    // The index too: each tracked path's staged blob, mode and stage, so what is staged and not on disk still counts.
+    let index = String::from_utf8(clean(&["ls-files", "--stage", "-z"])?).ok()?;
+    let tracked: String = index.split('\0').filter(|e| !e.is_empty()).map(|e| e.split_once('\t').map(|(_, path)| path).unwrap_or(e)).collect::<Vec<_>>().join("\0");
     let untracked = String::from_utf8(clean(&["ls-files", "--others", "--exclude-standard", "-z"])?).ok()?;
     let mut d = sha1_smol::Sha1::new();
+    d.update(index.as_bytes());
     for (side, list) in [("tracked", &tracked), ("untracked", &untracked)] {
         for f in list.split('\0').filter(|f| !f.is_empty()) {
             use std::os::unix::fs::PermissionsExt;

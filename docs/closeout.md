@@ -14,7 +14,8 @@ reviewed, pushed or merged again, and an approval or a question of another task 
 pane gets it, and a coordinator's before it is stopped or begun anew (`coordinator stop`, `coordinator new`; a
 restart keeps its conversation and needs none): no reviewer, Watcher or plan writer. Until a coordinator's closeout is
 through, its stop waits; held, the stop is not carried out, the coordinator keeps running and says why, and its
-record stays (a stop asked again goes on from it: the same save is never asked for twice).
+record stays (a stop asked again goes on from it, an `open` in between included: the same save is never asked for
+twice).
 
 Each step is proved apart, on its own pass, and nothing is ever typed twice:
 
@@ -57,7 +58,8 @@ starting with `closeout 未確認`:
   `/exit`, once that same wait has passed since the board first looked (before anything was sent, too);
 - its agent not plainly at rest (a dialog, or a status Herdr cannot place), or not in its pane before it was told to
   exit (a crash is never a finished closeout);
-- a tracked file changed that git is told to overlook is still a change (every file is read from disk itself);
+- a tracked file changed that git is told to overlook is still a change (every file is read from disk itself), and
+  so is what is staged only (the index is part of the version);
 - its agent's session not known, or its worktree that cannot be read (a file nobody may read, a folder git skips
   with a warning: its version is unknown, never the same one). A file's kind counts too: a link turned into a file of
   the same text is another version.
