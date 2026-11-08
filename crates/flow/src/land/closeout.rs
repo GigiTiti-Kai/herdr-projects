@@ -201,6 +201,16 @@ pub fn pane_gone(api: &Herdr, pane: &str) -> Option<bool> {
 }
 fn wait_ms(t: Option<&Task>) -> i64 { ms(setting("workspace.closeoutWait", t).as_str().unwrap_or("10m")) }
 
+/// What is changed in a worktree, by content: its changes to tracked files (the bytes, not only which files) and the
+/// contents of its untracked ones, as one digest. Empty when git cannot say (then nothing matches it later).
+pub fn changes_of(wt: &std::path::Path) -> String {
+    let (Ok(diff), Ok(untracked)) = (git_out(wt, &["diff", "HEAD", "--binary"]), git_out(wt, &["ls-files", "--others", "--exclude-standard", "-z"])) else { return String::new() };
+    let files: Vec<&str> = untracked.split('\0').filter(|f| !f.is_empty()).collect();
+    let hashes = if files.is_empty() { String::new() } else { match git_out(wt, &[&["hash-object", "--"][..], &files].concat()) { Ok(h) => h, Err(_) => return String::new() } };
+    let mut d = sha1_smol::Sha1::new();
+    for part in [diff.as_str(), "\0", untracked.as_str(), "\0", hashes.as_str()] { d.update(part.as_bytes()); }
+    d.digest().to_string()
+}
 /// A done task's worker, before its space is closed.
 pub fn gate(t: &Task) -> Gate {
     if !on(Some(t)) || !t.at("link").b("pane") { return Gate::Go; }
@@ -209,7 +219,7 @@ pub fn gate(t: &Task) -> Gate {
     let branch = if t.b("branch") { git_out(&folder_of(id), &["rev-parse", "--verify", &format!("refs/heads/{}", t.s("branch"))]).unwrap_or_default() } else { String::new() };
     let wt = std::path::Path::new(t.s("worktree"));
     let head = git_out(wt, &["rev-parse", "HEAD"]).unwrap_or_default();
-    let changed = git_out(wt, &["status", "--porcelain=v1", "-uall"]).map(|s| sha1_smol::Sha1::from(s.as_bytes()).digest().to_string()).unwrap_or_default();
+    let changed = changes_of(wt);
     let (tip, work) = (branch, format!("{head} {changed}"));
     let w = Who { work, api: h(t), pane: t.at("link").t("pane"), terminal: t.at("link").t("terminal"), session: t.t("session"), transcript: t.t("transcript"), agent: t.t("agent"), cwd: cwd_of(t), tip, events: t.i("eventSeq"), wait_ms: wait_ms(Some(t)) };
     let save = |patch: Value, whole: bool| update_wait(id, 10000, |c| {

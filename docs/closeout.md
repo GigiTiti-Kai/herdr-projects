@@ -42,7 +42,7 @@ what it waits for, and the clean-up is tried again by itself.
 starting with `closeout 未確認`:
 
 - new input after it was sent: a reply that is not the closeout's, a turn beyond its own, another session, the branch
-  or the worktree's own HEAD moved, or its changes changed;
+  or the worktree's own HEAD moved, or its changes changed (by their contents, untracked files included);
 - its reply gives no Exit decision (a last line `safe to Exit`), such as an Exit blocked or taken back;
 - another terminal or another session than its agent's in the pane, as Herdr shows it (or Herdr not saying which);
 - an input box not of the one shape known to be empty: the screen's last box, framed with its corners, holding one

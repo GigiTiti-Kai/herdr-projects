@@ -125,3 +125,45 @@ fn round12_detached_new_head_after_exit_keeps_space() {
     set_fake(None);
     assert!(space_open, "F17: old_tip={old_tip}; new_head={new_head}; space_open={space_open}; checkout_exists={checkout_exists}; cleaned={}; phase={}; msg={}", c.b("cleaned"), c.at("closeout").s("phase"), c.s("msg"));
 }
+
+
+fn dirty_snapshot(n: i64, tracked: bool, after_exit: bool) {
+    let w = world();
+    on();
+    fixed(Ok(vec![]));
+    let t = merged_with(&w, n, SAFE, |t| pane(&w, t, |p| p["agent"]["status"] = json!("working")));
+    assert_eq!(closeouts(&w, &t), 0);
+    let wt = Path::new(t.s("worktree"));
+    let file = wt.join(if tracked { format!("c{n}.txt") } else { "draft.txt".into() });
+    std::fs::write(&file, "saved version\n").unwrap();
+    let before_status = git(wt, &["status", "--porcelain=v1", "-uall"]);
+    let before_head = git(wt, &["rev-parse", "HEAD"]);
+    pane(&w, &t, |p| p["agent"]["status"] = json!("idle"));
+    pass(&w, t.s("id"));
+    assert_eq!(closeouts(&w, &t), 1);
+    assert_eq!(task(t.s("id")).at("closeout").s("phase"), "checkpointing");
+    accepted_now(&t);
+    if after_exit {
+        pass(&w, t.s("id"));
+        assert_eq!(task(t.s("id")).at("closeout").s("phase"), "closing");
+    }
+    std::fs::write(&file, "NEW UNSAVED VERSION\n").unwrap();
+    let after_status = git(wt, &["status", "--porcelain=v1", "-uall"]);
+    assert_eq!(before_status, after_status, "porcelain records paths and flags, not file bytes");
+    assert_eq!(before_head, git(wt, &["rev-parse", "HEAD"]));
+    if after_exit { pane(&w, &t, |p| { p["agent"] = Value::Null; p["frontPid"] = Value::Null; }); }
+    pass(&w, t.s("id"));
+    let c = task(t.s("id"));
+    let space_open = open(&w, &t);
+    let exit_count = exits(&w, &t);
+    eprintln!("round13 tracked={tracked} after_exit={after_exit}: status_before={before_status:?}; status_after={after_status:?}; exit_count={exit_count}; space_open={space_open}; phase={}; file_preserved={}; msg={}", c.at("closeout").s("phase"), file.exists(), c.s("msg"));
+    set_fake(None);
+    if after_exit { assert!(space_open, "new artifact bytes after /exit must invalidate the old decision and keep the pane"); }
+    else { assert_eq!(exit_count, 0, "new artifact bytes before /exit must invalidate the old decision"); }
+}
+#[test]
+fn round13_tracked_dirty_bytes_after_exit_keep_space() { dirty_snapshot(90, true, true); }
+#[test]
+fn round13_untracked_dirty_bytes_after_exit_keep_space() { dirty_snapshot(91, false, true); }
+#[test]
+fn round13_tracked_dirty_bytes_before_exit_send_nothing() { dirty_snapshot(92, true, false); }
