@@ -37,7 +37,7 @@ pub fn conflict_back(id: &str, g: &mut Guard, tree: &str, r: &Synced, held: &mut
     let repairs = t.i("syncRepairs");
     let failure = conflict_failure(&t, tree, r);
     let can = !r.files.is_empty() && r.restored && flow::task::is_agent_task(&t);
-    let live = flow::live::assert_live(&t).is_ok() && flow::task::h(&t).agent_get(t.at("link").s("pane")).ok().flatten().is_some();
+    let live = !crate::land::park::parking(&t) && flow::live::assert_live(&t).is_ok() && flow::task::h(&t).agent_get(t.at("link").s("pane")).ok().flatten().is_some();
     if can && live && repairs < rounds {
         let saved = failure_patch(&failure);
         let mut patch = saved.clone();

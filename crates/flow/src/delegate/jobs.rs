@@ -253,8 +253,9 @@ pub fn reopen(id: &str, restart: bool) -> Res<(Value, bool, Task)> {
 /// Its exited agent started again in the same conversation, nothing sent to it: the task stands as it stood.
 fn start_quietly(id: &str, g: &mut Guard, t: &Task) -> bool {
     let (stage, armed) = (t.at("stage").clone(), t.at("armedAt").clone());
+    let was = crate::land::park::parked(t).then(|| t.at("closeout").at("was").clone()); // a parked one's line as before it
     let ok = start_agent(id, g, "", Some(t.s("session"))).is_ok();
-    let _ = update_wait(id, 10000, |c| { c.put("stage", stage.clone()); c.put("armedAt", armed.clone()); c.put("turnOpen", false); Ok(Change::Write) }); // nothing was asked of it
+    let _ = update_wait(id, 10000, |c| { c.put("stage", stage.clone()); c.put("armedAt", armed.clone()); c.put("turnOpen", false); if let Some(w) = was.as_ref().filter(|_| ok) { c.put("msg", w.clone()); } Ok(Change::Write) }); // nothing was asked of it
     ok
 }
 /// A reopen's start that waited for memory: once there is room, its agent as `reopen` would have started it.

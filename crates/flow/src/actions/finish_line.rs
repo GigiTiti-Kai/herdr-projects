@@ -32,7 +32,7 @@ pub fn approve(id: &str, seen: Option<(Value, Value)>, anyway: bool) -> Res<Said
         if let Some((pr, head)) = &seen { if t.s("stage") == "approval" && (pr != t.at("pr") || head != t.at("reviewedHead")) { crate::fail!("{} changed while you were asked. Nothing was merged: look at it again, then approve.", t.s("id")); } }
         Ok(())
     };
-    moved(&cur)?;
+    moved(&cur)?; crate::land::park::refuse_busy(&cur)?;
     if cur.s("stage") == "asks" && cur.s("kind") == "permission" { return tell(cur.s("id"), "Yes, go ahead.", false); }
     if approvable(&cur) { return approve_plan(cur.s("id")); }
     if cur.s("stage") == "pick" { crate::fail!("{0} waits for you to pick one of its attempts, not for a merge: herdr-projects pick {0} <letter>", cur.s("id")); }

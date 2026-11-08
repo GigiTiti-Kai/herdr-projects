@@ -231,21 +231,30 @@ pub fn changes_of(wt: &std::path::Path) -> Option<String> {
     Some(d.digest().to_string())
 }
 /// A done task's worker, before its space is closed.
+/// A task's worker as the task knows it, its work as it stands: the branch, the worktree's own HEAD (detached or not)
+/// and what is changed in it. None: its worktree cannot be read.
+pub fn who_of(t: &Task) -> Option<Who> {
+    let branch = if t.b("branch") { git_out(&folder_of(t.s("id")), &["rev-parse", "--verify", &format!("refs/heads/{}", t.s("branch"))]).unwrap_or_default() } else { String::new() };
+    let wt = std::path::Path::new(t.s("worktree"));
+    let (Ok(head), Some(changed)) = (git_out(wt, &["rev-parse", "HEAD"]), changes_of(wt)) else { return None };
+    Some(Who { work: format!("{head} {changed}"), api: h(t), pane: t.at("link").t("pane"), terminal: t.at("link").t("terminal"), session: t.t("session"), transcript: t.t("transcript"), agent: t.t("agent"), cwd: cwd_of(t), tip: branch, events: t.i("eventSeq"), wait_ms: wait_ms(Some(t)) })
+}
+/// `step`'s `save` for a task's own record (`closeout`): the line before the first hold (`was`) stays.
+pub fn save_to(id: &str, patch: Value, whole: bool) -> bool {
+    update_wait(id, 10000, |c| {
+        let was = c.at("closeout").at("was").clone();
+        let park = c.at("closeout").at("park").clone(); // a park's record stays one
+        if whole { c.put("closeout", patch.clone()); if was.is_string() { c.obj_mut("closeout").put("was", was.clone()); } if park == json!(true) { c.obj_mut("closeout").put("park", true); } } else { for (k, v) in patch.as_object().cloned().unwrap_or_default() { c.obj_mut("closeout").insert(k, v); } }
+        Ok(Change::Write)
+    }).is_ok()
+}
 pub fn gate(t: &Task) -> Gate {
     if !on(Some(t)) || !t.at("link").b("pane") { return Gate::Go; }
     let id = t.s("id");
-    // Its work as it stands: the branch, the worktree's own HEAD (detached or not) and what is changed in it.
-    let branch = if t.b("branch") { git_out(&folder_of(id), &["rev-parse", "--verify", &format!("refs/heads/{}", t.s("branch"))]).unwrap_or_default() } else { String::new() };
-    let wt = std::path::Path::new(t.s("worktree"));
-    let (Ok(head), Some(changed)) = (git_out(wt, &["rev-parse", "HEAD"]), changes_of(wt)) else { return held("its worktree cannot be read, so whether its work moved cannot be told; archive the task to close its space") };
-    let (tip, work) = (branch, format!("{head} {changed}"));
-    let w = Who { work, api: h(t), pane: t.at("link").t("pane"), terminal: t.at("link").t("terminal"), session: t.t("session"), transcript: t.t("transcript"), agent: t.t("agent"), cwd: cwd_of(t), tip, events: t.i("eventSeq"), wait_ms: wait_ms(Some(t)) };
-    let save = |patch: Value, whole: bool| update_wait(id, 10000, |c| {
-        let was = c.at("closeout").at("was").clone(); // the line before the first hold stays
-        if whole { c.put("closeout", patch.clone()); if was.is_string() { c.obj_mut("closeout").put("was", was.clone()); } } else { for (k, v) in patch.as_object().cloned().unwrap_or_default() { c.obj_mut("closeout").insert(k, v); } }
-        Ok(Change::Write)
-    }).is_ok();
-    let g = step(&w, t.at("closeout"), &save);
+    // A park that never got as far as its agent's exit proves nothing for this closeout: it starts anew (park.rs).
+    let t = &if super::park::unfinished(t) { super::park::drop_record(id); crate::store::tasks::get(id).unwrap_or_else(|| t.clone()) } else { t.clone() };
+    let Some(w) = who_of(t) else { return held("its worktree cannot be read, so whether its work moved cannot be told; archive the task to close its space") };
+    let g = step(&w, t.at("closeout"), &|p, whole| save_to(id, p, whole));
     // in its chat, as the board's own words
     if matches!(g, Gate::Wait(_)) && t.at("closeout").s("phase").is_empty() && crate::store::tasks::get(id).map(|c| c.at("closeout").s("phase") == "checkpointing").unwrap_or(false) { crate::store::said_by::note_board(id, &prompt(t.s("agent"))); }
     if let Gate::Held(why) = g { return Gate::Held(format!("{why}; archive the task to close its space")); }

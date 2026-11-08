@@ -71,6 +71,7 @@ pub fn send_own(id: &str, text: &str, reason: &str, keep_intent: bool, patch: Ob
     let mut wake = obj(json!({ "reason": reason, "keepIntent": keep_intent, "at": now() }));
     if tries > 0 { wake.put("tries", tries); }
     let wake = Value::Object(wake);
+    if let Some(t) = get(id) { crate::land::park::refuse_busy(&t)?; if crate::land::park::parked(&t) { crate::fail!("{id} is parked: its agent has exited, and nothing was sent to it."); } }
     let w2 = wake.clone();
     let t = update_wait(id, 10000, move |t| {
         for (k, v) in patch { t.insert(k, v); }

@@ -113,6 +113,7 @@ pub fn apply(id: &str, a: &Value, api: &Herdr) {
             if !(seq > t.i("stopSeq") && t.b("sawIdleAfterStop")) { return Ok(Change::Write); }
         }
         if ["todo", "progress", "done", "queued", "starting", "setup"].contains(&t.s("stage")) { return Ok(Change::Write); }
+        if crate::land::park::parking(t) { return Ok(Change::Write); } // a park's own turns, never yours (land/park.rs)
         if status == "working" {
             if t.b("selfBlocked") { return Ok(Change::Write); } // it reported itself blocked and has not stopped yet: still that same turn
             if t.b("expectedWake") { if t.s("stage") != "working" && !runner_alive(t) { t.put("stage", "working"); } return Ok(Change::Write); } // the plugin's own turn: flaps change nothing

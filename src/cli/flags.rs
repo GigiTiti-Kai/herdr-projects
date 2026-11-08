@@ -62,6 +62,7 @@ fn takes(cmd: &str, sub: &str) -> Option<Takes> {
         "delegate" => s(&["research", "chat", "after", "now"]),
         "after" => f(&["clear"]),
         "approve" => f(&["anyway"]),
+        "park" => f(&["forget"]),
         "set" | "unset" | "show" => f(WHERE),
         "models" => f(&[]),
         "automations" | "automation" => match sub { "add" | "new" => s(AUTO_ADD), "change" | "edit" => f(AUTO_CHANGE), _ => f(&[]) },

@@ -24,6 +24,7 @@ pub fn run_job(job: &str, id: &str, extra: &[String]) -> i32 {
         "compare" => crate::attempts::compare::compare_job(&id),
         "recover" => crate::finish::recover_job::recover_job(&id),
         "land" => crate::land::merge::land_job(&id),
+        "park" => crate::land::park::drive(&id),
         "cleanup" => crate::land::cleanup::cleanup_job(&id, if has("--merged") { "merged" } else { "always" }),
         "prpoll" => poll_prs(),
         // What ended tasks left behind (leftovers/sweep.rs).
