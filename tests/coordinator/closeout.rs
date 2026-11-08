@@ -26,7 +26,7 @@ fn a_stop_waits_for_the_closeout_each_step_proved_and_what_cannot_be_proved_leav
     w.script(json!({ "coordinator": [{ "said": "Hello." }, { "said": "Saved.\nsafe to Exit" }] }));
     send(&w.root, "first", false, "", &w.socket).unwrap(); drain();
     assert_eq!(agents(&w), 1);
-    pane(&w, |p| { p["frontPid"] = json!(5150); p["agent"]["screen"] = json!("❯ "); p["agent"]["session"] = json!(session_of(&w)); });
+    pane(&w, |p| { p["frontPid"] = json!(5150); p["agent"]["screen"] = json!("╭──\n│ ❯ │\n╰──"); p["agent"]["session"] = json!(session_of(&w)); });
     queue(Ok(vec![]));
     stop(&w.socket).unwrap(); drain();
     // sent once; not stopped while its record is not accepted
@@ -50,7 +50,7 @@ fn a_stop_waits_for_the_closeout_each_step_proved_and_what_cannot_be_proved_leav
     w.script(json!({ "coordinator": [{ "said": "Back." }, { "said": "Saved.\nsafe to Exit" }] }));
     sw::clock::advance(5); send(&w.root, "again", false, "", &w.socket).unwrap(); drain();
     assert_eq!(agents(&w), 1);
-    pane(&w, |p| { p["frontPid"] = json!(5152); p["agent"]["screen"] = json!("❯ "); p["agent"]["session"] = json!(session_of(&w)); });
+    pane(&w, |p| { p["frontPid"] = json!(5152); p["agent"]["screen"] = json!("╭──\n│ ❯ │\n╰──"); p["agent"]["session"] = json!(session_of(&w)); });
     queue(Err("no Agent Memory queue".into()));
     fresh(None, &w.socket).unwrap(); drain();
     assert_eq!(get(&w).at("closeout").s("phase"), "checkpointing");
@@ -69,7 +69,7 @@ fn a_reply_to_other_words_before_the_first_look_is_not_the_closeout_s_and_the_st
     sw::clock::set(Some(sw::clock::now()));
     w.script(json!({ "coordinator": [{ "said": "Hello." }, { "said": "Saved.\nsafe to Exit" }, { "said": "Done that too. safe to Exit" }] }));
     send(&w.root, "first", false, "", &w.socket).unwrap(); drain();
-    pane(&w, |p| { p["frontPid"] = json!(5151); p["agent"]["screen"] = json!("❯ "); p["agent"]["session"] = json!(session_of(&w)); });
+    pane(&w, |p| { p["frontPid"] = json!(5151); p["agent"]["screen"] = json!("╭──\n│ ❯ │\n╰──"); p["agent"]["session"] = json!(session_of(&w)); });
     queue(Ok(vec![]));
     stop(&w.socket).unwrap(); drain();
     assert_eq!(get(&w).at("closeout").s("phase"), "checkpointing");

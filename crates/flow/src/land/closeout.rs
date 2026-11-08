@@ -129,46 +129,48 @@ fn still_saved(w: &Who, rec: &Value, wait: &dyn Fn(&str) -> Gate) -> Option<Gate
     if turn.id != rec.s("turn") && !(is_exit(&turn.asked) && turn.began >= rec.i("exitAt")) { return Some(held("new input reached its agent after /exit was typed")); }
     accepted_job(w, rec).err().map(|why| wait(&why))
 }
-/// The prompt that began a turn is `/exit` itself (as typed, or as Claude Code keeps a command it ran), not words
-/// that only name it.
-fn is_exit(asked: &str) -> bool { let a = asked.trim(); a == EXIT || a.starts_with("<command-name>/exit</command-name>") }
-/// The last look right before anything is typed, on the same answer of herdr's the text then goes in on: the same
+/// The prompt that began a turn is `/exit` itself: as typed, or as Claude Code keeps a command it ran (its name, its
+/// message and its arguments, all empty but `/exit`), and nothing else besides.
+fn is_exit(asked: &str) -> bool {
+    let rest = ["<command-name>/exit</command-name>", "<command-message>exit</command-message>", "<command-args></command-args>"].iter().fold(asked.to_string(), |a, tag| a.replacen(tag, "", 1));
+    asked.trim() == EXIT || (asked.trim_start().starts_with("<command-name>/exit</command-name>") && rest.trim().is_empty())
+}
+/// The last look right before anything is typed: its screen first, then herdr's answer the text goes in on: the same
 /// session and terminal, at rest, nothing waiting unsent in its input box. Err: why nothing was typed.
 fn type_in(w: &Who, term: &str, pane: &str, text: &str) -> Result<(), String> {
+    let screen = read_screen(&w.api, pane, Some("idle"), 40);
     let a = match w.api.agent_get(pane) { Ok(Some(a)) => a, Ok(None) => return Err("its agent left its pane".into()), Err(e) => return Err(format!("herdr did not answer ({})", e.code)) };
     if a.at("agent_session").t("value") != w.session || a.t("terminal_id") != term || term.is_empty() { return Err("another session or terminal came into its pane right before".into()); }
     if !["idle", "done"].contains(&a.s("agent_status")) { return Err(format!("its agent is {} right before", a.s("agent_status"))); }
-    match draft(&read_screen(&w.api, pane, Some(a.s("agent_status")), 40)) { Some(d) if d.is_empty() => {} Some(_) => return Err("words wait unsent in its input box".into()), None => return Err("its input box cannot be read".into()) }
+    match draft(&screen) { Some(d) if d.is_empty() => {} Some(_) => return Err("words wait unsent in its input box".into()), None => return Err("its input box cannot be read".into()) }
     match w.api.agent_prompt(pane, text) { Ok(_) => Ok(()), Err(e) if ["agent_prompt_stalled", "timeout"].contains(&e.code.as_str()) => Ok(()), Err(e) => Err(e.message) } // these do not prove nothing went in: never typed twice
 }
-/// Its reply says it may exit: it names the decision once, as its own last line, plain (not quoted, not in a list),
-/// and nothing in it takes that back (`unsafe`, `not safe`, an Exit blocked, a retraction).
+/// Its reply says it may exit: its own last line is `safe to Exit`, as is, at the line's start (not indented, quoted or
+/// in a list: an example is no decision), said once, and nothing in it takes that back (`unsafe`, `not safe`, an Exit
+/// blocked, a retraction).
 pub fn safe(said: &str) -> bool {
     let low = said.to_lowercase();
-    let last = said.lines().rev().map(str::trim).find(|l| !l.is_empty()).unwrap_or("");
+    let last = said.lines().rev().map(str::trim_end).find(|l| !l.trim().is_empty()).unwrap_or("");
     let last = last.strip_prefix('`').and_then(|l| l.strip_suffix('`')).unwrap_or(last).trim_end_matches(['.', '。']);
     last == SAFE && said.matches(SAFE).count() == 1 && !["unsafe to exit", "not safe to exit", "never safe to exit", "exit blocked", "exit is blocked", "撤回", "do not exit", "don't exit"].iter().any(|n| low.contains(n))
 }
-/// What waits in an agent's input box, read from its screen: the text after the last prompt mark (`❯`, `>`, `›`) at a
-/// line's start, inside its frame, and on every line below it down to the frame's end or a rule (`╰`, `└`, `─`).
-/// Below an unframed box (Codex), a line is its footer only as the program writes it (`a · b`, `? for shortcuts`):
-/// any other words count as yours. Some(""): empty, or the program's own placeholder. None: no input box seen.
-/// shortcut: only Codex's usual placeholder is known as one; another placeholder holds the closeout (it waits for you).
+/// Whether an agent's input box is empty, read from its screen, told only from the shapes an empty one has: a framed
+/// box (a rule or a frame above and below) holding one prompt mark (`❯`, `>`, `›`) and nothing else, or Codex's
+/// unframed box showing its placeholder (shown only while nothing is typed). Some(""): empty. Some(words): words seen
+/// in it. None: no input box of a known empty shape, which is never taken for an empty one.
+/// shortcut: only Codex's usual placeholder is known; another one holds the closeout (it waits for you).
 pub fn draft(screen: &str) -> Option<String> {
-    let lines: Vec<&str> = screen.lines().collect();
-    let strip = |l: &str| l.trim().trim_start_matches('│').trim_end_matches('│').trim().to_string();
-    let at = lines.iter().rposition(|l| ["❯", ">", "›"].iter().any(|m| strip(l).starts_with(m)))?;
-    let first = strip(lines[at]).trim_start_matches(['❯', '>', '›']).trim().to_string();
-    let mut words = vec![if ["Ask Codex to do anything"].contains(&first.as_str()) { String::new() } else { first }];
-    for l in &lines[at + 1..] {
-        let t = l.trim();
-        if t.starts_with(['╰', '└', '─', '━']) { break; }
-        let framed = t.starts_with('│');
-        let x = strip(l);
-        if !framed && (x.contains(" · ") || x.contains("? for shortcuts")) { continue; }
-        words.push(x);
-    }
-    Some(words.into_iter().filter(|w| !w.is_empty()).collect::<Vec<_>>().join("\n"))
+    let lines: Vec<&str> = screen.lines().map(str::trim).filter(|l| !l.is_empty()).collect();
+    let inner = |l: &str| l.trim_start_matches('│').trim_end_matches('│').trim().to_string();
+    let rule = |l: &str| l.starts_with(['╭', '┌', '╰', '└', '─', '━']);
+    let mark = |l: &str| ["❯", ">", "›"].iter().any(|m| inner(l).starts_with(m));
+    let after = |l: &str| inner(l).trim_start_matches(['❯', '>', '›']).trim().to_string();
+    let at = lines.iter().rposition(|l| mark(l))?;
+    let empty_framed = at > 0 && rule(lines[at - 1]) && lines.get(at + 1).is_some_and(|l| rule(l)) && after(lines[at]).is_empty();
+    if empty_framed || after(lines[at]) == "Ask Codex to do anything" { return Some(String::new()); }
+    // Not an empty shape: what it holds, from its mark down to its frame's end (or all below, unframed).
+    let words: Vec<String> = std::iter::once(after(lines[at])).chain(lines[at + 1..].iter().take_while(|l| !rule(l)).map(|l| inner(l))).filter(|x| !x.is_empty()).collect();
+    Some(if words.is_empty() { "(an input box of a shape not known to be empty)".into() } else { words.join("\n") })
 }
 /// Has the pane gone: herdr says there is no such pane. Some(false): it is there; None: herdr did not say.
 pub fn pane_gone(api: &Herdr, pane: &str) -> Option<bool> {

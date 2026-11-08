@@ -22,7 +22,7 @@ Each step is proved apart, on its own pass, and nothing is ever typed twice:
    on. It is looked up again on every pass until the space is closed: a job given up on since proves nothing.
 2. **Exit, decided now.** The agent's own last reply, read from its saved conversation, is its reply to the closeout
    (the turn the closeout's own words began, after it was sent, the same reply at every look) and ends with a plain line
-   `safe to Exit` of its own, said once (a decision taken back, quoted, `unsafe`, `not safe` or an Exit blocked is none). Right before, the agent is at
+   `safe to Exit` of its own, at the line's start (not indented), said once (a decision taken back, quoted, `unsafe`, `not safe` or an Exit blocked is none). Right before, the agent is at
    rest, nothing runs under it, and the session and branch tip are the ones it was sent for. Its processes are noted,
    and `/exit` is typed, once.
 3. **The agent gone.** Herdr sees no agent in the pane any more, the processes that were the agent have ended, and
@@ -43,9 +43,9 @@ starting with `closeout 未確認`:
   moved;
 - its reply gives no Exit decision (a last line `safe to Exit`), such as an Exit blocked or taken back;
 - another terminal or another session than its agent's in the pane, as Herdr shows it (or Herdr not saying which);
-- words waiting unsent in its input box, on any of its lines, or an input box that cannot be read (nothing is typed
-  with them). Every text goes in only on the last look right before it, at the same session and terminal;
-- new input after `/exit` went in (words that only name `/exit` included), another terminal in its pane by then, or
+- an input box not of a shape known to be empty: a frame or rule above and below one bare prompt mark, or Codex's
+  placeholder (shown only while nothing is typed). Words in it, or a shape not known, type nothing. Every text goes in only on the last look right before it, at the same session and terminal;
+- new input after `/exit` went in (words that only name `/exit`, or follow its tag, included), another terminal in its pane by then, or
   its save no longer accepted then;
 - no accepted job within `workspace.closeoutWait` (10 minutes), or a queue that cannot be read;
 - its turn still under way, herdr not answering, its saved conversation not readable, or the agent still there after

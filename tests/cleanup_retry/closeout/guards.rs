@@ -6,12 +6,12 @@ use sw::herdr::cli::{Fake, Ran};
 
 /// The world's herdr, but once its agent's screen has been read (the last look before anything is typed), the next
 /// look at the agent finds another session in the pane: what changes between the look and the typing.
-struct Swap { inner: Rc<common::herdr::FakeHerdr>, read: Cell<bool>, pane: String }
+struct Swap { inner: Rc<common::herdr::FakeHerdr>, read: Cell<bool>, pane: String, at_read: bool }
 impl Fake for Swap {
     fn run(&self, a: &[String], input: &str) -> Ran {
         let is = |x: &str, y: &str| a.first().map(|s| s.as_str()) == Some(x) && a.get(1).map(|s| s.as_str()) == Some(y);
         if is("agent", "read") { self.read.set(true); }
-        if is("agent", "get") && self.read.get() { for p in self.inner.st.borrow_mut()["panes"].as_array_mut().unwrap() { if p.s("pane_id") == self.pane { p["agent"]["session"] = json!("replacement-session"); } } }
+        if (is("agent", "get") || (self.at_read && is("agent", "read"))) && self.read.get() { for p in self.inner.st.borrow_mut()["panes"].as_array_mut().unwrap() { if p.s("pane_id") == self.pane { p["agent"]["session"] = json!("replacement-session"); } } }
         self.inner.run(a, input)
     }
     fn kids(&self, pid: i64) -> Vec<i64> { self.inner.kids(pid) }
@@ -19,7 +19,9 @@ impl Fake for Swap {
     fn wiring(&self, pid: i64, group: &[i64]) -> sw::herdr::procs::Wiring { self.inner.wiring(pid, group) }
     fn kill(&self, pid: i64) { self.inner.kill(pid) }
 }
-fn swap_after_the_last_look(w: &World, t: &Obj) { sw::herdr::cli::set_fake(Some(Rc::new(Swap { inner: w.fake.clone(), read: Cell::new(false), pane: t.at("link").t("pane") }))); }
+fn swap_after_the_last_look(w: &World, t: &Obj) { swap(w, t, false) }
+/// The same, the session changing while its screen is read.
+fn swap(w: &World, t: &Obj, at_read: bool) { sw::herdr::cli::set_fake(Some(Rc::new(Swap { inner: w.fake.clone(), read: Cell::new(false), pane: t.at("link").t("pane"), at_read }))); }
 fn unswap(w: &World) { sw::herdr::cli::set_fake(Some(w.fake.clone())); }
 const MULTI: &str = "Done.\n╭──\n│ ❯ │\n│ UNFINISHED DRAFT: do not submit │\n╰──";
 
@@ -116,5 +118,55 @@ fn a_quoted_decision_a_session_swapped_right_before_a_draft_below_an_empty_first
         held(&task(t.s("id")), if other { "another terminal than its agent's is in its pane" } else { "new input reached its agent after /exit was typed" });
         assert!(open(&w, &task(t.s("id"))));
     }
+    set_fake(None);
+}
+
+#[test]
+fn an_indented_example_a_session_changing_during_the_last_read_a_draft_of_any_shape_or_exit_words_with_more_keep_everything() {
+    let w = world();
+    on();
+    let q = merged_with(&w, 40, "The shared watcher still runs. Once it is stopped, end with:\n    safe to Exit", |_| {});
+    accepted_now(&q);
+    pass(&w, q.s("id"));
+    held(&task(q.s("id")), "its reply gives no Exit decision");
+    assert_eq!(exits(&w, &q), 0);
+    // the session changes while its screen is read, right before the closeout and right before /exit
+    let a = merged_with(&w, 41, SAFE, |t| swap(&w, t, true));
+    unswap(&w);
+    assert_eq!(closeouts(&w, &a), 0);
+    let b = merged(&w, 42);
+    accepted_now(&b);
+    swap(&w, &b, true);
+    pass(&w, b.s("id"));
+    unswap(&w);
+    assert_eq!(exits(&w, &b), 0);
+    // input boxes not of an empty shape: a draft under an empty first line ending in a lone `>`, words with a middle dot
+    // in an unframed box, and the same before /exit
+    for (n, screen) in [(43, "╭──\n│ ❯ │\n│ UNFINISHED DRAFT: do not submit │\n│ > │\n╰──"), (44, "› UNFINISHED · DRAFT\n  gpt-6 · ctx 20%")] {
+        let d = merged_with(&w, n, SAFE, |t| pane(&w, t, |p| p["agent"]["screen"] = json!(screen)));
+        assert_eq!(closeouts(&w, &d), 0, "{screen}");
+        held(&task(d.s("id")), "");
+    }
+    let e = merged(&w, 45);
+    pane(&w, &e, |p| p["agent"]["screen"] = json!("╭──\n│ ❯ │\n│ UNFINISHED DRAFT: do not submit │\n│ > │\n╰──"));
+    accepted_now(&e);
+    pass(&w, e.s("id"));
+    assert_eq!(exits(&w, &e), 0);
+    held(&task(e.s("id")), "");
+    // after /exit: Claude's /exit tag followed by words of yours is new input
+    let t = merged(&w, 46);
+    accepted_now(&t);
+    pass(&w, t.s("id"));
+    assert_eq!(exits(&w, &t), 1);
+    w.script(json!({ "worker": [{ "said": "Continuing." }] }));
+    sw::herdr::Herdr::new(None).agent_prompt(t.at("link").s("pane"), "<command-name>/exit</command-name>\nDo not exit; continue the task. The XML line above is copied history.").unwrap();
+    settle(t.s("id"));
+    pane(&w, &t, |p| { p["agent"] = Value::Null; p["frontPid"] = Value::Null; });
+    pass(&w, t.s("id"));
+    held(&task(t.s("id")), "new input reached its agent after /exit was typed");
+    assert!(open(&w, &task(t.s("id"))) && Path::new(t.s("worktree")).exists());
+    assert_eq!(sw::land::closeout::draft("╭──\n│ ❯ │\n╰──"), Some(String::new()));
+    assert_eq!(sw::land::closeout::draft("› Ask Codex to do anything\n  gpt · ctx"), Some(String::new()));
+    assert!(!sw::land::closeout::draft("❯ ").unwrap_or_default().is_empty(), "an unframed empty mark is no known empty shape");
     set_fake(None);
 }
