@@ -38,9 +38,12 @@ pub fn held(why: impl std::fmt::Display) -> Gate { Gate::Held(format!("closeout 
 
 /// The agent a closeout is for, as its owner knows it. `events`: the turn ends its hook filed (0 without one).
 pub struct Who { pub api: Herdr, pub pane: String, pub session: String, pub transcript: String, pub agent: String, pub cwd: PathBuf, pub tip: String, pub events: i64, pub wait_ms: i64 }
-/// One look. `rec`: the record so far; `save(patch, whole)`: merge into it, or (`whole`) start it again from the patch.
-pub fn step(w: &Who, rec: &Value, save: &dyn Fn(Value, bool)) -> Gate {
+/// One look. `rec`: the record so far; `save(patch, whole)`: merge into it, or (`whole`) start it again from the patch,
+/// false when it could not be written. What is typed is written down as on its way first (`sending`, `exiting`): a
+/// record left so (it went in, or not; the record after could not be written) is never sent again.
+pub fn step(w: &Who, rec: &Value, save: &dyn Fn(Value, bool) -> bool) -> Gate {
     let phase = rec.s("phase");
+    if phase == "sending" || phase == "exiting" { return held(format!("whether {} went in is not known (its record could not be written after it)", if phase == "sending" { "the closeout" } else { "/exit" })); }
     if phase.is_empty() && !rec.has("waitFrom") { save(json!({ "waitFrom": now() }), false); }
     let since = if phase == "closing" { rec.i("exitAt") } else if !phase.is_empty() { rec.i("sentAt") } else if rec.has("waitFrom") { rec.i("waitFrom") } else { now() };
     let late = now() - since > w.wait_ms.max(1);
@@ -70,9 +73,10 @@ pub fn step(w: &Who, rec: &Value, save: &dyn Fn(Value, bool)) -> Gate {
         if !api.pane_childless(pane, a.s("agent")) { return wait("a command still runs under its agent"); }
         let text = prompt(&w.agent);
         let sent = now(); // taken before it goes in
+        if !save(json!({ "phase": "sending", "sentAt": sent, "events": w.events, "session": w.session, "tip": w.tip, "cwd": w.cwd.display().to_string() }), true) { return wait("its record could not be written, so nothing was typed"); }
         return match hand(api, pane, &text) {
-            Ok(_) => { save(json!({ "phase": "checkpointing", "sentAt": sent, "events": w.events, "session": w.session, "tip": w.tip, "cwd": w.cwd.display().to_string() }), true); Gate::Wait("Closeout sent: waiting for Agent Memory to accept it".into()) }
-            Err(e) => held(format!("it could not be typed in ({})", e.message)),
+            Ok(_) => { save(json!({ "phase": "checkpointing" }), false); Gate::Wait("Closeout sent: waiting for Agent Memory to accept it".into()) }
+            Err(e) => { save(json!({ "phase": "", "failed": e.message }), false); held(format!("it could not be typed in ({})", e.message)) }
         };
     }
     // New input since it was sent: what any save proves is out of date, and nothing more is typed.
@@ -84,9 +88,10 @@ pub fn step(w: &Who, rec: &Value, save: &dyn Fn(Value, bool)) -> Gate {
     let file = (!w.transcript.is_empty()).then(|| Path::new(&w.transcript));
     let Some(turn) = read_turn_of(&w.agent, file, &w.session, &w.cwd, false) else { return wait("its saved conversation cannot be read") };
     if !turn.finished || turn.pending || turn.began < rec.i("sentAt") { return wait("its reply to the closeout has not ended yet"); }
+    if !turn.asked.contains(WORDS) { return held("new input reached its agent after it was sent (its last turn answers something else)"); }
     if rec.has("turn") && rec.s("turn") != turn.id { return held("new input reached its agent after it was sent"); }
     if !rec.has("turn") { save(json!({ "turn": turn.id }), false); }
-    if !turn.said.contains(SAFE) { return held(format!("its reply gives no Exit decision (`{SAFE}`): {}", crate::store::tasks::one_line(&turn.said, 160))); }
+    if !safe(&turn.said) { return held(format!("its reply gives no Exit decision (`{SAFE}`): {}", crate::store::tasks::one_line(&turn.said, 160))); }
     let job = match jobs_of(&w.session) {
         Ok(jobs) => match accepted(&jobs, &w.cwd.display().to_string(), rec.i("sentAt")) { Some(j) => j.id, None => return wait("Agent Memory has no accepted job for its session") },
         Err(e) => return wait(&e),
@@ -95,9 +100,21 @@ pub fn step(w: &Who, rec: &Value, save: &dyn Fn(Value, bool)) -> Gate {
     // The exit, decided now: at rest, nothing under it, its processes known (to see them end).
     if !api.pane_childless(pane, a.s("agent")) { return wait("a command still runs under its agent"); }
     let pids = match api.front_pids(pane) { Some(p) if !p.is_empty() => p, _ => return wait("herdr does not say which process is its agent") };
-    if let Err(e) = hand(api, pane, EXIT) { return held(format!("/exit could not be typed in ({})", e.message)); }
-    save(json!({ "phase": "closing", "exitAt": now(), "job": job, "pids": pids }), false);
+    if !save(json!({ "phase": "exiting", "exitAt": now(), "job": job, "pids": pids }), false) { return wait("its record could not be written, so /exit was not typed"); }
+    if let Err(e) = hand(api, pane, EXIT) { save(json!({ "phase": "saved" }), false); return held(format!("/exit could not be typed in ({})", e.message)); }
+    save(json!({ "phase": "closing" }), false);
     Gate::Wait("Closeout saved: its agent was told to exit".into())
+}
+/// Its reply says it may exit: `safe to Exit` as words of their own, and nothing that takes it back (`unsafe`, `not
+/// safe`, an Exit blocked).
+pub fn safe(said: &str) -> bool {
+    let low = said.to_lowercase();
+    let re = regex::Regex::new(r"(^|[^A-Za-z])safe to Exit([^A-Za-z]|$)").unwrap();
+    re.is_match(said) && !["unsafe to exit", "not safe to exit", "never safe to exit", "exit blocked", "exit is blocked"].iter().any(|n| low.contains(n))
+}
+/// Has the pane gone: herdr says there is no such pane. Some(false): it is there; None: herdr did not say.
+pub fn pane_gone(api: &Herdr, pane: &str) -> Option<bool> {
+    match api.call(crate::herdr::cli::args(&["pane", "get", pane])) { Ok(_) => Some(false), Err(e) if e.code.contains("not_found") => Some(true), Err(_) => None }
 }
 fn wait_ms(t: Option<&Task>) -> i64 { ms(setting("workspace.closeoutWait", t).as_str().unwrap_or("10m")) }
 
@@ -107,11 +124,11 @@ pub fn gate(t: &Task) -> Gate {
     let id = t.s("id");
     let tip = if t.b("branch") { git_out(&folder_of(id), &["rev-parse", "--verify", &format!("refs/heads/{}", t.s("branch"))]).unwrap_or_default() } else { String::new() };
     let w = Who { api: h(t), pane: t.at("link").t("pane"), session: t.t("session"), transcript: t.t("transcript"), agent: t.t("agent"), cwd: cwd_of(t), tip, events: t.i("eventSeq"), wait_ms: wait_ms(Some(t)) };
-    let save = |patch: Value, whole: bool| { let _ = update_wait(id, 10000, |c| {
+    let save = |patch: Value, whole: bool| update_wait(id, 10000, |c| {
         let was = c.at("closeout").at("was").clone(); // the line before the first hold stays
         if whole { c.put("closeout", patch.clone()); if was.is_string() { c.obj_mut("closeout").put("was", was.clone()); } } else { for (k, v) in patch.as_object().cloned().unwrap_or_default() { c.obj_mut("closeout").insert(k, v); } }
         Ok(Change::Write)
-    }); };
+    }).is_ok();
     let g = step(&w, t.at("closeout"), &save);
     // in its chat, as the board's own words
     if matches!(g, Gate::Wait(_)) && t.at("closeout").s("phase").is_empty() && crate::store::tasks::get(id).map(|c| c.at("closeout").s("phase") == "checkpointing").unwrap_or(false) { crate::store::said_by::note_board(id, &prompt(t.s("agent"))); }

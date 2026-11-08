@@ -21,14 +21,18 @@ Each step is proved apart, on its own pass, and nothing is ever typed twice:
    job accepted since the closeout was sent, for that agent's session, filed from the task's worktree, and not given up
    on. It is looked up again on every pass until the space is closed: a job given up on since proves nothing.
 2. **Exit, decided now.** The agent's own last reply, read from its saved conversation, is its reply to the closeout
-   (begun after it was sent, the same reply at every look) and says `safe to Exit`. Right before, the agent is at
+   (the turn the closeout's own words began, after it was sent, the same reply at every look) and says `safe to Exit`
+   (not `unsafe to Exit`, `not safe to Exit` or an Exit blocked). Right before, the agent is at
    rest, nothing runs under it, and the session and branch tip are the ones it was sent for. Its processes are noted,
    and `/exit` is typed, once.
 3. **The agent gone.** Herdr sees no agent in the pane any more, the processes that were the agent have ended, and
    nothing runs at its shell.
-4. **The space closed.** The clean-up as ever ([when a task is done](how-work-gets-done.md#when-a-task-is-done)).
+4. **The space closed.** The clean-up as ever ([when a task is done](how-work-gets-done.md#when-a-task-is-done)),
+   and `pane_closed` only once Herdr says there is no such pane any more (for a coordinator: else it says so).
 
-What it keeps on the task (`closeout`): `phase` (`checkpointing`, `saved`, `closing`, `agent_exited`, `pane_closed`),
+What it keeps on the task (`closeout`): `phase` (`sending`, `checkpointing`, `saved`, `exiting`, `closing`,
+`agent_exited`, `pane_closed`; what is typed is written down as on its way first, so a record that could not be
+written after it is never sent again: it is held),
 when it was sent and when `/exit` was, the session, the branch tip and the job. Until it is through, the task's line says
 what it waits for, and the clean-up is tried again by itself.
 

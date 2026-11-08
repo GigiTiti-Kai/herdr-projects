@@ -155,9 +155,11 @@ fn run_pump(co: &Co, taken: &mut HashSet<String>) -> Res<()> {
             taken.insert(w.t("at"));
             // Its conversation is known before its terminal goes: a restart reopens it.
             if w.s("what") != "open" { if c.b("run") { active(co, &c); c = get(co).unwrap_or(c); } close_place(&api, &c); }
+            let pane_left = c.b("pane") && super::closeout::pane_gone(&api, c.s("pane")) == Some(true);
             let _ = change(co, |c| {
                 if c.at("want").at("at") == w.at("at") { c.put("want", Value::Null); }
-                c.remove("closeout"); // through, or none: the next stop starts its own
+                // through, or none: the next stop starts its own; a pane herdr does not say is gone keeps the record, and says so
+                if c.at("closeout").s("phase") == "agent_exited" && !pane_left { c.put("error", "closeout: its pane was not confirmed closed"); } else { c.remove("closeout"); }
                 if w.s("what") == "open" { return true; }
                 nowhere(c);
                 if w.s("what") == "new" { for (k, v) in obj(json!({ "run": null, "pick": w.at("pick"), "session": null, "transcript": null, "seen": null, "intro": false, "last": "", "where": [], "mark": null })) { c.insert(k, v); } }

@@ -128,7 +128,7 @@ fn new_input_another_session_no_exit_decision_or_an_agent_gone_hold_it_and_type_
     update(y.s("id"), |t| { t.obj_mut("closeout").remove("turn"); Ok(Change::Write) }).unwrap(); // as if the board had not looked yet
     accepted_now(&y);
     assert_eq!(pass(&w, y.s("id")), 1);
-    held(&task(y.s("id")), "its reply gives no Exit decision");
+    held(&task(y.s("id")), "new input reached its agent after it was sent (its last turn answers something else)");
     assert_eq!((closeouts(&w, &y), exits(&w, &y)), (1, 0));
     assert_eq!(pass(&w, y.s("id")), 0, "held: not tried again by itself");
     // and one after the board's first look: another reply than the one it saw
@@ -147,6 +147,14 @@ fn new_input_another_session_no_exit_decision_or_an_agent_gone_hold_it_and_type_
     accepted_now(&b);
     pass(&w, b.s("id")); // held at its first look already
     held(&task(b.s("id")), "its reply gives no Exit decision");
+    // "unsafe to Exit" is no Exit decision, nor is "not safe to Exit"
+    for (n, reply) in [(14, "Saved, but unsafe to Exit: a watcher runs."), (15, "It is not safe to Exit yet.")] {
+        let u = merged_with(&w, n, reply, |_| {});
+        accepted_now(&u);
+        pass(&w, u.s("id"));
+        held(&task(u.s("id")), "its reply gives no Exit decision");
+        assert_eq!(exits(&w, &u), 0);
+    }
     // the session changed since it was sent
     let n = merged(&w, 6);
     update(n.s("id"), |t| { t.put("session", "s-other"); Ok(Change::Write) }).unwrap();
@@ -203,5 +211,26 @@ fn a_dialog_a_turn_that_never_ends_or_herdr_not_answering_never_close_anything_b
         held(&task(e.s("id")), "herdr did not answer");
         assert_eq!(closeouts(&w, &e), usize::from(sent));
     }
+    set_fake(None);
+}
+
+#[test]
+fn what_is_typed_is_written_down_first_and_a_record_that_cannot_be_written_types_nothing_or_nothing_again() {
+    let w = world();
+    on();
+    fixed(Ok(vec![]));
+    let t = merged_with(&w, 16, SAFE, |t| pane(&w, t, |p| p["agent"]["status"] = json!("working"))); // nothing sent yet
+    let c = task(t.s("id"));
+    let who = || sw::land::closeout::Who { api: sw::herdr::Herdr::new(None), pane: c.at("link").t("pane"), session: c.t("session"), transcript: String::new(), agent: c.t("agent"), cwd: c.s("worktree").into(), tip: String::new(), events: 0, wait_ms: 600000 };
+    pane(&w, &t, |p| p["agent"]["status"] = json!("idle"));
+    let g = sw::land::closeout::step(&who(), &json!({ "waitFrom": sw::clock::now() }), &|_, _| false);
+    assert!(matches!(&g, sw::land::closeout::Gate::Wait(m) if m.contains("could not be written")), "{g:?}");
+    assert_eq!(closeouts(&w, &t), 0, "not typed while its record cannot be written");
+    for phase in ["sending", "exiting"] {
+        let g = sw::land::closeout::step(&who(), &json!({ "phase": phase, "sentAt": 1 }), &|_, _| true);
+        assert!(matches!(&g, sw::land::closeout::Gate::Held(m) if m.contains("is not known")), "{g:?}");
+    }
+    assert_eq!((closeouts(&w, &t), exits(&w, &t)), (0, 0), "never sent again on a guess");
+    assert!(sw::land::closeout::safe("Saved. safe to Exit") && !sw::land::closeout::safe("unsafe to Exit") && !sw::land::closeout::safe("safe to Exiting"));
     set_fake(None);
 }

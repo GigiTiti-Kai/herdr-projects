@@ -59,3 +59,24 @@ fn a_stop_waits_for_the_closeout_each_step_proved_and_what_cannot_be_proved_leav
     assert_eq!(typed(&w).iter().filter(|p| p.as_str() == "/exit").count(), 0);
     set_fake(None);
 }
+
+#[test]
+fn a_reply_to_other_words_before_the_first_look_is_not_the_closeout_s_and_the_stop_is_held() {
+    let w = coord_world();
+    sw::store::settings::change::set_value("workspace.closeout", &json!(true), &sw::store::settings::lookup::Scope::you()).unwrap();
+    sw::clock::set(Some(sw::clock::now()));
+    w.script(json!({ "coordinator": [{ "said": "Hello." }, { "said": "Saved. safe to Exit" }, { "said": "Done that too. safe to Exit" }] }));
+    send(&w.root, "first", false, "", &w.socket).unwrap(); drain();
+    pane(&w, |p| p["frontPid"] = json!(5151));
+    queue(Ok(vec![]));
+    stop(&w.socket).unwrap(); drain();
+    assert_eq!(get(&w).at("closeout").s("phase"), "checkpointing");
+    sw::herdr::Herdr::new(None).agent_prompt(get(&w).s("pane"), "something else").unwrap(); // typed in its tab before the board looked
+    let cwd = get(&w).at("closeout").t("cwd");
+    queue(Ok(vec![Job { id: "c1".into(), status: "queued".into(), accepted: sw::clock::now() + 1, cwd }]));
+    pump(&w.socket); drain();
+    assert!(get(&w).s("error").contains("its last turn answers something else"), "{}", get(&w).s("error"));
+    assert_eq!(agents(&w), 1); assert!(!get(&w).b("want"));
+    assert_eq!(typed(&w).iter().filter(|p| p.as_str() == "/exit").count(), 0);
+    set_fake(None);
+}

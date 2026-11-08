@@ -204,6 +204,8 @@ pub fn tidy(id: &str, delete_branch: &str) {
     let kept = cleanup_with(&t, Opts { delete_branch, keep_unmerged: delete_branch != "always", still: Some(&still), since: prev.clone(), first });
     // Its temporary files go once its agent has (a kept worktree stays): docs/disk-space.md.
     let freed = if kept.retry { 0 } else { crate::leftovers::sweep::free_ended(&t) };
+    // After a closeout, its pane counts as closed once herdr says there is no such pane (closeout.rs).
+    let gone = (t.at("closeout").s("phase") == "agent_exited" && !kept.retry && kept.kept.is_empty()).then(|| if super::closeout::pane_gone(&flow::task::h(&t), t.at("link").s("pane")) == Some(true) { "pane_closed".to_string() } else { "agent_exited".to_string() });
     let mut left = false;
     let _ = update_wait(id, 10000, |t| {
         if !same(t) { return Ok(Change::Keep); }
@@ -216,7 +218,7 @@ pub fn tidy(id: &str, delete_branch: &str) {
         if !kept.ends.left.is_empty() { t.put("stillRunning", kept.ends.left.clone()); }
         t.put("tidy", if kept.retry { json!({ "deleteBranch": delete_branch, "tip": kept.tip, "comp": kept.comp, "still": if kept.still.is_null() { Value::Null } else { kept.still.clone() }, "eventSeq": kept.event_seq, "quietFrom": quiet_from, "msg": msg, "inUse": kept.in_use, "ends": ends }) } else { Value::Null });
         if !kept.kept.is_empty() { t.put("kept", kept.kept.clone()); } else {
-            flow::task::clear_notes(t); left = true; t.del("kept"); t.put("worktree", Value::Null); t.put("cleaned", now()); if t.at("closeout").is_object() { t.obj_mut("closeout").put("phase", "pane_closed"); }
+            flow::task::clear_notes(t); left = true; t.del("kept"); t.put("worktree", Value::Null); t.put("cleaned", now()); if let Some(p) = &gone { t.obj_mut("closeout").put("phase", p.as_str()); }
             let s = t.at("link").at("socket").clone(); t.put("link", json!({ "socket": s }));
         }
         let end = if msg.ends_with('.') { "" } else { "." };
