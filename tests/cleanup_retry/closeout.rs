@@ -11,7 +11,10 @@ use sw::json::*;
 use sw::memory_queue::{set_fake, Job};
 use sw::store::tasks::{update, Change};
 
-const SAFE: &str = "Saved: accepted. safe to Exit";
+/// What it never takes for leave to close.
+mod guards;
+
+const SAFE: &str = "Saved: accepted.\nsafe to Exit";
 const LATE: i64 = 11 * 60 * 1000;
 fn pass(w: &World, id: &str) -> usize {
     let _ = std::fs::remove_dir_all(sw::store::files::data_dir().join("stamps"));
@@ -30,7 +33,8 @@ fn merged_with(w: &World, n: i64, reply: &str, before: impl FnOnce(&Obj)) -> Obj
     let t = settle(&id);
     assert_eq!(t.s("stage"), "approval", "{}", t.at("failure"));
     assert!(t.b("session"), "its agent's session is known");
-    pane(w, &t, |p| p["frontPid"] = json!(4000 + n)); // its agent's process
+    // its agent's process and session as herdr shows them, its input box empty
+    pane(w, &t, |p| { p["frontPid"] = json!(4000 + n); p["agent"]["session"] = json!(t.s("session")); p["agent"]["screen"] = json!("Done.\n╭──\n│ ❯ \n╰──"); });
     before(&t);
     sw::actions::finish_line::approve(&id, None, false).unwrap();
     let t = settle(&id);
@@ -159,7 +163,7 @@ fn new_input_another_session_no_exit_decision_or_an_agent_gone_hold_it_and_type_
     let n = merged(&w, 6);
     update(n.s("id"), |t| { t.put("session", "s-other"); Ok(Change::Write) }).unwrap();
     assert_eq!(pass(&w, n.s("id")), 1);
-    held(&task(n.s("id")), "its agent's session changed");
+    held(&task(n.s("id")), "another session than its own is in its pane");
     // the agent left its pane before it was told to exit (a crash): never a finished closeout
     let g = merged(&w, 7);
     accepted_now(&g);
@@ -221,7 +225,7 @@ fn what_is_typed_is_written_down_first_and_a_record_that_cannot_be_written_types
     fixed(Ok(vec![]));
     let t = merged_with(&w, 16, SAFE, |t| pane(&w, t, |p| p["agent"]["status"] = json!("working"))); // nothing sent yet
     let c = task(t.s("id"));
-    let who = || sw::land::closeout::Who { api: sw::herdr::Herdr::new(None), pane: c.at("link").t("pane"), session: c.t("session"), transcript: String::new(), agent: c.t("agent"), cwd: c.s("worktree").into(), tip: String::new(), events: 0, wait_ms: 600000 };
+    let who = || sw::land::closeout::Who { api: sw::herdr::Herdr::new(None), pane: c.at("link").t("pane"), terminal: c.at("link").t("terminal"), session: c.t("session"), transcript: String::new(), agent: c.t("agent"), cwd: c.s("worktree").into(), tip: String::new(), events: 0, wait_ms: 600000 };
     pane(&w, &t, |p| p["agent"]["status"] = json!("idle"));
     let g = sw::land::closeout::step(&who(), &json!({ "waitFrom": sw::clock::now() }), &|_, _| false);
     assert!(matches!(&g, sw::land::closeout::Gate::Wait(m) if m.contains("could not be written")), "{g:?}");
@@ -231,6 +235,6 @@ fn what_is_typed_is_written_down_first_and_a_record_that_cannot_be_written_types
         assert!(matches!(&g, sw::land::closeout::Gate::Held(m) if m.contains("is not known")), "{g:?}");
     }
     assert_eq!((closeouts(&w, &t), exits(&w, &t)), (0, 0), "never sent again on a guess");
-    assert!(sw::land::closeout::safe("Saved. safe to Exit") && !sw::land::closeout::safe("unsafe to Exit") && !sw::land::closeout::safe("safe to Exiting"));
+    assert!(sw::land::closeout::safe("Saved.\nsafe to Exit") && !sw::land::closeout::safe("Saved. safe to Exit, said I") && !sw::land::closeout::safe("unsafe to Exit") && !sw::land::closeout::safe("safe to Exiting"));
     set_fake(None);
 }

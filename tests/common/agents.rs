@@ -113,7 +113,7 @@ pub fn agent(f: &F, verb: &str, arg2: &str, argv: &[String], flag: &dyn Fn(&str)
             ok(json!({ "type": "ok" }))
         }
         "focus" => { let pid = st["panes"][pi].t("pane_id"); arr(&mut st, "focus").push(json!(format!("agent {pid}"))); let p = st["panes"][pi].clone(); ok(json!({ "type": "agent_info", "agent": F::agent_out(&p) })) }
-        "read" => out(st["panes"][pi]["agent"].s("screen")),
+        "read" => { let a = &st["panes"][pi]["agent"]; out(&if a.at("box").is_string() { format!("{}\n❯ {}", a.s("screen"), a.s("box")) } else { a.t("screen") }) } // words typed and not sent show in its input box
         _ => fail("unknown_command", "agent"),
     }
 }

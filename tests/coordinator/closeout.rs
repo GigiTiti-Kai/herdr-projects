@@ -15,6 +15,7 @@ fn get(w: &World) -> Obj { state::get(&w.socket).unwrap_or_default() }
 fn agents(w: &World) -> usize { w.state().arr("panes").iter().filter(|p| p.at("agent").is_object()).count() }
 fn typed(w: &World) -> Vec<String> { prompts(w, get(w).s("pane")) }
 fn pane(w: &World, f: impl Fn(&mut Value)) { let id = get(w).t("pane"); w.patch(|s| { for p in s["panes"].as_array_mut().unwrap() { if p.s("pane_id") == id { f(p); } } }); }
+fn session_of(w: &World) -> String { get(w).t("session") }
 fn queue(r: Result<Vec<Job>, String>) { set_fake(Some(Rc::new(move |_| r.clone()))); }
 
 #[test]
@@ -22,10 +23,10 @@ fn a_stop_waits_for_the_closeout_each_step_proved_and_what_cannot_be_proved_leav
     let w = coord_world();
     sw::store::settings::change::set_value("workspace.closeout", &json!(true), &sw::store::settings::lookup::Scope::you()).unwrap();
     sw::clock::set(Some(sw::clock::now()));
-    w.script(json!({ "coordinator": [{ "said": "Hello." }, { "said": "Saved. safe to Exit" }] }));
+    w.script(json!({ "coordinator": [{ "said": "Hello." }, { "said": "Saved.\nsafe to Exit" }] }));
     send(&w.root, "first", false, "", &w.socket).unwrap(); drain();
     assert_eq!(agents(&w), 1);
-    pane(&w, |p| p["frontPid"] = json!(5150));
+    pane(&w, |p| { p["frontPid"] = json!(5150); p["agent"]["screen"] = json!("❯ "); p["agent"]["session"] = json!(session_of(&w)); });
     queue(Ok(vec![]));
     stop(&w.socket).unwrap(); drain();
     // sent once; not stopped while its record is not accepted
@@ -46,9 +47,10 @@ fn a_stop_waits_for_the_closeout_each_step_proved_and_what_cannot_be_proved_leav
     pump(&w.socket); drain();
     assert_eq!(get(&w).at("stopped"), &json!(true), "{:?}", get(&w)); assert!(!get(&w).b("closeout") && !get(&w).b("want"));
     // begun anew while the queue cannot be read: held once closeoutWait has passed; it keeps running, with the reason
-    w.script(json!({ "coordinator": [{ "said": "Back." }, { "said": "Saved. safe to Exit" }] }));
+    w.script(json!({ "coordinator": [{ "said": "Back." }, { "said": "Saved.\nsafe to Exit" }] }));
     sw::clock::advance(5); send(&w.root, "again", false, "", &w.socket).unwrap(); drain();
     assert_eq!(agents(&w), 1);
+    pane(&w, |p| { p["frontPid"] = json!(5152); p["agent"]["screen"] = json!("❯ "); p["agent"]["session"] = json!(session_of(&w)); });
     queue(Err("no Agent Memory queue".into()));
     fresh(None, &w.socket).unwrap(); drain();
     assert_eq!(get(&w).at("closeout").s("phase"), "checkpointing");
@@ -65,9 +67,9 @@ fn a_reply_to_other_words_before_the_first_look_is_not_the_closeout_s_and_the_st
     let w = coord_world();
     sw::store::settings::change::set_value("workspace.closeout", &json!(true), &sw::store::settings::lookup::Scope::you()).unwrap();
     sw::clock::set(Some(sw::clock::now()));
-    w.script(json!({ "coordinator": [{ "said": "Hello." }, { "said": "Saved. safe to Exit" }, { "said": "Done that too. safe to Exit" }] }));
+    w.script(json!({ "coordinator": [{ "said": "Hello." }, { "said": "Saved.\nsafe to Exit" }, { "said": "Done that too. safe to Exit" }] }));
     send(&w.root, "first", false, "", &w.socket).unwrap(); drain();
-    pane(&w, |p| p["frontPid"] = json!(5151));
+    pane(&w, |p| { p["frontPid"] = json!(5151); p["agent"]["screen"] = json!("❯ "); p["agent"]["session"] = json!(session_of(&w)); });
     queue(Ok(vec![]));
     stop(&w.socket).unwrap(); drain();
     assert_eq!(get(&w).at("closeout").s("phase"), "checkpointing");

@@ -6,7 +6,7 @@ When a task is done and its space is about to be closed ([when a task is done](h
 the board first types this into its working agent, once, as a turn of its own:
 
 ```
-/session-close 記録だけの session-close。ship・push・merge・PR・再 review・削除はしない。自分が所有し現在の権限で止められる背景処理（監視・cron・接続）だけ止めてから報告。他者・共有・所有不明のものは止めず、巻き込む可能性があれば残して理由付きで保留
+/session-close 記録だけの session-close。ship・push・merge・PR・再 review・削除はしない。自分が所有し現在の権限で止められる背景処理（監視・cron・接続）だけ止めてから報告。他者・共有・所有不明のものは止めず、巻き込む可能性があれば残して理由付きで保留。終了してよいと判断した時だけ、返事の最後の行に `safe to Exit` とだけ書く（それ以外は書かない）
 ```
 
 (`$session-close` for Codex.) The task stays done: that turn is never taken for a finish, so nothing is checked,
@@ -21,8 +21,8 @@ Each step is proved apart, on its own pass, and nothing is ever typed twice:
    job accepted since the closeout was sent, for that agent's session, filed from the task's worktree, and not given up
    on. It is looked up again on every pass until the space is closed: a job given up on since proves nothing.
 2. **Exit, decided now.** The agent's own last reply, read from its saved conversation, is its reply to the closeout
-   (the turn the closeout's own words began, after it was sent, the same reply at every look) and says `safe to Exit`
-   (not `unsafe to Exit`, `not safe to Exit` or an Exit blocked). Right before, the agent is at
+   (the turn the closeout's own words began, after it was sent, the same reply at every look) and ends with a line
+   `safe to Exit` of its own (a decision taken back, only quoted, `unsafe`, `not safe` or an Exit blocked is none). Right before, the agent is at
    rest, nothing runs under it, and the session and branch tip are the ones it was sent for. Its processes are noted,
    and `/exit` is typed, once.
 3. **The agent gone.** Herdr sees no agent in the pane any more, the processes that were the agent have ended, and
@@ -41,7 +41,10 @@ starting with `closeout 未確認`:
 
 - new input after it was sent: a reply that is not the closeout's, a turn beyond its own, another session, the branch
   moved;
-- its reply gives no Exit decision (`safe to Exit`), such as an Exit blocked;
+- its reply gives no Exit decision (a last line `safe to Exit`), such as an Exit blocked or taken back;
+- another terminal or another session than its agent's in the pane, as Herdr shows it (or Herdr not saying which);
+- words waiting unsent in its input box, or an input box that cannot be read (nothing is typed with them);
+- new input after `/exit` went in, or its save no longer accepted then;
 - no accepted job within `workspace.closeoutWait` (10 minutes), or a queue that cannot be read;
 - its turn still under way, herdr not answering, its saved conversation not readable, or the agent still there after
   `/exit`, once that same wait has passed since the board first looked (before anything was sent, too);
