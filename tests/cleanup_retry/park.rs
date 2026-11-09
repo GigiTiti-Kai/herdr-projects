@@ -18,6 +18,7 @@ mod round2;
 /// The reviewer's round 3 probes.
 mod round3;
 mod round5;
+mod round7;
 
 pub const SAFE: &str = "Saved: accepted.\nsafe to Exit";
 pub fn world() -> World { let w = world_with(Opts { repo: true, settings: json!({ "review.when": "never" }), ..Default::default() }); sw::clock::set(Some(sw::clock::now())); w }

@@ -13,8 +13,8 @@ agent, and keeps everything else:
    words waiting for its agent. Its pane stays open at its shell, and its line ends with `Parked: …`.
 
 While it is under way, the closeout's own turns are never taken for yours (no review goes stale, no approval is
-asked again), and nothing else goes in: a reply, an approval, a review sent back, a fix, or the board's own turns
-(a check, a conflict) are refused or wait until it is parked or held, and so is a report of yours. Its own agent
+asked again), and nothing else goes in: a reply, an approval, a review sent back, a fix, a delegation, going into it, or the board's own
+turns (a check, a conflict) are refused or wait until it is parked or held, and so is a report of yours. Its own agent
 reporting itself blocked (it cannot exit) holds the park with those words; the task keeps what it waits on.
 Only a worker is parked: a plan writer asking you something is refused.
 
@@ -25,7 +25,8 @@ Once it is parked:
 - **Going into the task, a reply, a review sent back, a fix, a restart** bring its agent back the way an exited agent
   comes back, in its own conversation (`--resume`). A reply or a fix then works as ever: the task is at work again.
   A conversation that cannot be resumed, or a worktree gone, starts nothing, never a fresh one: the task says why
-  (going into it too), and the words wait. Another agent than its own in its pane, another terminal in it, or words typed and not sent at its shell get
+  (going into it too), and the words wait. Another agent than its own in its pane, another terminal in it, words typed and not sent at its shell, or a program
+  running there (or herdr not saying) get
   nothing: a reply is refused, and nothing is started. Its own conversation back by itself ends the park: what you
   type there then counts as ever.
   Then archive it, or give up the conversation with `herdr-projects park <id> --forget` and delegate it again.

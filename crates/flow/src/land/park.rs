@@ -60,6 +60,17 @@ pub fn park(id: &str) -> Res<(Task, String)> {
 pub fn drive(id: &str) {
     let Some(t) = get(id) else { return };
     if !busy(&t) { return; }
+    // One driver at a time (park itself, the housekeeping pass's runner): a second one finds it claimed and leaves it.
+    static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let now = crate::clock::now();
+    let mine = json!({ "at": now, "by": format!("{}-{}", std::process::id(), N.fetch_add(1, std::sync::atomic::Ordering::Relaxed)) });
+    let claimed = update_wait(id, 10000, |c| { let at = c.at("parkDriver").i("at"); if !busy(c) || (at > 0 && now - at < 120000) { return Ok(Change::Keep); } c.put("parkDriver", mine.clone()); Ok(Change::Write) });
+    if !claimed.map(|c| c.at("parkDriver") == &mine).unwrap_or(false) { return; }
+    steps(id, &t);
+    let _ = update_wait(id, 10000, |c| { if c.at("parkDriver") != &mine { return Ok(Change::Keep); } c.put("parkDriver", Value::Null); Ok(Change::Write) });
+}
+fn steps(id: &str, t: &Task) {
+    let t = t.clone();
     let g = if rec(&t).b("blocked") {
         // Its agent said it cannot exit: held once its turn is over (so that turn stays the closeout's own).
         match crate::flow::task::h(&t).agent_get(t.at("link").s("pane")) { Ok(Some(a)) if a.s("agent_status") == "working" => Gate::Wait("Closeout not through yet: its agent reported it cannot exit, and its turn is under way".into()), _ => hold_why(format!("its agent reported: {}", rec(&t).s("blocked"))) }
@@ -97,6 +108,7 @@ pub fn reported(t: &Obj, words: &str) -> Option<Task> {
 }
 /// Before an agent is started on a parked task: only its own conversation again, never a fresh one or another.
 pub fn may_start(t: &Obj, resume: Option<&str>) -> Res<()> {
+    refuse_busy(t)?; // its closeout under way (or its agent gone mid-way, a crash the next look holds): nothing is started
     if parked(t) && !rec(t).b("held") { refuse_foreign(t)?; }
     if parked(t) && !rec(t).b("held") && (resume != Some(rec(t).s("session")) || !std::path::Path::new(t.s("worktree")).is_dir()) {
         crate::fail!("{} was parked, and {}: nothing was started (a fresh one is never started in its place). Its stage and waiting words are as they were; archive it, or delegate it again after: herdr-projects park {} --forget", t.s("id"), why_not(t, resume.is_some()), t.s("id"));
@@ -125,6 +137,7 @@ pub fn refuse_foreign(t: &Obj) -> Res<()> {
         Ok(None) => {
             let term = rec(t).s("terminal");
             if term.is_empty() || api.pane_get(pane).map(|p| p.t("terminal_id")).as_deref() != Some(term) { crate::fail!("{} is parked, and its pane is no longer the terminal it was parked in (or herdr does not say which): nothing was typed.", t.s("id")); }
+            if !api.pane_idle(pane) { crate::fail!("{} is parked, and its shell runs something (or herdr does not say what): nothing was typed.", t.s("id")); }
             if !super::closeout::shell_at_prompt(&api.pane_read(pane, "recent-unwrapped", Some(2000)).unwrap_or_default(), crate::agents::kinds::program(t.s("agent"))) { crate::fail!("{} is parked, and its shell may hold words typed and not sent (or its prompt cannot be read): nothing was typed.", t.s("id")); }
             Ok(())
         }
