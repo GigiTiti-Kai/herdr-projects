@@ -8,7 +8,7 @@
 //! one. An approval needs no agent: it merges, and the clean-up finds the agent already gone. What cannot be proved holds
 //! it (`held`), and it is then an ordinary task again; a crash (an agent gone before `/exit`) or herdr not answering is
 //! never taken for a park.
-use super::closeout::{held as hold_why, prompt, save_to, step, who_of, Gate};
+use super::closeout::{held as hold_why, prompt, save_if, step, who_of, Gate};
 use crate::err::Res;
 use crate::json::*;
 use crate::runner::{runner_alive, spawn_runner};
@@ -66,22 +66,22 @@ pub fn drive(id: &str) {
     let mine = json!({ "at": now, "by": format!("{}-{}", std::process::id(), N.fetch_add(1, std::sync::atomic::Ordering::Relaxed)) });
     let claimed = update_wait(id, 10000, |c| { let at = c.at("parkDriver").i("at"); if !busy(c) || (at > 0 && now - at < 120000) { return Ok(Change::Keep); } c.put("parkDriver", mine.clone()); Ok(Change::Write) });
     if !claimed.map(|c| c.at("parkDriver") == &mine).unwrap_or(false) { return; }
-    steps(id, &t);
+    steps(id, &t, &mine);
     let _ = update_wait(id, 10000, |c| { if c.at("parkDriver") != &mine { return Ok(Change::Keep); } c.put("parkDriver", Value::Null); Ok(Change::Write) });
 }
-fn steps(id: &str, t: &Task) {
+fn steps(id: &str, t: &Task, mine: &Value) {
     let t = t.clone();
     let g = if rec(&t).b("blocked") {
         // Its agent said it cannot exit: held once its turn is over (so that turn stays the closeout's own).
         match crate::flow::task::h(&t).agent_get(t.at("link").s("pane")) { Ok(Some(a)) if a.s("agent_status") == "working" => Gate::Wait("Closeout not through yet: its agent reported it cannot exit, and its turn is under way".into()), _ => hold_why(format!("its agent reported: {}", rec(&t).s("blocked"))) }
-    } else { match who_of(&t) { Some(w) => step(&w, rec(&t), &|p, whole| save_to(id, p, whole)), None => hold_why("its worktree cannot be read, so whether its work moved cannot be told") } };
+    } else { match who_of(&t) { Some(w) => step(&w, rec(&t), &|p, whole| save_if(id, p, whole, &|c| c.at("parkDriver") == mine)) /* nothing more once another driver took it over */, None => hold_why("its worktree cannot be read, so whether its work moved cannot be told") } };
     if matches!(g, Gate::Wait(_)) && rec(&t).s("phase").is_empty() && get(id).map(|c| c.at("closeout").s("phase") == "checkpointing").unwrap_or(false) { crate::store::said_by::note_board(id, &prompt(t.s("agent"))); }
     // Held for anything but new input: the closeout's own turns stay its own, not turns of yours for the hook to find later.
     let own = match &g { Gate::Held(why) => !["new input", "session changed", "another session", "moved"].iter().any(|n| why.contains(n)), _ => false };
     let seen = if own { t.at("link").b("pane").then(|| crate::flow::task::h(&t).agent_get(t.at("link").s("pane")).ok().flatten()).flatten() } else { None };
     let line = match &g { Gate::Go => "Parked: its agent exited after a record-only closeout; go into the task (or reply) to resume the same conversation".to_string(), Gate::Wait(l) | Gate::Held(l) => l.clone() };
     let _ = update_wait(id, 10000, |c| {
-        if !busy(c) { return Ok(Change::Keep); }
+        if !busy(c) || c.at("parkDriver") != mine { return Ok(Change::Keep); }
         let was = if c.at("closeout").has("was") { c.at("closeout").t("was") } else { c.t("msg") };
         c.obj_mut("closeout").put("was", was.clone());
         match &g { Gate::Go => { c.obj_mut("closeout").put("parked", true); c.obj_mut("closeout").put("parkedAt", crate::clock::now()); } Gate::Held(_) => c.obj_mut("closeout").put("held", true), Gate::Wait(_) => {} }

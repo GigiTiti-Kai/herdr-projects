@@ -240,13 +240,18 @@ pub fn who_of(t: &Task) -> Option<Who> {
     Some(Who { work: format!("{head} {changed}"), api: h(t), pane: t.at("link").t("pane"), terminal: t.at("link").t("terminal"), session: t.t("session"), transcript: t.t("transcript"), agent: t.t("agent"), cwd: cwd_of(t), tip: branch, events: t.i("eventSeq"), wait_ms: wait_ms(Some(t)) })
 }
 /// `step`'s `save` for a task's own record (`closeout`): the line before the first hold (`was`) stays.
-pub fn save_to(id: &str, patch: Value, whole: bool) -> bool {
+pub fn save_to(id: &str, patch: Value, whole: bool) -> bool { save_if(id, patch, whole, &|_| true) }
+/// `save_to`, only while `ok` holds for the task as it is now (a park's driver still owns it): false, nothing written.
+pub fn save_if(id: &str, patch: Value, whole: bool, ok: &dyn Fn(&Obj) -> bool) -> bool {
+    let wrote = std::cell::Cell::new(false);
     update_wait(id, 10000, |c| {
+        if !ok(c) { return Ok(Change::Keep); }
+        wrote.set(true);
         let was = c.at("closeout").at("was").clone();
         let park = c.at("closeout").at("park").clone(); // a park's record stays one
         if whole { c.put("closeout", patch.clone()); if was.is_string() { c.obj_mut("closeout").put("was", was.clone()); } if park == json!(true) { c.obj_mut("closeout").put("park", true); } } else { for (k, v) in patch.as_object().cloned().unwrap_or_default() { c.obj_mut("closeout").insert(k, v); } }
         Ok(Change::Write)
-    }).is_ok()
+    }).is_ok() && wrote.get()
 }
 pub fn gate(t: &Task) -> Gate {
     if !on(Some(t)) || !t.at("link").b("pane") { return Gate::Go; }

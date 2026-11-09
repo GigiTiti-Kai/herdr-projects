@@ -56,3 +56,59 @@ fn round7_two_interleaved_park_drivers_must_not_send_exit_twice() {
     let n=exits(&w,&t); let c=task(&id); set_fake(None);
     assert_eq!(n,1,"interleaved park drivers sent /exit {n} times; closeout={}",c.at("closeout"));
 }
+
+
+#[test]
+fn round8_f15_slow_queue_query_must_not_allow_two_exit_sends() {
+    let w=world(); on(); let t=waiting(&w,101,false,SAFE); let id=t.t("id");
+    sw::land::park::park(&id).unwrap();
+    let entered=std::cell::Cell::new(false); let other=id.clone();
+    let (cwd,at)=(t.t("worktree"),sw::clock::now()+1);
+    set_fake(Some(Rc::new(move |_| {
+        if !entered.replace(true) {
+            sw::clock::advance(120001);
+            sw::land::park::drive(&other);
+        }
+        Ok(vec![Job {id:"j1".into(),status:"queued".into(),accepted:at,cwd:cwd.clone()}])
+    })));
+    sw::land::park::drive(&id);
+    let n=exits(&w,&t); let c=task(&id); set_fake(None);
+    assert_eq!(n,1,"F15: slow in-flight query permits overlapping drivers; exit_count={n}; phase={}; held={}; stage={}",c.at("closeout").s("phase"),c.at("closeout").b("held"),c.s("stage"));
+}
+
+#[test]
+fn round8_f16_reopen_after_crash_then_drive_must_hold_without_starting() {
+    let w=world(); on(); let t=waiting(&w,102,true,SAFE); let id=t.t("id");
+    sw::land::park::park(&id).unwrap();
+    pane(&w,&t,|p| {p["agent"]=Value::Null; p["frontPid"]=Value::Null;});
+    let n=calls(&w).len(); let (_,has,_)=sw::delegate::reopen(&id,true).unwrap();
+    sw::land::park::drive(&id);
+    let c=task(&id); let a=activity(&w,n); set_fake(None);
+    assert!(!has && a.is_empty(),"crash reopened: has={has} activity={a:?}");
+    assert!(c.at("closeout").b("held") && !sw::land::park::parked(&c) && c.s("msg").contains("before it was told to exit"),"crash not held: {}",c.at("closeout"));
+    assert_eq!(c.s("stage"),t.s("stage"));
+}
+
+#[test]
+fn round8_f14_reply_busy_or_unknown_shell_must_type_nothing() {
+    let w=world(); on(); let t=parked(&w,103,true); let id=t.t("id");
+    pane(&w,&t,|p|p["busy"]=json!(true));
+    let n=calls(&w).len();
+    let r1=sw::actions::talk::tell(&id,"Original worker only",false);
+    pane(&w,&t,|p|p["busy"]=json!(false));
+    w.patch(|s|s["processInfoFails"]=json!(true));
+    let r2=sw::actions::talk::tell(&id,"Original worker only",false);
+    let a=activity(&w,n);set_fake(None);
+    assert!(r1.is_err() && r2.is_err() && a.is_empty(),"busy_ok={} unknown_ok={} activity={a:?}",r1.is_ok(),r2.is_ok());
+}
+
+#[test]
+fn round8_f14_queued_restart_must_recheck_processes_and_keep_inbox() {
+    let w=world(); on(); let t=parked(&w,104,true); let id=t.t("id");
+    sw::actions::talk::tell(&id,"Original worker only",false).unwrap();
+    pane(&w,&t,|p|p["busy"]=json!(true));
+    let n=calls(&w).len();settle(&id);let a=activity(&w,n);
+    let pending=sw::store::inbox::pending_text(&id);set_fake(None);
+    assert!(a.is_empty(),"queued restart: {a:?}");
+    assert!(pending.iter().any(|m|m.s("text")=="Original worker only"),"queued reply lost: {pending:?}");
+}
