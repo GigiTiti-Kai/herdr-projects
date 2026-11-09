@@ -44,6 +44,7 @@ pub fn launch_extras(t: &Task, role: &str, kind: &str, round: i64, standing: &st
 /// Used by a first delegation and by restarting an exited agent. The pane must be at its shell prompt.
 pub fn start_agent(id: &str, g: &mut Guard, prompt: &str, resume: Option<&str>) -> Res<&'static str> {
     let t = get(id).ok_or("the task is gone")?;
+    crate::land::park::may_start(&t, resume)?; // a parked task: its own conversation, never a fresh one
     let api = flow::task::h(&t);
     let kind = t.t("agent");
     // The worker's settings, read now, as it starts. A planner of its own runs on its own program and model.
@@ -106,6 +107,7 @@ pub fn start_agent(id: &str, g: &mut Guard, prompt: &str, resume: Option<&str>) 
             let h = t.obj_mut("handled"); h.put("msg", Value::Null); h.put("pos", 0);
         }
     })?;
+    crate::land::park::resumed(id);
     if prompt.is_empty() { return Ok("started"); }
     let mut extra = Obj::new();
     if resume.is_none() { extra.put("first", true); }

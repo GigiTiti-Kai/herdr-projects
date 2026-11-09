@@ -53,6 +53,7 @@ fn pass(socket: &str, force: Force) {
         if due(&format!("spaces-{}", key(socket)), 30000) { sweep_repo_spaces(socket); sweep_closing(socket); }
         // A clean-up that found the task's space in use is tried again, so a done task leaves the sidebar by itself once
         // the space is free; after a turn in the agent's own terminal only when that has been quiet for a while.
+        crate::land::park::park_pass(&tasks, socket); // parks under way, looked at again (land/park.rs)
         let quiet: i64 = std::env::var("HERDR_PROJECTS_QUIET_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(600000);
         for t in &tasks {
             if t.s("stage") != "done" || setting("workspace.cleanup", Some(t)) != json!(true) || !t.b("tidy") || t.b("archivedAt") || !same_socket(t.at("link").s("socket"), socket) || runner_alive(t) || now() - t.at("tidy").i("quietFrom") < quiet { continue; }

@@ -124,6 +124,7 @@ pub fn command(cmd: &str, a: &Args) -> Res<(Value, String)> {
         "start" => { let t = filing::start_human(&need(1, "an id")?)?; (shown_of(t.s("id")), format!("{}: in progress", t.s("id"))) }
         "pick" => said(crate::attempts::settle::pick(&need(1, "an id")?, &pos.get(2).cloned().unwrap_or_default())?),
         "approve" => said(finish_line::approve(&need(1, "an id")?, None, flags.at("anyway") == &json!(true))?),
+        "park" => { let id = need(1, "an id")?; let (t, msg) = if flags.b("forget") { crate::land::park::forget(&id)? } else { crate::land::park::park(&id)? }; (shown_of(t.s("id")), msg) }
         "review" => said(finish_line::send_review(&need(1, "an id")?)?),
         "retry" => said(finish_line::send_error_noted(&need(1, "an id")?, &rest(2))?),
         "fix" => said(finish_line::send_failure(&need(1, "an id")?)?),

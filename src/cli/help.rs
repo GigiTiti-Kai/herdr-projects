@@ -28,6 +28,9 @@ pub const HELP: &str = r#"herdr-projects: a work board for herdr
                                                 or its pull request's checks on GitHub failed);
                                                 on a task whose plan is ready (plan.approve you): yes to the plan, the build starts.
                                                 tell <id> <text> there sends the plan back with those words
+  herdr-projects park <id> [--forget]          close out the agent of a task that waits for your approval or answer and
+                                                leave it exited, all else kept (workspace.park; off unless you turn it on);
+                                                --forget: give up its conversation
   herdr-projects pick <id> <letter>            keep one of a task's several attempts (attempts.by); the others' tabs close
   herdr-projects review <id>                   send the reviewer's findings back to the agent
   herdr-projects retry <id>                    send the saved error back to the agent; on a task a limit stopped: continue

@@ -90,7 +90,7 @@ pub fn step(w: &Who, rec: &Value, save: &dyn Fn(Value, bool) -> bool) -> Gate {
         let text = prompt(&w.agent);
         let sent = now(); // taken before it goes in
         if !save(json!({ "phase": "sending", "sentAt": sent, "events": w.events, "session": w.session, "terminal": live_term, "tip": w.tip, "work": w.work, "cwd": w.cwd.display().to_string() }), true) { return wait("its record could not be written, so nothing was typed"); }
-        return match type_in(w, &live_term, pane, &text) {
+        return match type_in(w, &live_term, pane, &text, save) {
             Ok(_) => { save(json!({ "phase": "checkpointing" }), false); Gate::Wait("Closeout sent: waiting for Agent Memory to accept it".into()) }
             Err(e) => { save(json!({ "phase": "", "failed": e.clone() }), false); held(format!("nothing was typed: {e}")) }
         };
@@ -114,7 +114,7 @@ pub fn step(w: &Who, rec: &Value, save: &dyn Fn(Value, bool) -> bool) -> Gate {
     if let Some(g) = draft() { return g; }
     let pids = match api.front_pids(pane) { Some(p) if !p.is_empty() => p, _ => return wait("herdr does not say which process is its agent") };
     if !save(json!({ "phase": "exiting", "exitAt": now(), "job": job, "pids": pids }), false) { return wait("its record could not be written, so /exit was not typed"); }
-    if let Err(e) = type_in(w, &rec.t("terminal"), pane, EXIT) { save(json!({ "phase": "saved" }), false); return held(format!("/exit was not typed: {e}")); }
+    if let Err(e) = type_in(w, &rec.t("terminal"), pane, EXIT, save) { save(json!({ "phase": "saved" }), false); return held(format!("/exit was not typed: {e}")); }
     save(json!({ "phase": "closing" }), false);
     Gate::Wait("Closeout saved: its agent was told to exit".into())
 }
@@ -158,12 +158,13 @@ fn is_exit(asked: &str) -> bool {
 }
 /// The last look right before anything is typed: its screen first, then herdr's answer the text goes in on: the same
 /// session and terminal, at rest, nothing waiting unsent in its input box. Err: why nothing was typed.
-fn type_in(w: &Who, term: &str, pane: &str, text: &str) -> Result<(), String> {
+fn type_in(w: &Who, term: &str, pane: &str, text: &str, save: &dyn Fn(Value, bool) -> bool) -> Result<(), String> {
     let screen = read_screen(&w.api, pane, Some("idle"), 40);
     let a = match w.api.agent_get(pane) { Ok(Some(a)) => a, Ok(None) => return Err("its agent left its pane".into()), Err(e) => return Err(format!("herdr did not answer ({})", e.code)) };
     if a.at("agent_session").t("value") != w.session || a.t("terminal_id") != term || term.is_empty() { return Err("another session or terminal came into its pane right before".into()); }
     if !["idle", "done"].contains(&a.s("agent_status")) { return Err(format!("its agent is {} right before", a.s("agent_status"))); }
     match draft(&screen) { Some(d) if d.is_empty() => {} Some(_) => return Err("words wait unsent in its input box".into()), None => return Err("its input box cannot be read".into()) }
+    if !save(json!({}), false) { return Err("its record is no longer this look's (another look took it over)".into()); } // last, right before it goes in
     match w.api.agent_prompt(pane, text) { Ok(_) => Ok(()), Err(e) if ["agent_prompt_stalled", "timeout"].contains(&e.code.as_str()) => Ok(()), Err(e) => Err(e.message) } // these do not prove nothing went in: never typed twice
 }
 /// Its reply says it may exit: its own last line is `safe to Exit`, as is, at the line's start (not indented, quoted or
@@ -231,21 +232,35 @@ pub fn changes_of(wt: &std::path::Path) -> Option<String> {
     Some(d.digest().to_string())
 }
 /// A done task's worker, before its space is closed.
+/// A task's worker as the task knows it, its work as it stands: the branch, the worktree's own HEAD (detached or not)
+/// and what is changed in it. None: its worktree cannot be read.
+pub fn who_of(t: &Task) -> Option<Who> {
+    let branch = if t.b("branch") { git_out(&folder_of(t.s("id")), &["rev-parse", "--verify", &format!("refs/heads/{}", t.s("branch"))]).unwrap_or_default() } else { String::new() };
+    let wt = std::path::Path::new(t.s("worktree"));
+    let (Ok(head), Some(changed)) = (git_out(wt, &["rev-parse", "HEAD"]), changes_of(wt)) else { return None };
+    Some(Who { work: format!("{head} {changed}"), api: h(t), pane: t.at("link").t("pane"), terminal: t.at("link").t("terminal"), session: t.t("session"), transcript: t.t("transcript"), agent: t.t("agent"), cwd: cwd_of(t), tip: branch, events: t.i("eventSeq"), wait_ms: wait_ms(Some(t)) })
+}
+/// `step`'s `save` for a task's own record (`closeout`): the line before the first hold (`was`) stays.
+pub fn save_to(id: &str, patch: Value, whole: bool) -> bool { save_if(id, patch, whole, &|_| true) }
+/// `save_to`, only while `ok` holds for the task as it is now (a park's driver still owns it): false, nothing written.
+pub fn save_if(id: &str, patch: Value, whole: bool, ok: &dyn Fn(&Obj) -> bool) -> bool {
+    let wrote = std::cell::Cell::new(false);
+    update_wait(id, 10000, |c| {
+        if !ok(c) { return Ok(Change::Keep); }
+        wrote.set(true);
+        let was = c.at("closeout").at("was").clone();
+        let park = c.at("closeout").at("park").clone(); // a park's record stays one
+        if whole { c.put("closeout", patch.clone()); if was.is_string() { c.obj_mut("closeout").put("was", was.clone()); } if park == json!(true) { c.obj_mut("closeout").put("park", true); } } else { for (k, v) in patch.as_object().cloned().unwrap_or_default() { c.obj_mut("closeout").insert(k, v); } }
+        Ok(Change::Write)
+    }).is_ok() && wrote.get()
+}
 pub fn gate(t: &Task) -> Gate {
     if !on(Some(t)) || !t.at("link").b("pane") { return Gate::Go; }
     let id = t.s("id");
-    // Its work as it stands: the branch, the worktree's own HEAD (detached or not) and what is changed in it.
-    let branch = if t.b("branch") { git_out(&folder_of(id), &["rev-parse", "--verify", &format!("refs/heads/{}", t.s("branch"))]).unwrap_or_default() } else { String::new() };
-    let wt = std::path::Path::new(t.s("worktree"));
-    let (Ok(head), Some(changed)) = (git_out(wt, &["rev-parse", "HEAD"]), changes_of(wt)) else { return held("its worktree cannot be read, so whether its work moved cannot be told; archive the task to close its space") };
-    let (tip, work) = (branch, format!("{head} {changed}"));
-    let w = Who { work, api: h(t), pane: t.at("link").t("pane"), terminal: t.at("link").t("terminal"), session: t.t("session"), transcript: t.t("transcript"), agent: t.t("agent"), cwd: cwd_of(t), tip, events: t.i("eventSeq"), wait_ms: wait_ms(Some(t)) };
-    let save = |patch: Value, whole: bool| update_wait(id, 10000, |c| {
-        let was = c.at("closeout").at("was").clone(); // the line before the first hold stays
-        if whole { c.put("closeout", patch.clone()); if was.is_string() { c.obj_mut("closeout").put("was", was.clone()); } } else { for (k, v) in patch.as_object().cloned().unwrap_or_default() { c.obj_mut("closeout").insert(k, v); } }
-        Ok(Change::Write)
-    }).is_ok();
-    let g = step(&w, t.at("closeout"), &save);
+    // A park that never got as far as its agent's exit proves nothing for this closeout: it starts anew (park.rs).
+    let t = &if super::park::unfinished(t) { super::park::drop_record(id); crate::store::tasks::get(id).unwrap_or_else(|| t.clone()) } else { t.clone() };
+    let Some(w) = who_of(t) else { return held("its worktree cannot be read, so whether its work moved cannot be told; archive the task to close its space") };
+    let g = step(&w, t.at("closeout"), &|p, whole| save_to(id, p, whole));
     // in its chat, as the board's own words
     if matches!(g, Gate::Wait(_)) && t.at("closeout").s("phase").is_empty() && crate::store::tasks::get(id).map(|c| c.at("closeout").s("phase") == "checkpointing").unwrap_or(false) { crate::store::said_by::note_board(id, &prompt(t.s("agent"))); }
     if let Gate::Held(why) = g { return Gate::Held(format!("{why}; archive the task to close its space")); }

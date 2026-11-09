@@ -22,6 +22,7 @@ const FRESH: &[&str] = &[
     "startedOnce",
     "startedAgentAt",
     "cleaned",
+    "closeout",
     "worktree",
     "branch",
     "from",
@@ -86,6 +87,7 @@ pub fn delegate_with(id: &str, asked: Vec<(String, Value)>, w: Wait) -> Res<Task
     let mut old: Option<(String, String)> = None; // the last round's space, when its clean-up had not closed it yet
     let t = update(cur.s("id"), |t| {
         assert_unarchived(t)?;
+        crate::land::park::refuse_busy(t)?; // its closeout under way: the stage it waits in stays
         let id = t.t("id");
         if t.s("stage") == "attempts" { crate::fail!("{id} already has its attempts working on it."); }
         if t.s("stage") == "pick" { crate::fail!("{id} waits for you to pick one of its attempts: herdr-projects pick {id} <letter>."); }

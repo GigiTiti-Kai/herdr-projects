@@ -66,3 +66,5 @@ starting with `closeout 未確認`:
 
 Such a task is no longer tried again by itself: archive it to close its space. Archiving a task does not go through
 the closeout.
+
+A task that waits for you can be closed out the same way and left waiting: [parking](park.md).

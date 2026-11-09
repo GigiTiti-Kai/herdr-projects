@@ -77,12 +77,14 @@ fn delegate_steps(id: &str, g: &mut Guard, mut t: Task) -> Res<()> {
     // The step goes on: its worktree read-only again, where a stop made it writable.
     if plan::open(&t) && !t.at("plan").b("locked") { plan::lock::set_locked(id, true); t = g.check()?; }
     // 1. A place to work, unless the task still has a live pane from an earlier run.
+    if crate::land::park::kept_from_foreign(&t) { return Ok(()); }
     let live_pane = if t.at("link").b("pane") { api.pane_get(t.at("link").s("pane")) } else { None };
     if live_pane.is_some() && api.agent_get(t.at("link").s("pane"))?.is_some() { // delegate again on a task whose agent is still there: just continue it
         t = g.set(|t| { let _ = r::starts_as(t); })?;
         let turned = turned_words(&t);
         t = g.set(|t| { t.put("stage", "working"); t.put("armedAt", now()); t.put("turnOpen", true); t.put("turnBy", "start"); t.del("researchTurned"); t.del("chatTurned"); })?;
         flow::send::deliver(&t, &flow::send::with_tail(&t, &[turned, "Continue this task.".into()].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join("\n\n")), None, false)?;
+        crate::land::park::resumed(id);
         return Ok(());
     }
     // Room on the disk first: on a nearly full one the task waits in the queue, not fails half-way (leftovers/room.rs).
@@ -189,6 +191,7 @@ pub fn restart_job(id: &str) {
     release(id, false);
 }
 fn restart_steps(id: &str, g: &mut Guard, mut t: Task) -> Res<()> {
+    if crate::land::park::kept_from_foreign(&t) { return Ok(()); } // another agent in a parked task's pane: nothing of it is touched
     let api = flow::task::h(&t);
     let root = folder_of(t.s("id"));
     let mut pane = if t.at("link").b("pane") { api.pane_get(t.at("link").s("pane")) } else { None };
@@ -199,6 +202,7 @@ fn restart_steps(id: &str, g: &mut Guard, mut t: Task) -> Res<()> {
     if pane.is_some() && api.agent_get(t.at("link").s("pane"))?.is_some() { // it is back by itself: just deliver
         let waiting: Vec<String> = take_text(id)?.iter().map(|m| m.t("text")).collect();
         if !waiting.is_empty() { flow::send::deliver(&t, &waiting.join("\n\n"), None, false)?; }
+        crate::land::park::resumed(id); // its own conversation came back by itself (deliver checked it): the park is over
         return Ok(());
     }
     if pane.is_none() {
@@ -243,18 +247,21 @@ pub fn reopen(id: &str, restart: bool) -> Res<(Value, bool, Task)> {
         }
     };
     let mut has_agent = api.agent_get(pane.s("pane_id"))?.is_some();
+    let parked = crate::land::park::parked(&t);
     if !has_agent && restart && resumable(&t) && !marker_alive(t.at("runner")) {
         // Too little memory: its space now, and its agent by a runner that waits for room (memory_wait.rs).
         if crate::memory_wait::low().is_some() { crate::runner::spawn_runner("reopen", t.s("id"), &[]); }
         else { has_agent = start_quietly(t.s("id"), &mut Guard::free(t.s("id")), &t); }
     }
+    if parked && restart && !has_agent && !marker_alive(t.at("runner")) && crate::memory_wait::low().is_none() { crate::land::park::not_back(t.s("id"), resumable(&t)); }
     Ok((pane, has_agent, get(t.s("id")).unwrap_or(t)))
 }
 /// Its exited agent started again in the same conversation, nothing sent to it: the task stands as it stood.
 fn start_quietly(id: &str, g: &mut Guard, t: &Task) -> bool {
     let (stage, armed) = (t.at("stage").clone(), t.at("armedAt").clone());
+    let was = crate::land::park::parked(t).then(|| t.at("closeout").at("was").clone()); // a parked one's line as before it
     let ok = start_agent(id, g, "", Some(t.s("session"))).is_ok();
-    let _ = update_wait(id, 10000, |c| { c.put("stage", stage.clone()); c.put("armedAt", armed.clone()); c.put("turnOpen", false); Ok(Change::Write) }); // nothing was asked of it
+    let _ = update_wait(id, 10000, |c| { c.put("stage", stage.clone()); c.put("armedAt", armed.clone()); c.put("turnOpen", false); if let Some(w) = was.as_ref().filter(|_| ok) { c.put("msg", w.clone()); } Ok(Change::Write) }); // nothing was asked of it
     ok
 }
 /// A reopen's start that waited for memory: once there is room, its agent as `reopen` would have started it.

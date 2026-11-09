@@ -113,6 +113,8 @@ pub fn apply(id: &str, a: &Value, api: &Herdr) {
             if !(seq > t.i("stopSeq") && t.b("sawIdleAfterStop")) { return Ok(Change::Write); }
         }
         if ["todo", "progress", "done", "queued", "starting", "setup"].contains(&t.s("stage")) { return Ok(Change::Write); }
+        if crate::land::park::back(t, a) { t.put("closeout", Value::Null); } // its own conversation back by itself: the park is over
+        if crate::land::park::parking(t) { return Ok(Change::Write); } // a park's own turns, never yours (land/park.rs)
         if status == "working" {
             if t.b("selfBlocked") { return Ok(Change::Write); } // it reported itself blocked and has not stopped yet: still that same turn
             if t.b("expectedWake") { if t.s("stage") != "working" && !runner_alive(t) { t.put("stage", "working"); } return Ok(Change::Write); } // the plugin's own turn: flaps change nothing
@@ -259,6 +261,7 @@ fn deliver_inbox(t: &Task, api: &Herdr) {
     let id = t.s("id");
     let items = take_text(id).unwrap_or_default();
     if items.is_empty() { return; }
+    if crate::land::park::refuse_foreign(t).is_err() { let _ = untake_text(id, items.len()); return; } // not into another conversation than a parked task's own
     let wake = items.iter().filter_map(|m| m.at("wake").as_object().filter(|_| m.b("wake")).cloned()).last();
     // The send time arms the pipeline for the turn this starts, so it is written before the text goes out.
     let before: Vec<(&str, Value)> = ["armedAt", "expectedWake", "stage", "msg"].iter().map(|k| (*k, t.at(k).clone())).collect();
