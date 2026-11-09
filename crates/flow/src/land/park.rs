@@ -97,6 +97,7 @@ pub fn reported(t: &Obj, words: &str) -> Option<Task> {
 }
 /// Before an agent is started on a parked task: only its own conversation again, never a fresh one or another.
 pub fn may_start(t: &Obj, resume: Option<&str>) -> Res<()> {
+    if parked(t) && !rec(t).b("held") { refuse_foreign(t)?; }
     if parked(t) && !rec(t).b("held") && (resume != Some(rec(t).s("session")) || !std::path::Path::new(t.s("worktree")).is_dir()) {
         crate::fail!("{} was parked, and {}: nothing was started (a fresh one is never started in its place). Its stage and waiting words are as they were; archive it, or delegate it again after: herdr-projects park {} --forget", t.s("id"), why_not(t, resume.is_some()), t.s("id"));
     }
@@ -115,11 +116,18 @@ pub fn not_back(id: &str, resumable: bool) {
         Ok(Change::Write)
     });
 }
-/// Before anything is typed into a parked task's pane: an agent there now is its own conversation, or nothing goes in.
+/// Before anything is typed into a parked task's pane: an agent there now is its own conversation, or nothing goes in;
+/// with no agent, its pane is still the terminal it was parked in, its shell at a bare prompt (nothing typed unsent).
 pub fn refuse_foreign(t: &Obj) -> Res<()> {
     if !parked(t) { return Ok(()); }
-    match crate::flow::task::h(t).agent_get(t.at("link").s("pane")) {
-        Ok(None) => Ok(()),
+    let (api, pane) = (crate::flow::task::h(t), t.at("link").s("pane"));
+    match api.agent_get(pane) {
+        Ok(None) => {
+            let term = rec(t).s("terminal");
+            if term.is_empty() || api.pane_get(pane).map(|p| p.t("terminal_id")).as_deref() != Some(term) { crate::fail!("{} is parked, and its pane is no longer the terminal it was parked in (or herdr does not say which): nothing was typed.", t.s("id")); }
+            if !super::closeout::shell_at_prompt(&api.pane_read(pane, "recent-unwrapped", Some(2000)).unwrap_or_default(), crate::agents::kinds::program(t.s("agent"))) { crate::fail!("{} is parked, and its shell may hold words typed and not sent (or its prompt cannot be read): nothing was typed.", t.s("id")); }
+            Ok(())
+        }
         Ok(Some(a)) if a.at("agent_session").s("value") == rec(t).s("session") && !rec(t).s("session").is_empty() => Ok(()),
         Ok(Some(_)) => crate::fail!("{} is parked, and another agent than its own is in its pane: nothing was sent.", t.s("id")),
         Err(e) => crate::fail!("{} is parked, and herdr did not say which agent is in its pane ({}): nothing was sent.", t.s("id"), e.code),
@@ -131,7 +139,7 @@ pub fn kept_from_foreign(t: &Obj) -> bool {
     let Err(e) = refuse_foreign(t) else { return false };
     let _ = update_wait(t.s("id"), 10000, |c| {
         c.put("stage", "failed"); c.put("msg", e.msg.clone()); c.put("turnOpen", false); c.put("expectedWake", Value::Null);
-        c.put("failure", json!({ "stage": "agent", "title": "Another agent is in its pane", "detail": e.msg, "agentCanFix": false, "at": crate::clock::now() }));
+        c.put("failure", json!({ "stage": "agent", "title": if e.msg.contains("another agent") { "Another agent is in its pane" } else { "Its pane is not as it was parked" }, "detail": e.msg, "agentCanFix": false, "at": crate::clock::now() }));
         Ok(Change::Write)
     });
     true
@@ -144,6 +152,8 @@ pub fn resumed(id: &str) {
         Ok(Change::Write)
     });
 }
+/// herdr shows its own conversation in its pane again (it came back by itself): a parked task's park is over.
+pub fn back(t: &Obj, a: &Value) -> bool { parked(t) && !rec(t).s("session").is_empty() && a.at("agent_session").s("value") == rec(t).s("session") }
 /// `park --forget`: you give up on its conversation; the record goes, and the task is an ordinary one again.
 pub fn forget(id: &str) -> Res<(Task, String)> {
     let t = find(id)?;

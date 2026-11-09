@@ -84,6 +84,7 @@ fn delegate_steps(id: &str, g: &mut Guard, mut t: Task) -> Res<()> {
         let turned = turned_words(&t);
         t = g.set(|t| { t.put("stage", "working"); t.put("armedAt", now()); t.put("turnOpen", true); t.put("turnBy", "start"); t.del("researchTurned"); t.del("chatTurned"); })?;
         flow::send::deliver(&t, &flow::send::with_tail(&t, &[turned, "Continue this task.".into()].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join("\n\n")), None, false)?;
+        crate::land::park::resumed(id);
         return Ok(());
     }
     // Room on the disk first: on a nearly full one the task waits in the queue, not fails half-way (leftovers/room.rs).
@@ -201,6 +202,7 @@ fn restart_steps(id: &str, g: &mut Guard, mut t: Task) -> Res<()> {
     if pane.is_some() && api.agent_get(t.at("link").s("pane"))?.is_some() { // it is back by itself: just deliver
         let waiting: Vec<String> = take_text(id)?.iter().map(|m| m.t("text")).collect();
         if !waiting.is_empty() { flow::send::deliver(&t, &waiting.join("\n\n"), None, false)?; }
+        crate::land::park::resumed(id); // its own conversation came back by itself (deliver checked it): the park is over
         return Ok(());
     }
     if pane.is_none() {

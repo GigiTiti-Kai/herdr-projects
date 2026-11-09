@@ -113,6 +113,7 @@ pub fn apply(id: &str, a: &Value, api: &Herdr) {
             if !(seq > t.i("stopSeq") && t.b("sawIdleAfterStop")) { return Ok(Change::Write); }
         }
         if ["todo", "progress", "done", "queued", "starting", "setup"].contains(&t.s("stage")) { return Ok(Change::Write); }
+        if crate::land::park::back(t, a) { t.put("closeout", Value::Null); } // its own conversation back by itself: the park is over
         if crate::land::park::parking(t) { return Ok(Change::Write); } // a park's own turns, never yours (land/park.rs)
         if status == "working" {
             if t.b("selfBlocked") { return Ok(Change::Write); } // it reported itself blocked and has not stopped yet: still that same turn

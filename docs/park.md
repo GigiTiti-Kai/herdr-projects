@@ -25,7 +25,9 @@ Once it is parked:
 - **Going into the task, a reply, a review sent back, a fix, a restart** bring its agent back the way an exited agent
   comes back, in its own conversation (`--resume`). A reply or a fix then works as ever: the task is at work again.
   A conversation that cannot be resumed, or a worktree gone, starts nothing, never a fresh one: the task says why
-  (going into it too), and the words wait. Another agent than its own in its pane gets nothing: a reply is refused.
+  (going into it too), and the words wait. Another agent than its own in its pane, another terminal in it, or words typed and not sent at its shell get
+  nothing: a reply is refused, and nothing is started. Its own conversation back by itself ends the park: what you
+  type there then counts as ever.
   Then archive it, or give up the conversation with `herdr-projects park <id> --forget` and delegate it again.
 - The board's own turns (a check failure, a pull request repair) type nothing.
 - Once its space is closed after the merge, that round is over: a new round starts as ever.
