@@ -90,7 +90,7 @@ pub fn step(w: &Who, rec: &Value, save: &dyn Fn(Value, bool) -> bool) -> Gate {
         let text = prompt(&w.agent);
         let sent = now(); // taken before it goes in
         if !save(json!({ "phase": "sending", "sentAt": sent, "events": w.events, "session": w.session, "terminal": live_term, "tip": w.tip, "work": w.work, "cwd": w.cwd.display().to_string() }), true) { return wait("its record could not be written, so nothing was typed"); }
-        return match type_in(w, &live_term, pane, &text) {
+        return match type_in(w, &live_term, pane, &text, save) {
             Ok(_) => { save(json!({ "phase": "checkpointing" }), false); Gate::Wait("Closeout sent: waiting for Agent Memory to accept it".into()) }
             Err(e) => { save(json!({ "phase": "", "failed": e.clone() }), false); held(format!("nothing was typed: {e}")) }
         };
@@ -114,7 +114,7 @@ pub fn step(w: &Who, rec: &Value, save: &dyn Fn(Value, bool) -> bool) -> Gate {
     if let Some(g) = draft() { return g; }
     let pids = match api.front_pids(pane) { Some(p) if !p.is_empty() => p, _ => return wait("herdr does not say which process is its agent") };
     if !save(json!({ "phase": "exiting", "exitAt": now(), "job": job, "pids": pids }), false) { return wait("its record could not be written, so /exit was not typed"); }
-    if let Err(e) = type_in(w, &rec.t("terminal"), pane, EXIT) { save(json!({ "phase": "saved" }), false); return held(format!("/exit was not typed: {e}")); }
+    if let Err(e) = type_in(w, &rec.t("terminal"), pane, EXIT, save) { save(json!({ "phase": "saved" }), false); return held(format!("/exit was not typed: {e}")); }
     save(json!({ "phase": "closing" }), false);
     Gate::Wait("Closeout saved: its agent was told to exit".into())
 }
@@ -158,12 +158,13 @@ fn is_exit(asked: &str) -> bool {
 }
 /// The last look right before anything is typed: its screen first, then herdr's answer the text goes in on: the same
 /// session and terminal, at rest, nothing waiting unsent in its input box. Err: why nothing was typed.
-fn type_in(w: &Who, term: &str, pane: &str, text: &str) -> Result<(), String> {
+fn type_in(w: &Who, term: &str, pane: &str, text: &str, save: &dyn Fn(Value, bool) -> bool) -> Result<(), String> {
     let screen = read_screen(&w.api, pane, Some("idle"), 40);
     let a = match w.api.agent_get(pane) { Ok(Some(a)) => a, Ok(None) => return Err("its agent left its pane".into()), Err(e) => return Err(format!("herdr did not answer ({})", e.code)) };
     if a.at("agent_session").t("value") != w.session || a.t("terminal_id") != term || term.is_empty() { return Err("another session or terminal came into its pane right before".into()); }
     if !["idle", "done"].contains(&a.s("agent_status")) { return Err(format!("its agent is {} right before", a.s("agent_status"))); }
     match draft(&screen) { Some(d) if d.is_empty() => {} Some(_) => return Err("words wait unsent in its input box".into()), None => return Err("its input box cannot be read".into()) }
+    if !save(json!({}), false) { return Err("its record is no longer this look's (another look took it over)".into()); } // last, right before it goes in
     match w.api.agent_prompt(pane, text) { Ok(_) => Ok(()), Err(e) if ["agent_prompt_stalled", "timeout"].contains(&e.code.as_str()) => Ok(()), Err(e) => Err(e.message) } // these do not prove nothing went in: never typed twice
 }
 /// Its reply says it may exit: its own last line is `safe to Exit`, as is, at the line's start (not indented, quoted or

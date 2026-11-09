@@ -112,3 +112,55 @@ fn round8_f14_queued_restart_must_recheck_processes_and_keep_inbox() {
     assert!(a.is_empty(),"queued restart: {a:?}");
     assert!(pending.iter().any(|m|m.s("text")=="Original worker only"),"queued reply lost: {pending:?}");
 }
+
+
+struct AtExitRead {
+    inner: Rc<common::herdr::FakeHerdr>,
+    id: String,
+    fired: std::cell::Cell<bool>,
+    human_turn: bool,
+}
+impl sw::herdr::cli::Fake for AtExitRead {
+    fn run(&self, args: &[String], input: &str) -> sw::herdr::cli::Ran {
+        if args.first().map(String::as_str)==Some("agent") && args.get(1).map(String::as_str)==Some("read")
+            && task(&self.id).at("closeout").s("phase")=="exiting" && !self.fired.replace(true) {
+            let old = task(&self.id).at("parkDriver").clone();
+            sw::clock::advance(2000);
+            sw::land::park::drive(&self.id);
+            let c=task(&self.id);
+            assert_ne!(c.at("parkDriver"), &old, "takeover did not happen");
+            assert!(c.at("closeout").b("held"), "second driver must hold uncertain send");
+            if self.human_turn {
+                sw::actions::talk::tell(&self.id,"New human work: keep this session open",false).unwrap();
+            }
+        }
+        self.inner.run(args,input)
+    }
+    fn kids(&self, pid:i64)->Vec<i64>{ self.inner.kids(pid) }
+    fn wiring(&self, pid:i64, group:&[i64])->sw::herdr::procs::Wiring{self.inner.wiring(pid,group)}
+    fn command(&self,pid:i64)->Option<String>{self.inner.command(pid)}
+    fn alive(&self,pid:i64)->Option<bool>{self.inner.alive(pid)}
+    fn kill(&self,pid:i64){self.inner.kill(pid)}
+}
+fn revoked_during_exit_read(human_turn:bool) {
+    let w=world(); on(); let t=waiting(&w,109+human_turn as i64,false,SAFE); let id=t.t("id");
+    sw::land::park::park(&id).unwrap();
+    let (cwd, at)=(t.t("worktree"),sw::clock::now()+1);
+    let queried=std::cell::Cell::new(false);
+    set_fake(Some(Rc::new(move |_| {
+        if !queried.replace(true) {sw::clock::advance(119000);}
+        Ok(vec![Job{id:"j1".into(),status:"queued".into(),accepted:at,cwd:cwd.clone()}])
+    })));
+    w.script(json!({"worker":[{"said":"New work in progress","status":"idle"}]}));
+    let probe=Rc::new(AtExitRead{inner:w.fake.clone(),id:id.clone(),fired:std::cell::Cell::new(false),human_turn});
+    sw::herdr::cli::set_fake(Some(probe.clone()));
+    sw::land::park::drive(&id);
+    let c=task(&id);let n=exits(&w,&t);let triggered=probe.fired.get();
+    sw::herdr::cli::set_fake(Some(w.fake.clone()));set_fake(None);
+    assert!(triggered,"probe never reached post-reservation exit read");
+    assert_eq!(n,0,"F15: revoked driver still sent /exit; human_turn={human_turn}; exit_count={n}; phase={}; held={}; stage={}; prompts={:?}",c.at("closeout").s("phase"),c.at("closeout").b("held"),c.s("stage"),prompts(&w,t.at("link").s("pane")));
+}
+#[test]
+fn round9_f15_revoked_driver_must_not_send_after_exit_reservation() {revoked_during_exit_read(false);}
+#[test]
+fn round9_f15_revoked_driver_must_not_exit_new_human_turn() {revoked_during_exit_read(true);}
