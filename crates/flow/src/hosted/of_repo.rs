@@ -27,6 +27,7 @@ pub fn spaces(api: &Herdr, root: &Path) -> Res<Vec<Value>> {
     let mut seen: HashMap<PathBuf, bool> = HashMap::new();
     // git only for a folder inside a checkout: it is slow on some disks (/mnt/c)
     let mut in_repo = |dir: &str| {
+        if dir.is_empty() { return false; } // herdr named no folder: not the one this process is in
         let dir = real(Path::new(dir));
         if !checkouts.iter().any(|c| dir.starts_with(c)) { return false; }
         *seen.entry(dir.clone()).or_insert_with(|| common_dir(&dir).is_ok_and(|d| d == common))

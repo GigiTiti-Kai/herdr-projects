@@ -138,6 +138,7 @@ impl FakeHerdr {
             ("workspace", "create") => {
                 let cwd = flag("--cwd").unwrap_or_else(|| ".".into());
                 let made = Self::new_workspace(&mut st, &cwd, flag("--label").as_deref(), Value::Null);
+                if st.b("spaceNoPane") { let ws = made.at("workspace").t("workspace_id"); arr(&mut st, "panes").retain(|p| p.s("workspace_id") != ws); return ok(json!({ "type": "workspace_created", "workspace": made.at("workspace") })); } // the space is there, with no terminal in it
                 if let Some(pi) = find_pane(&st, made.at("root_pane").s("pane_id")) { st["panes"][pi]["env"] = env_of(); }
                 let mut m = made.as_object().cloned().unwrap(); m.insert("type".into(), json!("workspace_created"));
                 return ok(Value::Object(m));
