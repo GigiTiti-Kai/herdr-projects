@@ -49,6 +49,52 @@ fn spaces_you_opened_count_when_their_first_tab_works_in_the_repo_and_no_other_f
 }
 
 #[test]
+fn a_space_whose_pane_says_no_folder_is_not_the_repos_even_when_the_board_itself_runs_in_the_repo() {
+    let w = tab_world();
+    std::env::set_current_dir(&w.root).unwrap(); // a folder left out must not be read as the one this process is in
+    plain_space(&w, "blank", &repo_name(&w), "", true);
+    worker(&w, 1);
+    let a = w.add("No folder");
+    delegate(&a);
+    let t = settle(&a);
+    assert_eq!(t.s("stage"), "approval", "{}", t.at("failure"));
+    assert_ne!(t.at("link").s("workspace"), "blank"); assert!(t.at("link").b("hosted"));
+    assert_eq!(tabs_in(&w, "blank").len(), 1);
+}
+
+#[test]
+fn a_repo_in_a_folder_with_a_very_long_path_still_starts_its_task_in_a_tab() {
+    let w = tab_world();
+    let root = w.base.join("d".repeat(120)).join("e".repeat(120)).join("deep"); // its lock's file is named after the repo
+    std::fs::create_dir_all(&root).unwrap();
+    git(&root, &["init", "-q", "-b", "main"]); std::fs::write(root.join("a.txt"), "one\n").unwrap();
+    git(&root, &["add", "-A"]); git(&root, &["commit", "-qm", "init"]);
+    worker(&w, 1);
+    let a = sw::actions::filing::add(&root, "Deep", Default::default()).unwrap().t("id");
+    delegate(&a);
+    let t = settle(&a);
+    assert_eq!(t.s("stage"), "approval", "{}", t.at("failure"));
+    assert!(t.at("link").b("hosted"));
+    assert_eq!(ws_of(&w, t.at("link").s("workspace")).unwrap().t("label"), "deep");
+}
+
+#[test]
+fn a_space_herdr_opens_with_no_terminal_in_it_is_closed_again_and_the_start_fails_with_its_worktree_and_branch_gone() {
+    let w = tab_world();
+    w.patch(|s| { s["spaceNoPane"] = json!(true); });
+    worker(&w, 1);
+    let a = w.add("No terminal");
+    delegate(&a);
+    let t = settle(&a);
+    assert_eq!(t.s("stage"), "failed");
+    assert!(t.at("failure").to_string().contains("opened no terminal"), "{}", t.at("failure"));
+    assert_eq!(made(&w, "workspace close"), 1);
+    assert!(w.state().arr("workspaces").is_empty());
+    assert_eq!(git(&w.root, &["worktree", "list", "--porcelain"]).matches("worktree ").count(), 1);
+    assert_eq!(git(&w.root, &["branch", "--format=%(refname:short)"]).trim(), "main");
+}
+
+#[test]
 fn the_repo_space_herdr_opened_beside_a_worktree_of_the_boards_never_takes_a_task_tab_and_still_closes_after_its_last_child() {
     let w = tab_world();
     worker(&w, 1);

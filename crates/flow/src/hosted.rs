@@ -80,11 +80,15 @@ fn tab_in(api: &Herdr, ws: &str, dir: &str, label: &str, t: &Obj) -> Res<Value> 
 fn own_label(t: &Obj) -> String { let mut named = t.clone(); mark(&mut named, &json!({ "hosted": true })); flow::tabs::agent_tab(Some(&named)) }
 /// The task's agent at `dir`: a tab (or, set to `pane`, a pane beside yours) in a space found (`prefer` first), else
 /// the repo's space the board opens. One repo at a time, from the search to the space made, so two tasks starting at
-/// once never open two spaces, nor split the same pane.
+/// once never open two spaces, nor split the same pane. The tab's name is made first: a task's key may take the keys'
+/// lock (store/keys_given.rs), which is never taken inside this one. The lock's file is named after the lock, so the
+/// repo's folder is in its name as a hash: a long path would make a file name no disk takes.
 fn place(api: &Herdr, root: &Path, dir: &str, t: &Obj, prefer: &str) -> Res<Value> {
-    with_lock_wait(&format!("host:{}|{}", api.socket_path(), flow::spaces::real(root).display()), 60000, || {
+    let label = own_label(t);
+    let repo = sha1_smol::Sha1::from(flow::spaces::real(root).display().to_string()).digest();
+    with_lock_wait(&format!("host:{}|{repo}", api.socket_path()), 60000, || {
         if let Some(ws) = host(api, root, prefer)? { // a search herdr did not answer fails the start: never a second space
-            match if beside(t) { split::beside(api, &ws, dir, t) } else { tab_in(api, &ws, dir, &own_label(t), t) } {
+            match if beside(t) { split::beside(api, &ws, dir, t) } else { tab_in(api, &ws, dir, &label, t) } {
                 Ok(r) => return Ok(r),
                 Err(e) => match api.call(args(&["workspace", "get", &ws])) {
                     Err(gone) if gone.code.contains("not_found") => {} // herdr closed it as the tab was asked for: the repo gets a space again
@@ -92,7 +96,7 @@ fn place(api: &Herdr, root: &Path, dir: &str, t: &Obj, prefer: &str) -> Res<Valu
                 },
             }
         }
-        new_space::open(api, root, dir, t, beside(t))
+        new_space::open(api, root, dir, t, &label, beside(t))
     })
 }
 /// A first start that asked for a tab: its worktree, made as herdr makes one, and its place (`place`). None: the task

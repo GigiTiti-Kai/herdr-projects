@@ -23,7 +23,7 @@ opened yourself, in herdr or with `herdr workspace create`, counts when its firs
 in one of its worktrees; a repo of its own inside the repo's folder is not the repo. The repo space herdr opened by
 itself beside a worktree of the board's (the one the board closes again after its last task) never counts. No such space
 open: the board opens one for the repo, named after its folder, with the task's agent in its first tab; the repo's later
-tasks open their tabs there, and herdr closes it with its last pane. No bare shell is left behind in it. A task done by [several attempts](attempts.md) always gets one: its attempts share it.
+tasks open their tabs there, and herdr closes it with its last pane. No bare shell is left behind in it. A task done by [several attempts](attempts.md) always gets a space of its own (`worktree create`): its attempts share it.
 One that was already in a tab of yours when its attempts were made (`attempts.by` raised while its plan waited) keeps
 them there: tabs `PRJ-12 Agent A`, `PRJ-12 Agent B` and `PRJ-12 Picker` in your space, and after the pick only the other
 attempts' own panes close.
@@ -34,7 +34,7 @@ attempts' own panes close.
 - **Its tabs are named after it**: `PRJ-12 Agent`, `PRJ-12 Reviewer #1`, `PRJ-12 Planner`, so you can tell them from
   yours.
 - **Started again** (a reply after its terminal was closed, or going into it): a new tab in the same space, or in
-  another found as at the start when that one is gone.
+  another found as at the start when that one is gone, or the repo's space the board opens again.
 
 ## What it never does to your space
 
