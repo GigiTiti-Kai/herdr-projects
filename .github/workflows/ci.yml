@@ -6,8 +6,9 @@
 # folder whose path is a link (warm_start: /var is /private/var), a copied program that may need signing again
 # (take_over_more), and a machine name too long to show whole (the runners' own: coordinator_levels,
 # board_coordinators_inks). The whole check passed there once too, on the commit that brought these.
-# The board's own whole check is this run, waited for whole by scripts/check-cloud.sh: a failure comes back to the task
-# with its job's and step's names here (docs/check-on-github.md).
+# The board's own whole check is this run, waited for whole by scripts/check-cloud.sh: a failure of one of the steps that
+# run the check (its own_steps: rename one here, rename it there) goes back to the task with its job's and step's names;
+# any other step that fails is GitHub's, and the task waits for you (docs/check-on-github.md).
 name: Check
 
 on:

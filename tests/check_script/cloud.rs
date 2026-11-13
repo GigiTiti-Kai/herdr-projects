@@ -102,6 +102,12 @@ fn real_programs_a_failed_step_comes_back_with_its_job_step_log_and_address() {
 fn real_programs_a_run_that_ended_with_no_step_failed_never_started_or_never_ended_is_no_answer() {
     let b = Bench::new("down");
     b.says("list", "101|1|Check\n");
+    // A step of GitHub's own failed (an outage at the job's start): not the check's, whatever the run's conclusion says.
+    b.says("view", &format!("completed|failure|{{sha}}|1|push|Check|{URL}\n"));
+    b.says("steps", "check / Set up job\n");
+    let (code, last, out) = b.run(true, &[]);
+    assert_eq!((code, last.as_str()), (3, format!("{CI_DOWN_LINE}: a step of GitHub's own failed, not the check: check / Set up job · {URL}").as_str()), "{out}");
+    std::fs::remove_file(b.base.join("gh/steps")).unwrap();
     // As GitHub had it on 2026-11-02: the run failed, its macOS job cancelled before any step ran.
     b.says("view", &format!("completed|failure|{{sha}}|1|push|Check|{URL}\n"));
     b.says("jobs", "macos cancelled, check success\n");
@@ -115,6 +121,10 @@ fn real_programs_a_run_that_ended_with_no_step_failed_never_started_or_never_end
     let (code, last, _) = b.run(true, &[("HERDR_PROJECTS_CHECK_TIMEOUT", "2")]);
     assert_eq!(code, 3);
     assert!(last.starts_with(&format!("{CI_DOWN_LINE}: the run did not finish within the check's time (check.timeout)")), "{last}");
+    // Its waits never go past its end: GitHub looked at every 15 seconds, and 2 allowed.
+    let at = std::time::Instant::now();
+    assert_eq!(b.run(true, &[("HERDR_PROJECTS_CHECK_TIMEOUT", "2"), ("CHECK_CLOUD_POLL", "15")]).0, 3);
+    assert!(at.elapsed() < std::time::Duration::from_secs(10), "it waited {:?}", at.elapsed());
     // No run ever started for the commit.
     std::fs::remove_file(b.base.join("gh/list")).unwrap();
     let (code, last, _) = b.run(true, &[("HERDR_PROJECTS_CHECK_TIMEOUT", "2")]);

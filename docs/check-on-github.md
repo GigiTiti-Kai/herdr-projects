@@ -21,12 +21,18 @@ the agents. The shorter check of a fix round (`check.again`, [shorter checks](sh
 | The run | The check | The task |
 |---|---|---|
 | passed | passes, with the run's address | goes on to its review |
-| a step failed | fails: each failed job and step, the last 60 lines of its log, the run's address | goes back to its agent, as a failed check does |
+| a step of the check failed | fails: each failed job and step, the last 60 lines of its log, the run's address | goes back to its agent, as a failed check does |
 | GitHub gave no answer | fails on one line: `The check could not run on GitHub: <why> · <address>` | waits for you, and is not sent back |
 
-"No answer" covers a run that never started, was cancelled or skipped, or ended with no step failed. It also covers gh
-not reaching GitHub, the branch failing to push, the branch moving on during the run, and the time running out. None of
-these says anything about the code, so none of them uses up one of the agent's `review.rounds`.
+The steps of the check are the ones that run the code's own check: `The check`, `The made tables are committed` and
+`The areas that differ on macOS` (`own_steps` in the script; a step renamed in `ci.yml` is renamed there too). Any other
+step that fails, such as `Set up job` on a GitHub outage, the checkout, or installing Rust or Node, is GitHub's.
+
+"No answer" covers a run that never started, was cancelled or skipped, ended with no step of the check failed, or had
+one of GitHub's own steps fail. It also covers gh not reaching GitHub, the branch failing to push, the branch moving on
+during the run, and the time running out. Its waits between two looks at GitHub never go past its end, and a check the
+board stops at `check.timeout` while it waits for CI is said the same way. None of these says anything about the code,
+so none of them uses up one of the agent's `review.rounds`.
 
 To go on:
 

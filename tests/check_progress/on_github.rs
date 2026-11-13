@@ -46,6 +46,19 @@ fn a_run_github_gave_no_answer_on_waits_for_you_and_is_not_one_of_the_agents_rou
 }
 
 #[test]
+fn a_check_the_board_stops_at_its_time_while_it_waits_for_ci_waits_for_you() {
+    let cmd = r#"printf '{"state":"running","ci":"GitHub run 9"}' > "$HERDR_PROJECTS_PROGRESS"; sleep 30"#;
+    let w = world_with(Opts { repo: true, repo_settings: Some(json!({ "check.command": cmd, "check.timeout": "1s" })), ..Default::default() });
+    w.script(json!({ "worker": [{ "note": "Done." }, { "note": "Done again." }] }));
+    let id = w.add("Out of time on GitHub");
+    delegate(&id);
+    let t = settle(&id);
+    assert_eq!((t.s("stage"), t.at("failure").b("agentCanFix"), t.i("checkFails")), ("failed", false, 0));
+    assert_eq!(t.s("msg"), format!("{CI_DOWN_LINE}: the board stopped it at check.timeout while it waited for CI (GitHub run 9)"));
+    assert_eq!(prompts(&w, t.at("link").s("pane")).len(), 1, "nothing was sent back to the agent");
+}
+
+#[test]
 fn a_check_that_failed_on_github_still_goes_back_to_the_agent_even_when_its_log_holds_the_words_of_no_answer() {
     let cmd = format!("echo 'Failed on GitHub (job / step):'; echo '  check / The check'; echo 'assertion failed: \"{CI_DOWN_LINE}: …\"'; echo 'The check failed on GitHub: check / The check · https://github.com/me/proj/actions/runs/8'; exit 1");
     let w = world_with(Opts { repo: true, repo_settings: Some(json!({ "check.command": cmd })), ..Default::default() });

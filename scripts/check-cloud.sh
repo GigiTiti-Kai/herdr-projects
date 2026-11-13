@@ -36,6 +36,11 @@ limit=${HERDR_PROJECTS_CHECK_TIMEOUT:-900}
 end=$(( $(date +%s) + (limit > 120 ? limit - 60 : limit / 2) ))
 poll=${CHECK_CLOUD_POLL:-15}
 late() { [ "$(date +%s)" -ge "$end" ]; }
+# A wait between two looks, never past the end.
+nap() { left=$(( end - $(date +%s) )); [ "$left" -le 0 ] || sleep $(( poll < left ? poll : left )); }
+# The steps of ci.yml that run the code's own check: only a failure of one of them is the code's. Any other step that
+# fails (Set up job, the checkout, installing Rust or Node, the cache) is GitHub's or the network's.
+own_steps="The check|The made tables are committed|The areas that differ on macOS"
 # The branch is the board's own: what was pushed before is overwritten only while origin still holds what was seen here.
 say '{"state":"running","ci":"pushing the branch"}'
 pushed=$(git push -q --force-with-lease origin "HEAD:refs/heads/$branch" 2>&1) || infra "the branch could not be pushed: $(printf '%s' "$pushed" | tail -n 3 | tr '\n' ' ')"
@@ -44,7 +49,7 @@ say '{"state":"running","ci":"waiting for GitHub to start the run"}'
 while :; do
   run=$(gh run list -R "$repo" --workflow ci.yml --commit "$sha" --branch "$branch" --event push --limit 1 --json databaseId,attempt,workflowName --jq '.[0] // empty | "\(.databaseId)|\(.attempt)|\(.workflowName)"' 2>&1) && [ -n "$run" ] && break
   late && infra "no run of ci.yml started on GitHub for $sha on $branch${run:+ (gh: $(printf '%s' "$run" | tail -n 1))}"
-  sleep "$poll"
+  nap
 done
 IFS='|' read -r id attempt workflow <<EOF
 $run
@@ -55,7 +60,7 @@ say "{\"state\":\"running\",\"ci\":\"GitHub run $id\"}"
 while :; do
   seen=$(gh run view "$id" -R "$repo" --json status,conclusion,headSha,attempt,event,workflowName,url --jq '[.status, .conclusion, .headSha, (.attempt | tostring), .event, .workflowName, .url] | join("|")' 2>&1) && case "$seen" in completed\|*) break ;; esac
   late && infra "the run did not finish within the check's time (check.timeout)${seen:+, last seen: $(printf '%s' "$seen" | tail -n 1)}"
-  sleep "$poll"
+  nap
 done
 IFS='|' read -r _status conclusion head now_attempt event now_workflow seen_url <<EOF
 $seen
@@ -65,17 +70,20 @@ EOF
 [ "$head" = "$sha" ] && [ "$now_attempt" = "$attempt" ] && [ "$event" = push ] && [ "$now_workflow" = "$workflow" ] || infra "the run is no longer the one started for $sha (commit $head, attempt $now_attempt of $attempt, $event, $now_workflow)"
 [ "$(git rev-parse HEAD)" = "$sha" ] || infra "the branch moved on while it ran: it checked $sha, and $(git rev-parse HEAD) is checked out now"
 if [ "$conclusion" = success ]; then echo "The check passed on GitHub: $url"; exit 0; fi
-# A step that failed is the code's: its job and step, and the end of its log (each line without its job, step and time).
+# A step of the code's own check that failed: its job and step, and the end of its log (each line without its job, step
+# and time).
 steps=$(gh run view "$id" -R "$repo" --json jobs --jq '.jobs[] | .name as $job | .steps[]? | select(.conclusion == "failure") | "\($job) / \(.name)"' 2>/dev/null)
-if [ "$conclusion" = failure ] && [ -n "$steps" ]; then
+own=$(printf '%s\n' "$steps" | grep -E " / ($own_steps)\$" || true)
+if [ "$conclusion" = failure ] && [ -n "$own" ]; then
   echo "Failed on GitHub (job / step):"
   printf '%s\n' "$steps" | sed 's/^/  /'
   echo
   echo "The end of its log:"
   gh run view "$id" -R "$repo" --log-failed 2>&1 | tail -n 60 | cut -f3- | sed 's/^[^ ]*[0-9]Z //'
   echo
-  echo "The check failed on GitHub: $(printf '%s\n' "$steps" | head -n 1) · $url"
+  echo "The check failed on GitHub: $(printf '%s\n' "$own" | head -n 1) · $url"
   exit 1
 fi
 jobs=$(gh run view "$id" -R "$repo" --json jobs --jq '[.jobs[] | "\(.name) \(.conclusion)"] | join(", ")' 2>/dev/null)
+[ -z "$steps" ] || infra "a step of GitHub's own failed, not the check: $(printf '%s' "$steps" | tr '\n' ',' | sed 's/,$//; s/,/, /g')"
 infra "the run ended ${conclusion:-with no conclusion}${jobs:+ ($jobs)}, with no step of its own failed"
