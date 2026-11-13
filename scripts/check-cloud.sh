@@ -22,9 +22,10 @@ infra() {
 }
 command -v gh >/dev/null 2>&1 || infra "the GitHub CLI (gh) is not installed"
 auth=$(gh auth status 2>&1) || infra "gh cannot reach GitHub as you: $(printf '%s' "$auth" | grep -v '^ *$' | head -n 2 | tr '\n' ' ')"
-# The repo as origin names it: written there, before git's own url rewrites.
-repo=$(git config --get remote.origin.url | sed -e 's#^https://github\.com/##' -e 's#^ssh://git@github\.com/##' -e 's#^git@github\.com:##' -e 's#\.git$##')
-case "$repo" in */*/*|*:*|"") infra "origin is not a GitHub repo ($(git config --get remote.origin.url))" ;; */*) ;; *) infra "origin is not a GitHub repo ($repo)" ;; esac
+# The repo as origin names it: written there, before git's own url rewrites. Never said with a login in it.
+origin=$(git config --get remote.origin.url | sed -e 's#^https://[^/@]*@#https://#')
+repo=$(printf '%s' "$origin" | sed -e 's#^https://github\.com/##' -e 's#^ssh://git@github\.com/##' -e 's#^git@github\.com:##' -e 's#\.git$##')
+case "$repo" in */*/*|*:*|"") infra "origin is not a GitHub repo ($origin)" ;; */*) ;; *) infra "origin is not a GitHub repo ($repo)" ;; esac
 branch=$(git symbolic-ref -q --short HEAD) || quit "The check on GitHub checks a branch: HEAD is not on one."
 # The run checks the commit, not the folder: what is not committed would not be checked.
 [ -z "$(git status --porcelain)" ] || quit "The check on GitHub checks the commit, and this folder has changes that are not in it: commit them first.

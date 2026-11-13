@@ -124,7 +124,8 @@ pub fn pipeline(id: &str, g: &mut Guard, text: &str, keep_intent: bool, reason: 
             let auth = is_auth_failure(&r.out);
             let tail = r.out.lines().filter(|l| !l.is_empty()).last().unwrap_or("").to_string();
             // GitHub gave the check no answer: nothing was judged, so it is neither the agent's to fix nor one of its rounds.
-            if r.out.contains(CI_DOWN_LINE) {
+            // Its last line only: a failed run's log above it may hold the words.
+            if tail.starts_with(CI_DOWN_LINE) {
                 let mut f = failure("check", CI_DOWN_LINE, &format!("Command: {ran}\nFolder: {}\n\n{}", folder.display(), r.out), "Nothing was judged: look at the run, then retry. The check's own last lines say how to run it on this machine instead.");
                 f.put("auth", auth); f.put("agentCanFix", false); f.put("msg", tail);
                 fail(g, f, FailHow::default())?; return Ok(());

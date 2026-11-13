@@ -1,6 +1,6 @@
 //! The whole check on GitHub as the board takes it (docs/check-on-github.md): a check that waits for CI says so and
 //! which run, apart from the wait for its turn here; it is handed `check.timeout`; and a run GitHub gave no answer on
-//! waits for you instead of going back to the agent, while a check that failed still goes back.
+//! waits for you instead of going back to the agent, while a check that failed still goes back, whatever its log says.
 use crate::common;
 use common::*;
 use serde_json::json;
@@ -46,8 +46,9 @@ fn a_run_github_gave_no_answer_on_waits_for_you_and_is_not_one_of_the_agents_rou
 }
 
 #[test]
-fn a_check_that_failed_on_github_still_goes_back_to_the_agent() {
-    let w = world_with(Opts { repo: true, repo_settings: Some(json!({ "check.command": "echo 'Failed on GitHub (job / step):'; echo '  check / The check'; echo 'The check failed on GitHub: check / The check · https://github.com/me/proj/actions/runs/8'; exit 1" })), ..Default::default() });
+fn a_check_that_failed_on_github_still_goes_back_to_the_agent_even_when_its_log_holds_the_words_of_no_answer() {
+    let cmd = format!("echo 'Failed on GitHub (job / step):'; echo '  check / The check'; echo 'assertion failed: \"{CI_DOWN_LINE}: …\"'; echo 'The check failed on GitHub: check / The check · https://github.com/me/proj/actions/runs/8'; exit 1");
+    let w = world_with(Opts { repo: true, repo_settings: Some(json!({ "check.command": cmd })), ..Default::default() });
     w.script(json!({ "worker": [{ "note": "Done." }, { "note": "Done again." }] }));
     let id = w.add("Fails on GitHub");
     delegate(&id);
