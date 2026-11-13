@@ -6,6 +6,9 @@
 # folder whose path is a link (warm_start: /var is /private/var), a copied program that may need signing again
 # (take_over_more), and a machine name too long to show whole (the runners' own: coordinator_levels,
 # board_coordinators_inks). The whole check passed there once too, on the commit that brought these.
+# The board's own whole check is this run, waited for whole by scripts/check-cloud.sh: a failure of one of the steps that
+# run the check (its own_steps: rename one here, rename it there) goes back to the task with its job's and step's names;
+# any other step that fails is GitHub's, and the task waits for you (docs/check-on-github.md).
 name: Check
 
 on:
@@ -45,6 +48,18 @@ jobs:
           GIT_COMMITTER_NAME: ci
           GIT_COMMITTER_EMAIL: ci@example.com
         run: npm run check -- --all
+
+      # The check writes the made tables (docs/keys.md, docs/settings.md, docs/agents.md); what it wrote here is not sent
+      # back. A table out of date in the commit fails, with its name, for the task to write and commit it itself.
+      - name: The made tables are committed
+        run: |
+          changed=$(git diff --name-only)
+          if [ -n "$changed" ]; then
+            echo "::error::The check wrote files that differ from the commit: $(echo $changed)"
+            echo "These files in git are out of date in the commit:"; echo "$changed" | sed 's/^/  /'
+            echo "Run npm run check (or ./target/quick/herdr-projects docs) in your worktree and commit what it wrote."
+            exit 1
+          fi
 
   macos:
     # shortcut: Intel, because the arm64 runners are too few: since 2026-11-02 a job there often gets none and GitHub

@@ -8,6 +8,8 @@ use std::process::{Child, Command};
 
 /// The tests' turns at the environment they share in one process (scripts/run-tests.sh).
 mod env_turn;
+/// The whole check on GitHub, as its own script runs it (scripts/check-cloud.sh).
+mod cloud;
 
 /// A copy of the check's scripts in a git repo of its own, an empty home, a machine of three cores, and a `cargo` that
 /// writes down what it was given and stops the check (exit 7, without a word), so only the check's start runs.

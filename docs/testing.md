@@ -336,7 +336,8 @@ about them.
 ## On macOS too
 
 GitHub runs the whole check on Linux, and on macOS the areas whose tests differ there (`.github/workflows/ci.yml`; the
-whole check passed there too). A test holds on both when it asks what both have:
+whole check passed there too). The board's own whole check is that run ([the whole check on GitHub](check-on-github.md)).
+A test holds on both when it asks what both have:
 
 - a process's state from `ps -o stat= -p <pid>`, not `/proc` (macOS has none);
 - a lock through `libc::flock` in the test itself, not the `flock` command (macOS has none): a flock belongs to one

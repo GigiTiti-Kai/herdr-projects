@@ -3,6 +3,8 @@
 use serde_json::{json, Value};
 use sw::check_progress::{check_shown, ran_for, read_report, start_check, step_check, still_after, KNOWN_LINE};
 use sw::json::*;
+/// The check that waits for CI on GitHub (docs/check-on-github.md).
+mod on_github;
 
 const MIN: i64 = 60000;
 const T0: i64 = 1_000_000_000_000;

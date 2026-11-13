@@ -1,6 +1,6 @@
 //! Running the repo's check with its progress shown: the file the command reports to, and what is kept on the task while
 //! it runs (the row shows that, and herdr's sidebar the row).
-use crate::check_progress::{ran_for, read_report, start_check, step_check, KNOWN_LINE};
+use crate::check_progress::{ran_for, read_report, start_check, step_check, CI_DOWN_LINE, KNOWN_LINE};
 use crate::clock::now;
 use crate::err::Res;
 use crate::json::*;
@@ -11,6 +11,9 @@ use std::path::{Path, PathBuf};
 
 /// The name of the file a check writes its progress to, given to the command in this variable (docs/check-progress.md).
 pub const PROGRESS_ENV: &str = "HERDR_PROJECTS_PROGRESS";
+/// How long the board lets the check run, in seconds (`check.timeout`): one that waits for CI elsewhere ends by itself
+/// before that, with its own word (scripts/check-cloud.sh).
+pub const TIMEOUT_ENV: &str = "HERDR_PROJECTS_CHECK_TIMEOUT";
 pub fn progress_file(id: &str) -> PathBuf { dir_of(id).join("check-progress") }
 /// The check itself, followed: what `sh` gave, plus `known` when the command answered at once for code that passed before.
 /// `short`: the shorter check of a later round (check_again.rs), said so on the task.
@@ -31,12 +34,18 @@ pub fn run_check(g: &mut Guard, id: &str, cmd: &str, short: bool, folder: &Path,
     };
     let mut env = env.to_vec();
     env.push((PROGRESS_ENV.into(), file.display().to_string()));
+    if timeout_min > 0.0 { env.push((TIMEOUT_ENV.into(), ((timeout_min * 60.0).round() as i64).to_string())); }
     let gcell = std::cell::RefCell::new(g);
     let alive = || gcell.borrow().check().is_ok();
     let mut tick = || -> Res<()> { if read() { let c = check.borrow().clone(); gcell.borrow_mut().set(|t| t.put("check", c))?; } Ok(()) };
     let r = sh(cmd, folder, &env, timeout_min, Some(&alive), Some(&mut tick));
     let g = gcell.into_inner();
     read();
+    // Stopped at `check.timeout` while it waited for CI elsewhere: that is a wait out of time, not a failure of the code.
+    let mut r = r;
+    if !r.ok && !r.aborted && !check.borrow().s("ci").is_empty() && r.out.ends_with(&format!("stopped after {timeout_min} minutes")) {
+        r.out.push_str(&format!("\n{CI_DOWN_LINE}: the board stopped it at check.timeout while it waited for CI ({})", check.borrow().s("ci")));
+    }
     let known = check.borrow().s("state") == "known";
     if r.ok && !r.aborted { if let Some(ran) = ran_for(&check.borrow(), now()) { note_check_run(root, cmd, ran); } }
     let _ = std::fs::remove_file(&file);

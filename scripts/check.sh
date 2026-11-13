@@ -14,6 +14,7 @@ trap 'st=$?; sc_leave 2>/dev/null; [ "$st" = 0 ] || echo "The check stopped whil
 quit() { echo "$1" >&2; trap - EXIT; exit 2; }
 here=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$here"
+args="$*"
 # The folder checked is this one. The board runs a task's check with HERDR_PROJECTS_REPO set to your own checkout
 # (finish/pipeline.rs), and the program's made pages and rules follow that variable (docs.rs): taken along, the check
 # would read and write your checkout, not the task's.
@@ -60,6 +61,22 @@ if [ "$fresh" = 0 ] && [ -n "$stamp" ] && [ -f "$cache/$stamp" ]; then
   say '{"state":"known"}'
   echo "The check already passed for this exact code."
   exit 0
+fi
+# The whole check and the shorter one are heavy jobs: one at a time on the whole machine, under its memory caps, where
+# that shared lock is installed (`heavy-run`, docs/check-on-github.md). heavy-run starts the job afresh, in the home
+# folder and with none of this environment: both are handed in, the environment on its input (never on disk or on a
+# command line, where it would show). It runs the job apart, as a unit of its own, where the
+# board's stop (a kill of this check's process group) does not reach: the job watches this check and ends with it.
+# A run of names is not one of them.
+if [ -z "$names" ] && [ -z "${HEAVY_RUN_ACTIVE:-}" ] && command -v heavy-run >/dev/null 2>&1; then
+  say '{"state":"waiting"}'
+  trap - EXIT
+  # shellcheck disable=SC2086,SC2016
+  sh -c 'export -p' | heavy-run -- sh -c 'eval "$(cat)"; cd "$1" || exit 2; caller=$2; shift 2
+    unit=/sys/fs/cgroup$(cut -d: -f3 /proc/self/cgroup | head -n 1)
+    ( while kill -0 "$caller" 2>/dev/null; do sleep 1; done; echo 1 > "$unit/cgroup.kill" ) &
+    exec sh scripts/check.sh "$@" < /dev/null' check "$here" $$ $args
+  exit $?
 fi
 started=$(date +%s)
 sc_join
