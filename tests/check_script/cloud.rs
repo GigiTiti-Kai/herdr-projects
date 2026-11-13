@@ -18,7 +18,7 @@ impl Bench {
         std::fs::write(base.join("proj/scripts/check.sh"), "echo \"the whole check here: $*\"\n").unwrap();
         std::fs::write(base.join("proj/.gitignore"), "progress\n").unwrap();
         let mut b = Bench { base, sha: String::new() };
-        b.stub("gh", &format!("d='{}'\necho \"$*\" >> \"$d/calls\"\ncase \"$*\" in\n  *--log-failed*) cat \"$d/log\" ;;\n  *select*) cat \"$d/steps\" 2>/dev/null ;;\n  *'join(\", \")'*) cat \"$d/jobs\" 2>/dev/null ;;\n  'run view'*) cat \"$d/view\" ;;\n  'run list'*) cat \"$d/list\" 2>/dev/null ;;\nesac\nexit 0", b.base.join("gh").display()));
+        b.stub("gh", &format!("d='{}'\n[ -f \"$d/first\" ] || cp \"$HERDR_PROJECTS_PROGRESS\" \"$d/first\"\necho \"$*\" >> \"$d/calls\"\ncase \"$*\" in\n  *--log-failed*) cat \"$d/log\" ;;\n  *select*) cat \"$d/steps\" 2>/dev/null ;;\n  *'join(\", \")'*) cat \"$d/jobs\" 2>/dev/null ;;\n  'run view'*) cat \"$d/view\" ;;\n  'run list'*) cat \"$d/list\" 2>/dev/null ;;\nesac\nexit 0", b.base.join("gh").display()));
         Self::git_in(&b.base.join("origin.git"), &["init", "-q", "--bare"]);
         b.git(&["init", "-q", "-b", "work/1-thing"]);
         b.git(&["remote", "add", "origin", "https://github.com/me/proj.git"]);
@@ -74,6 +74,8 @@ fn real_programs_only_a_success_of_the_run_it_fixed_on_the_commit_still_checked_
     assert!(calls.contains(&format!("run list -R me/proj --workflow ci.yml --commit {} --branch work/1-thing --event push", b.sha)), "{calls}");
     assert!(calls.contains("run view 101 -R me/proj"), "{calls}");
     assert_eq!(b.progress().trim(), r#"{"state":"running","ci":"GitHub run 101"}"#);
+    let first = std::fs::read_to_string(b.base.join("gh/first")).unwrap_or_default();
+    assert!(first.contains(r#""ci""#), "it says it waits for CI before its first call to gh, which may hang: {first:?}");
     // The same run, on another commit, another attempt or another event, or with the branch moved on: no answer.
     for view in ["completed|success|0000000|1|push|Check", "completed|success|{sha}|2|push|Check", "completed|success|{sha}|1|pull_request|Check"] {
         b.says("view", &format!("{view}|{URL}\n"));

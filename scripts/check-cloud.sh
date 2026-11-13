@@ -20,6 +20,9 @@ infra() {
   echo "$down: $1${url:+ · $url}"
   exit 3
 }
+# Said before anything that may take long (gh, git push): a check the board stops at check.timeout while it says it
+# waits for CI is a wait out of time, never the code's failure (check_run.rs).
+say '{"state":"running","ci":"getting ready"}'
 command -v gh >/dev/null 2>&1 || infra "the GitHub CLI (gh) is not installed"
 auth=$(gh auth status 2>&1) || infra "gh cannot reach GitHub as you: $(printf '%s' "$auth" | grep -v '^ *$' | head -n 2 | tr '\n' ' ')"
 # The repo as origin names it: written there, before git's own url rewrites. Never said with a login in it.
