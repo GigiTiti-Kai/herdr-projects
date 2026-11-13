@@ -13,6 +13,7 @@ progress shows: its row, the task panel, the details page, the chat line and Her
 |---|---|---|---|
 | runs, and reports a count | `Running the check · tests 31 of 47` | the count: 31 of 47 is 65% | how long full runs took here, minus the time spent |
 | waits for its turn | `Waiting for its turn · 2 ahead` | none | the runs ahead, then its own |
+| waits for CI elsewhere, and says which run | `Waiting for CI · GitHub run 123 · 2m of about 5m` | none | what it took before, minus the time spent |
 | answers at once: this code passed before | `The check already passed for this exact code` | none | none |
 | runs, and reports nothing | `Running the check · 2m of about 5m` | none | what it took before, minus the time spent |
 | reports nothing, and never ran here before | `Running the check · 2m` | none | none |
@@ -65,6 +66,7 @@ Write one line, as JSON or plain words:
 | `{"done": 45, "total": 50, "before": 40}` | 40 of them were done before this run began (they passed earlier and did not run again): the run is timed as part of a full one |
 | `{"state": "waiting", "ahead": 2}` | it has not started: two runs go first |
 | `{"state": "known"}` | answered at once, nothing run: this exact code passed before |
+| `{"state": "running", "ci": "GitHub run 123"}` | it runs elsewhere and waits for CI there: the words after `ci` (letters, digits, spaces, `#`, `.`, `-`, up to 60) are shown after `Waiting for CI` ([the whole check on GitHub](check-on-github.md)) |
 
 A shell check, for example:
 

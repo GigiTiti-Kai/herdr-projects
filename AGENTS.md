@@ -77,7 +77,8 @@ board: asked again, it answers at once.
   the tests whose own names hold it (`npm run check textbox`): a second or two after the build. With no name it runs
   them all, about 15 seconds on a quiet machine.
 - **The board runs the whole check at the end**, when you finish: `npm run check -- --all`. Run that yourself at most
-  once, last of all, when your task asks for it; never after each edit. The board's run then answers at once.
+  once, last of all, when your task asks for it; never after each edit. The board's own run is on GitHub Actions
+  (`scripts/check-cloud.sh`, [docs/check-on-github.md](docs/check-on-github.md)): it waits for the run of the commit.
   On a later round (a review or a failed check sent the work back) it runs the shorter check instead,
   `npm run check -- --since <commit>`: only the test files your change since the last whole run reaches.
 - **Never wait in a loop for the machine to be quiet**, and never look at the load before a run. A busy machine fails

@@ -8,6 +8,7 @@ use super::hand_over::hand_over;
 use super::pipeline_end::{after_review, Ctx};
 use super::research::{kept_report, research_only};
 use super::shared::{fail, failure, first_line, FailHow};
+use crate::check_progress::CI_DOWN_LINE;
 use crate::clock::now;
 use crate::err::Res;
 use crate::flow;
@@ -122,6 +123,12 @@ pub fn pipeline(id: &str, g: &mut Guard, text: &str, keep_intent: bool, reason: 
             let last = fails > rounds; // it goes back by itself `review.rounds` times
             let auth = is_auth_failure(&r.out);
             let tail = r.out.lines().filter(|l| !l.is_empty()).last().unwrap_or("").to_string();
+            // GitHub gave the check no answer: nothing was judged, so it is neither the agent's to fix nor one of its rounds.
+            if r.out.contains(CI_DOWN_LINE) {
+                let mut f = failure("check", CI_DOWN_LINE, &format!("Command: {ran}\nFolder: {}\n\n{}", folder.display(), r.out), "Nothing was judged: look at the run, then retry. The check's own last lines say how to run it on this machine instead.");
+                f.put("auth", auth); f.put("agentCanFix", false); f.put("msg", tail);
+                fail(g, f, FailHow::default())?; return Ok(());
+            }
             let mut f = failure("check", &format!("Check failed{}", if last && fails > 1 { format!(" after {fails} tries") } else { String::new() }), &format!("Command: {ran}\nFolder: {}\n\n{}", folder.display(), r.out), "Fix the failed check, run it again and finish for a fresh review.");
             f.put("auth", auth); f.put("agentCanFix", true);
             if last && fails > 1 { f.put("msg", format!("The check still fails after {fails} tries ({ran}): {tail}")); }

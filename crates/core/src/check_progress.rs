@@ -6,12 +6,16 @@ use crate::json::*;
 
 const MIN: i64 = 60000;
 pub const KNOWN_LINE: &str = "The check already passed for this exact code";
+/// The line a check on GitHub ends with when GitHub gave no answer (scripts/check-cloud.sh): nothing was judged, so the
+/// task waits for you instead of going back to its agent.
+pub const CI_DOWN_LINE: &str = "The check could not run on GitHub";
 /// How long nothing may move before the row says so: three times a usual run, never under three minutes; ten where none was timed.
 pub fn still_after(usual: i64) -> i64 { if usual > 0 { (3 * MIN).max(3 * usual) } else { 10 * MIN } }
 const MIN_SHARE: f64 = 0.05;
 fn count(v: &Value) -> Option<i64> { let n = number(v); (v.is_number() || v.as_str().map(|s| s.trim().parse::<f64>().is_ok()).unwrap_or(false)).then_some(n).filter(|n| n.is_finite() && *n >= 0.0).map(|n| n.floor() as i64) }
 /// What a check wrote: JSON ({"done":31,"total":47,"unit":"tests","before":0}, {"state":"waiting","ahead":2},
-/// {"state":"known"}) or plain words ("31/47", "31 of 47 tests"). None: nothing the board can read.
+/// {"state":"known"}, {"state":"running","ci":"GitHub run 123"}: it waits for CI elsewhere) or plain words ("31/47",
+/// "31 of 47 tests"). None: nothing the board can read.
 pub fn read_report(text: &str) -> Option<Value> {
     let s = text.trim();
     if s.is_empty() { return None; }
@@ -25,6 +29,8 @@ pub fn read_report(text: &str) -> Option<Value> {
     if state == &json!("known") { return Some(json!({ "state": "known" })); }
     if state == &json!("waiting") { return Some(json!({ "state": "waiting", "ahead": count(j.at("ahead")) })); }
     if !state.is_null() && state != &json!("running") { return None; }
+    let ci: String = j.at("ci").as_str().map(|u| u.chars().filter(|c| c.is_ascii_alphanumeric() || " #.-".contains(*c)).take(60).collect::<String>().trim().to_string()).unwrap_or_default();
+    if !ci.is_empty() { return Some(json!({ "state": "running", "ci": ci })); }
     let (done, total) = (count(j.at("done")), count(j.at("total")).filter(|t| *t > 0));
     let (Some(done), Some(total)) = (done, total) else { return if state == &json!("running") { Some(json!({ "state": "running" })) } else { None } };
     let unit: String = j.at("unit").as_str().map(|u| u.chars().filter(|c| c.is_ascii_alphabetic() || *c == ' ').collect::<String>().trim().chars().take(20).collect()).unwrap_or_default();
@@ -41,10 +47,10 @@ pub fn step_check(c: &Value, r: Option<&Value>, now: i64) -> Value {
         n.put("ahead", r.at("ahead").clone());
         if c.s("state") != "waiting" || c.at("ahead") != r.at("ahead") { n.put("movedAt", now); }
     } else if r.s("state") == "running" {
-        for k in ["done", "total", "unit"] { n.put(k, r.at(k).clone()); }
+        for k in ["done", "total", "unit", "ci"] { n.put(k, r.at(k).clone()); }
         n.put("from", r.i("before"));
         if c.s("state") != "running" && c.has("state") { n.put("runAt", now); n.put("movedAt", now); }
-        if r.at("done") != c.at("done") { n.put("movedAt", now); }
+        if r.at("done") != c.at("done") || r.at("ci") != c.at("ci") { n.put("movedAt", now); }
     }
     Value::Object(n)
 }
@@ -87,10 +93,13 @@ pub fn check_shown(c: &Value, now: i64) -> Shown {
             else if (done - from) as f64 / (total - from) as f64 >= MIN_SHARE { Some(left_of(spent as f64 * (total - done) as f64 / (done - from) as f64)) } else { None };
         return shown(format!("Running the check · {place}"), Some(progress), eta);
     }
-    if usual == 0 { return shown(format!("Running the check · {}", spent_words(spent)), None, None); }
-    if spent > (3 * usual).max(usual + 10 * MIN) { return shown(format!("The check runs far longer than usual · {}, usually {}", spent_words(spent), mins(usual)), None, None); }
-    if spent >= usual { return shown(format!("Running the check · {}, usually {}", spent_words(spent), mins(usual)), None, None); }
-    shown(format!("Running the check · {} of about {}", spent_words(spent), mins(usual)), None, Some(left_of((usual - spent) as f64)))
+    // A check that waits for CI elsewhere says so, and which run: not the board's own queue, nor a check left alone.
+    let ci = c.s("ci");
+    let (head, far) = if ci.is_empty() { ("Running the check".to_string(), "The check runs far longer than usual".to_string()) } else { (format!("Waiting for CI · {ci}"), format!("Waiting for CI far longer than usual · {ci}")) };
+    if usual == 0 { return shown(format!("{head} · {}", spent_words(spent)), None, None); }
+    if spent > (3 * usual).max(usual + 10 * MIN) { return shown(format!("{far} · {}, usually {}", spent_words(spent), mins(usual)), None, None); }
+    if spent >= usual { return shown(format!("{head} · {}, usually {}", spent_words(spent), mins(usual)), None, None); }
+    shown(format!("{head} · {} of about {}", spent_words(spent), mins(usual)), None, Some(left_of((usual - spent) as f64)))
 }
 
 #[cfg(test)]
