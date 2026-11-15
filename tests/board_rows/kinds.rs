@@ -50,12 +50,11 @@ fn a_task_its_message_hands_to_another_is_named_with_where_that_one_stands() {
     assert_eq!(handed(&s, &row("PRJ-26 を見ている")), "");
     assert_eq!(handed(&s, &row("別のボードに委任")), "");
     // One it takes back right after names nothing; another one in the same message still does.
-    for no in ["PRJ-26に委任しない。手で続ける", "PRJ-26に委任せず手で回す", "PRJ-26に委任しません", "PRJ-26に委任していません。手で続ける", "PRJ-26に委任してはいけない。手で続ける", "PRJ-26に委任することは拒否された。手で続ける", "PRJ-26に委任しなかった", "PRJ-26に委任を取り消した", "PRJ-26に委任をやめた", "PRJ-26に委任するのは禁止"] {
+    for no in ["PRJ-26に委任しない。手で続ける", "PRJ-26に委任せず手で回す", "PRJ-26に委任しません", "PRJ-26に委任していません。手で続ける", "PRJ-26に委任してはいけない。手で続ける", "PRJ-26に委任することは拒否された。手で続ける", "PRJ-26に委任しなかった", "PRJ-26に委任を取り消した", "PRJ-26に委任をやめた", "PRJ-26に委任するのは禁止", "PRJ-26に委任することは、拒否された。手で続ける", "PRJ-26に委任することは、禁止されている。手で続ける", "PRJ-26に委任済み、手では回さない"] {
         assert_eq!(handed(&s, &row(no)), "", "{no}");
     }
     assert_eq!(handed(&s, &row("OPS-246に委任しない。PRJ-26に委任")), "[委任先 PRJ-26・作業中]");
-    // What comes after the clause is another clause: a no there takes nothing back.
-    assert_eq!(handed(&s, &row("PRJ-26に委任済み、手では回さない")), "[委任先 PRJ-26・作業中]");
+    // A no in another sentence takes nothing back.
     assert_eq!(handed(&s, &row("PRJ-26に委任した。返事はまだない")), "[委任先 PRJ-26・作業中]");
     // Never itself, and not another machine's row (its keys are that machine's).
     assert_eq!(handed(&s, &obj(json!({ "id": "ops/201", "raw": "OPS-201に委任" }))), "");
