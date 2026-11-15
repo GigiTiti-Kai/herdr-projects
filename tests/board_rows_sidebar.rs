@@ -70,7 +70,8 @@ fn herdrs_sidebar_every_stage_the_entrys_three_rows_are_the_board_rows_number_an
         assert!(e.stands.ends_with(&[plain_words(&f.review.text()), plain_words(&f.pr.text())].into_iter().filter(|x| !x.is_empty()).collect::<Vec<_>>().join(" ")), "{name}");
         let one = std::sync::Arc::new(r.clone());
         let lay = row_layout(&mut s, &theme, std::slice::from_ref(&one), 200, &[vec![one.clone()]], 200);
-        assert!(plain_words(&row(&s, &theme, &r, 200, &lay).text()).contains(&e.name) || r.s("state") == "done", "{name}");
+        // The sidebar names the task without the row's kind chip (view/kind.rs).
+        assert!(plain_words(&row(&s, &theme, &r, 200, &lay).text()).replace("[運用] ", "").contains(&e.name) || r.s("state") == "done", "{name}");
     }
     // The reviewer's own entry names the task the same way, with the reviewer as who, whatever the task waits for.
     let in_review = with(&base, json!({ "stage": "reviewing", "state": "working", "reviewRound": 2, "note": "Reading the diff", "progress": 40 }));

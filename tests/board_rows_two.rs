@@ -55,7 +55,7 @@ fn lines(s: &mut State, r: &Rec, width: usize) -> Vec<String> { lines_in(s, r, s
 fn list(s: &mut State, width: usize, h: usize, screen: usize) -> Vec<String> { list_lines(s, &t(), width, h, screen).iter().map(|l| l.text()).collect() }
 fn is_lit(l: &Inked) -> bool { l.0.iter().any(|p| p.bg == Some(Ink::Selection) || p.inv) }
 fn lit(s: &mut State, width: usize) -> Vec<String> { list_lines(s, &t(), width, 20, width).iter().filter(|l| is_lit(l)).map(|l| l.text()).collect() }
-fn len(l: &str) -> usize { l.chars().count() }
+fn len(l: &str) -> usize { sw::text::width(l) }
 
 #[test]
 fn a_live_tasks_row_is_two_lines_the_second_what_it_says_under_its_name_a_done_to_do_or_archived_one_stays_one_line() {
@@ -66,7 +66,7 @@ fn a_live_tasks_row_is_two_lines_the_second_what_it_says_under_its_name_a_done_t
     let said: Vec<String> = live().iter().map(|r| under(&mut s, r, 100)).collect();
     assert_eq!(said, ["      Reading the panel and its tests.", "      Running the tests", "      Running the repo's check", "      Pass · 1 minor", "      Review failed · 1 critical", "      Sand or pebbles?", "      The check failed"]);
     let first = lines(&mut s, &live()[0], 100)[0].clone();
-    assert!(has(&first, r"^[ ▌]◐ #\d+ Agent at work +█+░+ +40% 12m left +2h$"), "{first:?}");
+    assert!(has(&first, r"^[ ▌]◐ #\d+ \[運用\] Agent at work +█+░+ +40% 12m left +2h$"), "{first:?}");
     // It has the row's whole width, and is cut at its end when it is longer still: never a third line.
     let long = work(json!({ "id": "p/1", "title": "Agent at work", "progress": 40, "eta": 12, "msg": "Tracing how prefix+w got suggested, checking keys.js and the herdr defaults before changing the hint line." }));
     assert_eq!(under(&mut s, &long, 120), format!("      {}", long.s("msg")));
@@ -92,14 +92,14 @@ fn all_machines_a_remote_tasks_second_line_starts_under_its_tasks_name_at_every_
             for r in &list {
                 let l = lines_in(&mut s, r, &list, width, SCREEN);
                 let start = l[1].chars().position(|c| !c.is_whitespace()).map(|n| n as i64).unwrap_or(-1);
-                let name = l[0].find("Remote").map(|b| l[0][..b].chars().count() as i64).unwrap_or(-1);
+                let name = l[0].find("[運用]").map(|b| sw::text::width(&l[0][..b]) as i64).unwrap_or(-1);
                 assert_eq!(start, name, "{} at {width}:\n{}\n{}", r.s("host"), l[0], l[1]); assert!(len(&l[1]) <= width);
             }
         }
     }
     let head: Vec<String> = lines(&mut s, &far, 100).iter().map(|l| l.chars().take(47).collect::<String>().trim_end().to_string()).collect();
     // The machine is its heading's, never the row's: the row is as on one machine's board.
-    assert_eq!(head, [" ◐ #1 Remote task".to_string(), format!("{}Checking the implementation", " ".repeat(6))]);
+    assert_eq!(head, [" ◐ #1 [運用] Remote task".to_string(), format!("{}Checking the implementation", " ".repeat(6))]);
     s.scope = String::new(); // one machine's board: the same, under the name, right of the mark
     assert_eq!(lines(&mut s, &far, 100)[1], "      Checking the implementation");
 }
@@ -111,13 +111,13 @@ fn a_row_with_nothing_to_say_yet_keeps_its_second_line_which_says_something_true
     let finished = done(json!({ "id": "p/3", "title": "Finished" }));
     let mut s = board(&[silent.clone(), waits.clone(), finished.clone()], "", "");
     let one = std::slice::from_ref(&silent);
-    assert_eq!(lines_in(&mut s, &silent, one, 60, SCREEN), [format!(" ◐ #1 New one{}2h", " ".repeat(45)), "      Just started".to_string()]);
+    assert_eq!(lines_in(&mut s, &silent, one, 60, SCREEN), [format!(" ◐ #1 [運用] New one{}2h", " ".repeat(38)), "      Just started".to_string()]);
     let bare = work(json!({ "id": "p/1", "title": "New one", "msg": "" }));
     assert_eq!(lines_in(&mut s, &bare, one, 60, SCREEN)[1].trim(), "Working", "an older board's task that says nothing: the plain word, never a gap");
     let yours = work(json!({ "id": "p/1", "title": "New one", "msg": "", "stage": "progress" }));
     assert_eq!(lines_in(&mut s, &yours, one, 60, SCREEN)[1].trim(), "Yours: no agent on it");
     let w: Vec<String> = lines_in(&mut s, &waits, std::slice::from_ref(&waits), 60, SCREEN).iter().map(|l| l.trim_end().to_string()).collect();
-    assert_eq!(w, [format!(" ◆ #2 Never reviewed{}2h ago", " ".repeat(34)), "      Not reviewed".to_string()]);
+    assert_eq!(w, [format!(" ◆ #2 [運用] Never reviewed{}2h ago", " ".repeat(27)), "      Not reviewed".to_string()]);
     let before = list(&mut s, 60, 20, SCREEN);
     let talks = work(json!({ "id": "p/1", "title": "New one", "msg": "Reading the code." }));
     let passed = ready(json!({ "id": "p/2", "title": "Never reviewed", "review": pass() }));
@@ -133,12 +133,12 @@ fn the_highlight_covers_both_lines_of_the_selected_row_and_the_arrow_keys_go_tas
     let mut s = board(&[live()[0].clone(), live()[1].clone(), quiet()[0].clone()], "p/1", "");
     let l = lit(&mut s, 80);
     assert_eq!(l.len(), 2, "{l:?}");
-    assert!(has(&l[0], r"^[ ▌]  ◐ #\d+ Agent at work +█+░+ +40% 12m left +2h *$"), "{l:?}");
+    assert!(has(&l[0], r"^[ ▌]  ◐ #\d+ \[運用\] Agent at work +█+░+ +40% 12m left +2h *$"), "{l:?}");
     assert_eq!(l[1].trim_end(), "▌       Reading the panel and its tests.", "the bar in the gutter is on every line of the selected row");
     assert!(l.iter().all(|x| len(x) == 80), "each to the window's edge");
     step(&mut s, 1); assert_eq!(s.sel, "p/2", "one press, one task: never onto a row's second line");
-    let l: Vec<String> = lit(&mut s, 80).iter().map(|x| x.chars().take(25).collect::<String>().trim_end().to_string()).collect();
-    assert_eq!(l, ["▌  ◑ #2 Under review", "▌       Running the tests"]);
+    let l: Vec<String> = lit(&mut s, 80).iter().map(|x| x.chars().take(30).collect::<String>().trim_end().to_string()).collect();
+    assert_eq!(l, ["▌  ◑ #2 [運用] Under review", "▌       Running the tests"]);
     s.sel = "p/8".into(); s.rows = fold_rows(&mut s);
     assert_eq!(lit(&mut s, 80).len(), 1, "a done row is one line (selected, it shows)");
     s.sel = "p/2".into(); step(&mut s, -1); step(&mut s, -1); assert_eq!(s.sel, "p/1");
@@ -148,7 +148,7 @@ fn the_highlight_covers_both_lines_of_the_selected_row_and_the_arrow_keys_go_tas
 fn the_list_scrolls_by_whole_rows_no_row_is_ever_shown_half_and_the_selected_one_is_always_whole() {
     let many: Vec<Rec> = (1..=5).map(|n| work(json!({ "id": format!("p/{n}"), "title": format!("Working {n}"), "msg": format!("Says {n}") })))
         .chain((0..3).map(|n| todo(json!({ "id": format!("p/{}", n + 20), "title": format!("Later {}", n + 1) })))).collect();
-    let first = Regex::new(r"^[ ▌]  ◐ #\d+ +Working (\d+) ").unwrap();
+    let first = Regex::new(r"^[ ▌]  ◐ #\d+ +\[運用\] Working (\d+) ").unwrap();
     let second = Regex::new(r"^[ ▌] {8}Says (\d+)").unwrap();
     for h in [2, 3, 4, 5, 8] {
         let mut s = board(&many, "p/1", "");
@@ -157,10 +157,10 @@ fn the_list_scrolls_by_whole_rows_no_row_is_ever_shown_half_and_the_selected_one
             assert_eq!(lines.len(), h);
             for (n, l) in lines.iter().enumerate() {
                 if let Some(c) = first.captures(l) { assert_eq!(lines.get(n + 1).map(|x| x.trim_end().replacen('▌', " ", 1)), Some(format!("         Says {}", &c[1])), "h {h}, at {}: a first line with no second\n{}", s.sel, lines.join("\n")); }
-                if let Some(c) = second.captures(l) { assert!(n > 0 && has(&lines[n - 1], &format!(r"^[ ▌]  ◐ #\d+ +Working {} ", &c[1])), "h {h}, at {}: a second line with no first\n{}", s.sel, lines.join("\n")); }
+                if let Some(c) = second.captures(l) { assert!(n > 0 && has(&lines[n - 1], &format!(r"^[ ▌]  ◐ #\d+ +\[運用\] Working {} ", &c[1])), "h {h}, at {}: a second line with no first\n{}", s.sel, lines.join("\n")); }
             }
             let n: usize = s.sel.split('/').nth(1).unwrap().parse().unwrap();
-            let want = if n < 20 { format!(r"^[ ▌]  ◐ #{n}  Working {n} ") } else { format!(r"^[ ▌]  ○ #{n} Later {} ", n - 19) };
+            let want = if n < 20 { format!(r"^[ ▌]  ◐ #{n}  \[運用\] Working {n} ") } else { format!(r"^[ ▌]  ○ #{n} \[運用\] Later {} ", n - 19) };
             assert!(lines.iter().any(|l| has(l, &want)), "h {h}: {} is in view\n{}", s.sel, lines.join("\n"));
         };
         look(&mut s);
@@ -169,7 +169,7 @@ fn the_list_scrolls_by_whole_rows_no_row_is_ever_shown_half_and_the_selected_one
     }
     // In a list of one line there is no room for both: the selected row's first line, its name, is what shows.
     let mut s = board(&many, "p/3", "");
-    assert!(has(&list(&mut s, 60, 1, SCREEN)[0], r"^[ ▌]  ◐ #3  Working 3 "));
+    assert!(has(&list(&mut s, 60, 1, SCREEN)[0], r"^[ ▌]  ◐ #3  \[運用\] Working 3 "));
 }
 
 #[test]

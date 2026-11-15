@@ -36,7 +36,7 @@ fn typing_adds_a_task_tab_delegates_space_replies_and_enter_opens_the_agent() {
     s.press(&["ctrl+s"]);
     settle("proj/1"); s.load();
     let t = s.text();
-    assert!(has(&t, r"\n   ▾ working +[^\n]*\n[ ▌]  ◐ PRJ-\d+ +Add a greeting"), "{t}");
+    assert!(has(&t, r"\n   ▾ working +[^\n]*\n[ ▌]  ◐ PRJ-\d+ +\[自動\] Add a greeting"), "{t}");
     assert!(!has(&t, "On its screen|Editing greet|esc to interrupt"), "nothing of the program's screen is shown");
     assert!(t.contains(&format!("alt+o open this task's agent · space talk to the agent · {} stop the agent · esc close · ? all keys", key_name("stop"))), "{t}");
     s.press(&["space"]);

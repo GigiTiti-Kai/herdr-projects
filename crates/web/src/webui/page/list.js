@@ -4,13 +4,14 @@
 /* global ResizeObserver, localStorage */
 import { h, icon, ink, said, markEl } from "./dom.js";
 
-// What is said of a task after its title (`×3`, `[auto]`, `[research]` …) is dimmed: colour means status only. The pin
-// mark `★` last is yellow, as on the terminal board (board/view/fields.rs).
+// A task's kind chip before its title (`kind`: `[運用]`) and what is said of it after it (`×3`, `[auto]`, `[research]`,
+// `[委任先 …]` …) are dimmed: colour means status only. The pin mark `★` last is yellow, as on the terminal board
+// (board/view/fields.rs).
 const PIN = " ★";
 const titleOf = (r) => {
   const pinned = r.title.endsWith(PIN), t = pinned ? r.title.slice(0, -PIN.length) : r.title;
-  const m = /(?: ×\d+)?(?: \[[a-z]+\])*$/.exec(t); const at = m && m[0] ? m.index : t.length;
-  return [t.slice(0, at), at < t.length ? h("span.sw-count", t.slice(at)) : null, pinned ? h("span.sw-count", " ", h("span.sw-pin", PIN.trim())) : null];
+  const m = /(?: ×\d+)?(?: \[(?:[a-z]+|委任先 [^\]]*)\])*$/.exec(t); const at = m && m[0] ? m.index : t.length;
+  return [r.kind ? h("span.sw-count", `${r.kind} `) : null, t.slice(0, at), at < t.length ? h("span.sw-count", t.slice(at)) : null, pinned ? h("span.sw-count", " ", h("span.sw-pin", PIN.trim())) : null];
 };
 
 export function rowEl(r, { selected, opened, onPick, onOpen }) {

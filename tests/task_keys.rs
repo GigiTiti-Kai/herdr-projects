@@ -81,7 +81,7 @@ fn on_the_board_a_keyed_repos_rows_read_hsw_134_the_panel_the_chat_and_the_messa
     assert_eq!([nine.as_str(), big.as_str(), next.as_str()], ["proj/9", "proj/134", "proj/135"]);
     let mut s = open(&w.root, 40); s.s.side = false;
     let row = |s: &mut common::board::Board, title: &str| s.screen(100).into_iter().find(|l| l.contains(title) && has(l, r"^[ ▌] *\S ")).unwrap_or_default();
-    assert!(has(&row(&mut s, "Number nine"), r"^[ ▌]  ○ PRJ-9 {3}Number nine +\ds ago$"), "{}", s.text()); assert!(has(&row(&mut s, "Number one three four"), r"^[ ▌]  ○ PRJ-134 Number one three four +\ds ago$"));
+    assert!(has(&row(&mut s, "Number nine"), r"^[ ▌]  ○ PRJ-9 {3}\[運用\] Number nine +\ds ago$"), "{}", s.text()); assert!(has(&row(&mut s, "Number one three four"), r"^[ ▌]  ○ PRJ-134 \[運用\] Number one three four +\ds ago$"));
     // Find: the number, `#` and the number, or the tag; exactly one task's, the selection goes to it.
     for typed in ["134", "#134"] {
         s.s.sel = nine.clone(); s.press(&["ctrl+f"]); s.typed(typed);

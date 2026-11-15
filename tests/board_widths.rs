@@ -24,7 +24,7 @@ fn every_row_at_every_width_from_20_to_200_fits_and_keeps_its_mark_and_name() {
             assert!(!lines.is_empty() && lines.len() <= 12, "{at}: {} lines", lines.len());
             for l in &lines { assert!(width(l) <= wd, "{at}: a line is {} wide: {l:?}", width(l)); }
             let title: String = r.s("title").chars().take(3).collect();
-            assert!(lines[0].contains(&title), "{at}: the start of its name is gone: {:?}", lines[0]);
+            assert!(lines.iter().take(2).any(|l| l.contains(&title)), "{at}: the start of its name is gone: {lines:?}"); // the kind chip may stand alone on the first line when the first word of a title does not fit beside it
         }
     }
 }

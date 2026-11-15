@@ -7,7 +7,7 @@ use crate::board::state::{Row, State};
 use crate::board::update::coords::REPO_HEAD_INK;
 use crate::board::tags::{row_tag, tag_cells};
 use crate::board::theme::Theme;
-use crate::board::view::fields::{fields, mark, row_title};
+use crate::board::view::fields::{bare_title, fields, mark, row_title};
 use crate::board::view::row::list_numbering;
 use crate::json::*;
 use crate::shown::row_says::{row_fields, sentence};
@@ -19,7 +19,7 @@ pub fn row_of(s: &State, t: &Theme, r: &Obj, now: i64) -> Value {
     let m = first(&mark(t, r));
     let live = r.s("state") != "done" && r.at("progress").is_number();
     json!({
-        "id": r.s("id"), "label": id_label(if r.b("rid") { r.s("rid") } else { r.s("id") }), "tag": row_tag(r, &s.data.keys), "host": r.s("host"), "title": row_title(s, r),
+        "id": r.s("id"), "label": id_label(if r.b("rid") { r.s("rid") } else { r.s("id") }), "tag": row_tag(r, &s.data.keys), "host": r.s("host"), "title": bare_title(s, r), "kind": crate::board::view::kind::chip(r), // `kind`: the chip before its title (view/kind.rs)
         "strong": false, "mark": m.s("t"), "markDim": m.b("d"), "markBold": m.b("b"), "color": status_ink(r).name(), "live": is_live(r),
         "says": pieces(&sentence(r)), "progress": if live { json!(r.f("progress").clamp(0.0, 100.0)) } else { Value::Null },
         "percent": f.percent.text().trim(), "eta": f.eta.text(), "review": pieces(&f.review), "pr": pieces(&f.pr), "prUrl": crate::review_page::render::web_url(r.s("pr")),

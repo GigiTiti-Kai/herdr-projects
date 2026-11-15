@@ -41,10 +41,10 @@ fn squeeze(l: &str) -> String { Regex::new(r"[█░]+").unwrap().replace(&Regex
 fn narrow_screen_the_highlight_covers_all_three_lines_of_the_selected_row_and_the_arrow_keys_go_task_by_task() {
     let mut s = board(&[agent(), fresh(), done(json!({ "id": "p/9", "title": "Finished" }))], "p/1");
     let l = lit(&mut s);
-    assert_eq!(l.iter().map(|x| squeeze(x)).collect::<Vec<_>>(), ["▌ ◐ #1 Agent at work", "▌  Reading the panel and its tests.", "▌  bar 40% 12m left  2h"], "the bar in the gutter on each of its lines");
-    assert!(l.iter().all(|x| x.chars().count() == 50), "each to the screen's edge");
+    assert_eq!(l.iter().map(|x| squeeze(x)).collect::<Vec<_>>(), ["▌ ◐ #1 [運用] Agent at work", "▌  Reading the panel and its tests.", "▌  bar 40% 12m left  2h"], "the bar in the gutter on each of its lines");
+    assert!(l.iter().all(|x| sw::text::width(x) == 50), "each to the screen's edge");
     step(&mut s, 1); assert_eq!(s.sel, "p/4", "one press, one task: never onto a row's second or third line");
-    assert_eq!(lit(&mut s).iter().map(|x| squeeze(x.trim())).collect::<Vec<_>>(), ["▌ ◐ #4 Brand new", "▌  Just started  2h"], "only a time for a third line: it stands on the second");
+    assert_eq!(lit(&mut s).iter().map(|x| squeeze(x.trim())).collect::<Vec<_>>(), ["▌ ◐ #4 [運用] Brand new", "▌  Just started  2h"], "only a time for a third line: it stands on the second");
     s.sel = "p/9".into(); s.rows = fold_rows(&mut s);
     assert_eq!(lit(&mut s).len(), 1, "a done row is one line (selected, it shows)");
     s.sel = "p/4".into(); step(&mut s, -1); assert_eq!(s.sel, "p/1");
@@ -54,7 +54,7 @@ fn narrow_screen_the_highlight_covers_all_three_lines_of_the_selected_row_and_th
 fn narrow_screen_the_list_scrolls_by_whole_rows_a_row_of_three_lines_is_never_shown_in_part() {
     let many: Vec<Rec> = (1..=5).map(|n| work(json!({ "id": format!("p/{n}"), "title": format!("Working {n}"), "msg": format!("Says {n}"), "progress": n * 10 })))
         .chain((0..3).map(|n| todo(json!({ "id": format!("p/{}", n + 20), "title": format!("Later {}", n + 1) })))).collect();
-    let res = [Regex::new(r"^[ ▌] ◐ #\d+ +Working (\d) ").unwrap(), Regex::new(r"^[ ▌] {7}Says (\d)").unwrap(), Regex::new(r"^[ ▌] +[█░]+ +(\d)0% ").unwrap()];
+    let res = [Regex::new(r"^[ ▌] ◐ #\d+ +\[運用\] Working (\d) ").unwrap(), Regex::new(r"^[ ▌] {7}Says (\d)").unwrap(), Regex::new(r"^[ ▌] +[█░]+ +(\d)0% ").unwrap()];
     let kind = |l: &str| res.iter().enumerate().find_map(|(p, re)| re.captures(l).map(|c| (p, c[1].to_string())));
     for h in [3, 4, 5, 6, 7, 8, 11] {
         let mut s = board(&many, "p/1");
@@ -67,7 +67,7 @@ fn narrow_screen_the_list_scrolls_by_whole_rows_a_row_of_three_lines_is_never_sh
                 for p in 0..3 { let at = n as i64 - part as i64 + p as i64; let other = if at < 0 { "" } else { lines.get(at as usize).map(|x| x.as_str()).unwrap_or("") }; assert_eq!(kind(other), Some((p, row.clone())), "line {} of Working {row} is missing: {note}", p + 1); }
             }
             let n: usize = s.sel.split('/').nth(1).unwrap().parse().unwrap();
-            let want = if n < 20 { format!(r"^[ ▌] ◐ #{n}  Working {n} ") } else { format!(r"^[ ▌] ○ #{n} Later {} ", n - 19) };
+            let want = if n < 20 { format!(r"^[ ▌] ◐ #{n}  \[運用\] Working {n} ") } else { format!(r"^[ ▌] ○ #{n} \[運用\] Later {} ", n - 19) };
             assert!(lines.iter().any(|l| has(l, &want)), "the selected task is in view: {note}");
         };
         look(&mut s);

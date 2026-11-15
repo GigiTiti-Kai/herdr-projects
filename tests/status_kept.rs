@@ -69,7 +69,7 @@ fn what_the_watcher_or_an_agent_wrote_is_on_the_row_exactly_as_written_only_the_
         row_lines(&s, &theme, &r, 120, &lay).iter().map(|l| l.text()).collect::<Vec<_>>().join("\n")
     };
     // Under the task's name, where its name starts (the JS rows had no number, so two spaces there: the column is what counts).
-    let col = |text: &str| { let first = text.lines().next().unwrap_or(""); first[..first.find("Work").unwrap_or(0)].chars().count() };
+    let col = |text: &str| { let first = text.lines().next().unwrap_or(""); sw::text::width(&first[..first.find("[運用]").unwrap_or(0)]) };
     let ends = |text: &str, re: &str| regex::Regex::new(&format!(r"\n[ ▌]{} *$", re.replace("{2}", &format!("{{{}}}", col(text) - 1)))).unwrap().is_match(text);
     for msg in ["Working", "WORKING", "Under review", "Needs you", "Idle"] {
         let r = row_of(&with(&base(), json!({ "watch": { "msg": msg, "progress": 10, "role": "agent", "at": T0 } })), json!({ "status": "working" }));

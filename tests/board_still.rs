@@ -36,8 +36,8 @@ impl Still {
         for e in fx { if let Effect::Take { cols, rows } = e { self.took.push((cols, rows)); update(&mut self.b.s, Event::Took(Ok(()))); } }
     }
 }
-/// The screen as it was, in a terminal of another size: the same lines, cut on the right and from the top.
-fn cut(lines: &[String], cols: usize, rows: usize) -> Vec<String> { lines[lines.len().saturating_sub(rows)..].iter().map(|l| l.chars().take(cols).collect::<String>().trim_end().to_string()).collect() }
+/// The screen as it was, in a terminal of another size: the same lines, cut on the right (by cells, not characters: a Japanese one is two) and from the top.
+fn cut(lines: &[String], cols: usize, rows: usize) -> Vec<String> { lines[lines.len().saturating_sub(rows)..].iter().map(|l| sw::text::head(l, cols).trim_end().to_string()).collect() }
 /// The list on the left, the task panel on the right.
 fn side_panel(lines: &[String]) -> bool { lines.iter().filter(|l| has(l, r"\S.* │ ")).count() > 10 }
 fn squash(lines: &[String]) -> String { regex::Regex::new(r"\s+").unwrap().replace_all(&lines.join(" "), " ").to_string() }

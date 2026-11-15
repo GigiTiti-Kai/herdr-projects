@@ -66,7 +66,7 @@ fn the_side_panel_is_closed_on_a_first_opening_and_the_list_has_the_whole_width_
     sw::board::run::prefs::apply(&mut first, &sw::board::run::prefs::read(false));
     assert!(!first.side, "a board opened for the first time has it closed");
     let mut s = open(&w.root, 34); s.press(&["alt+p"]); assert!(!s.s.side);
-    assert!(has(&s.screen(120).join("\n"), r"◐ PRJ-1 +My own task {70,}█[^\n]*\n[ ▌] {10}half way *\n"), "{}", s.screen(120).join("\n"));
+    assert!(has(&s.screen(120).join("\n"), r"◐ PRJ-1 +\[運用\] My own task {70,}█[^\n]*\n[ ▌] {10}half way *\n"), "{}", s.screen(120).join("\n"));
 }
 
 #[test]
@@ -95,7 +95,7 @@ fn every_machines_tasks_say_whose_they_are_and_a_far_merge_says_where_it_lands()
     s.s.sel = "otherbox:proj/1".into(); s.load();
     let t = s.screen(100).join("\n");
     // Each machine a step in under All machines, its status groups a step in under that: the row's tag is the number alone.
-    assert!(has(&t, r"\n   (○ |  )?▾ otherbox *\n     ▾ to do\n▌    ○ #1 +Far away "), "{t}"); assert!(!t.contains("otherbox#1") && !t.contains("otherbox Far away"));
+    assert!(has(&t, r"\n   (○ |  )?▾ otherbox *\n     ▾ to do\n▌    ○ #1 +\[運用\] Far away "), "{t}"); assert!(!t.contains("otherbox#1") && !t.contains("otherbox Far away"));
     s.press(&["ctrl+f"]); s.typed("1");
     assert!(s.s.rows.iter().any(|r| matches!(r, sw::board::state::Row::Rec(o) if o.s("host") == "otherbox")), "find takes the number alone: no machine in it");
     s.press(&["esc"]);

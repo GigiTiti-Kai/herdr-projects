@@ -27,7 +27,7 @@ fn todo(more: Value) -> Rec { rec(json!({ "state": "idle", "stage": "todo", "at"
 fn group(r: &Obj) -> &'static str { if r.b("kind") { GROUPS[0] } else if r.s("state") == "working" { GROUPS[1] } else if r.s("state") == "done" { GROUPS[2] } else { GROUPS[3] } }
 fn board() -> State { sw::clock::set(Some(NOW)); let mut s = State::new(Default::default(), Default::default()); s.whole = true; s } // every done row shows, as with all done
 fn skip(l: &str, n: usize) -> String { l.chars().skip(n).collect() }
-fn at(l: &str, b: usize) -> usize { l[..b].chars().count() }
+fn at(l: &str, b: usize) -> usize { sw::text::width(&l[..b]) }
 /// The list as the board draws it under its headings: each task's first line, in the order given, and where a name
 /// starts on them (right of the mark and of the column of the tasks' numbers, gone from the narrowest lists).
 struct Drawn { rows: Vec<String>, lead: usize }
@@ -38,7 +38,7 @@ fn draw(s: &mut State, list: &[Rec], width: usize) -> Drawn {
     let k = if width + 2 >= 60 { 2 } else { 1 };
     let lines: Vec<String> = list_lines(s, &Theme::default_dark(false), width + k, 80, 200).iter().map(|l| l.text().chars().skip(k).collect()).collect();
     let cells = number_cells(width, list_numbering(s, &[]));
-    let lead = 3 + if cells > 0 { cells + 1 } else { 0 };
+    let lead = 3 + if cells > 0 { cells + 1 } else { 0 } + 5; // 5: the kind chip `[運用] ` (view/kind.rs), 7 cells wide
     let rows = list.iter().map(|r| { let head: String = r.s("title").chars().take(8).collect(); lines.iter().find(|l| skip(l, lead).starts_with(&head)).cloned().unwrap_or_default() }).collect();
     Drawn { rows, lead }
 }
@@ -105,14 +105,14 @@ fn the_rows_of_a_section_show_the_same_things_at_every_width_in_one_order_and_th
         for (n, line) in d.rows.iter().enumerate() {
             let r = &all[n];
             let here = places(line, d.lead);
-            assert!(!line.is_empty() && line.chars().count() <= width, "{} fits {width}", r.s("id"));
+            assert!(!line.is_empty() && sw::text::width(&line) <= width, "{} fits {width}", r.s("id"));
             // A column starts at the same place on every row of the list, whatever its section shows.
             for (k, x) in &here { let p = *place.entry(k).or_insert(*x); assert_eq!(*x, p, "{k} of {} is in line at {width}:\n{text}", r.s("id")); seen.insert(*k); }
             // The name comes before the extras: whole beside a bar, and never under NAME_OWED cells beside any column.
             let rest = skip(line, d.lead);
             let name = Regex::new(r"^(.*?)(…| {2}|$)").unwrap().captures(&rest).unwrap()[1].to_string();
             if here.contains_key("bar") { assert!(rest.starts_with(r.s("title")), "{}: its name is cut beside a bar at {width}", r.s("id")); }
-            if !here.is_empty() { assert!(name == r.s("title") || name.chars().count() >= NAME_OWED - 1, "{}: its name is cut to {} beside a column at {width}", r.s("id"), name.chars().count()); }
+            if !here.is_empty() { assert!(name == r.s("title") || name.chars().count() + 7 >= NAME_OWED - 1, "{}: its name is cut to {} beside a column at {width}", r.s("id"), name.chars().count()); }
         }
         for g in GROUPS {
             // A section gives its columns up from the left, the minutes left with their percent: what it shows is the right end.
@@ -151,16 +151,16 @@ fn one_row_with_no_room_for_its_bar_takes_the_bar_off_every_row_of_its_section_a
         work(json!({ "id": "p/4", "title": "Board screen glitches when agents start or finish", "progress": 60, "eta": 16 })),
         work(json!({ "id": "p/5", "title": "Board closes when jumping into an agent", "progress": 45, "eta": 32, "pr": 61, "reviewRound": 5 })),
     ];
-    let d = draw(&mut s, &five, 90);
+    let d = draw(&mut s, &five, 97);
     assert!(d.rows.iter().all(|l| !has(l, "[█░]")), "no bar on any row, the short names too:\n{}", d.rows.join("\n"));
     assert!(d.rows.iter().enumerate().all(|(n, l)| skip(l, d.lead).starts_with(five[n].s("title")) && has(l, r"\d%") && has(l, r"\dm left ")), "and nothing else went:\n{}", d.rows.join("\n"));
-    let d = draw(&mut s, &five, 98);
+    let d = draw(&mut s, &five, 105);
     assert!(d.rows.iter().all(|l| has(l, "[█░]{8}")), "room for the longest name's bar: every row has its bar:\n{}", d.rows.join("\n"));
     // The scope is the section: a long name under another heading leaves the bars of `working` alone.
     let two = vec![five[2].clone(), five[4].clone(), ready(json!({ "id": "p/8", "title": "Rewrite the whole of the first-run screen and what it asks", "progress": 100, "pr": 7 })), ready(json!({ "id": "p/9", "title": "Add an undo", "progress": 100, "pr": 12 }))];
-    let l = draw(&mut s, &two, 99).rows;
-    assert!(has(&l[0], r"^[ ▌]◐ #\d+ Coordinator as a tab in the home space +█{6}░░ {2}72% {2}3m left {13}2h {4}$") && has(&l[1], "[█░]{8}"), "{}", l.join("\n"));
-    assert!(has(&l[2], r"^[ ▌]◆ #\d+ Rewrite the whole of the first-run screen and what it asks +100% +PR#7 +2h ago$") && has(&l[3], r"^[ ▌]◆ #\d+ Add an undo +100% +PR#12 +2h ago$"), "its bar went with its neighbour's:\n{}", l.join("\n"));
+    let l = draw(&mut s, &two, 106).rows;
+    assert!(has(&l[0], r"^[ ▌]◐ #\d+ \[運用\] Coordinator as a tab in the home space +█{6}░░ {2}72% {2}3m left {13}2h {4}$") && has(&l[1], "[█░]{8}"), "{}", l.join("\n"));
+    assert!(has(&l[2], r"^[ ▌]◆ #\d+ \[運用\] Rewrite the whole of the first-run screen and what it asks +100% +PR#7 +2h ago$") && has(&l[3], r"^[ ▌]◆ #\d+ \[運用\] Add an undo +100% +PR#12 +2h ago$"), "its bar went with its neighbour's:\n{}", l.join("\n"));
     let idx = |l: &str, p: &str| l.find(p).map(|b| at(l, b)).unwrap();
     assert_eq!(idx(&l[1], "PR#61"), idx(&l[2], "PR#7")); assert_eq!(idx(&l[2], "PR#7"), idx(&l[3], "PR#12")); assert_eq!(idx(&l[0], "72%") + 3, idx(&l[3], "100%") + 4);
 }
@@ -173,22 +173,22 @@ fn a_long_name_is_cut_a_little_before_its_section_loses_a_column_never_for_a_bar
     // 6: the mark, and the task's number (`#1`) with the cell after it; then the gap, the percent, the minutes (at their
     // widest), the gap between the groups, PR#35, the time.
     let columns = 2 + 4 + 1 + 9 + 2 + 5 + 1 + 3;
-    let room = |width: usize| width - 6 - columns;
+    let room = |width: usize| width - 6 - columns; // the name's room: the kind chip is part of the name (NAME_OWED counts it)
     assert_eq!(long.s("title").len(), 58);
-    let l = draw(&mut s, &list, 6 + 58 + columns).rows;
-    assert!(has(&l[0], r"^[ ▌]◐ #\d+ Rewrite the whole of the first-run screen and what it asks +40% 12m left {2}PR#7 +2h$") && has(&l[1], r"^[ ▌]◐ #\d+ Fix login +55% {2}3m left {2}PR#35 +2h$"), "the whole name beside every column but the bar:\n{}", l.join("\n"));
-    let l = draw(&mut s, &list, 6 + 58 + columns + 8).rows;
+    let l = draw(&mut s, &list, 6 + 7 + 58 + columns).rows;
+    assert!(has(&l[0], r"^[ ▌]◐ #\d+ \[運用\] Rewrite the whole of the first-run screen and what it asks +40% 12m left {2}PR#7 +2h$") && has(&l[1], r"^[ ▌]◐ #\d+ \[運用\] Fix login +55% {2}3m left {2}PR#35 +2h$"), "the whole name beside every column but the bar:\n{}", l.join("\n"));
+    let l = draw(&mut s, &list, 6 + 7 + 58 + columns + 8).rows;
     assert!(l.iter().all(|x| !has(x, "[█░]")) && l[0].contains(long.s("title")), "not yet room for a bar: the name is not cut for one");
-    assert!(draw(&mut s, &list, 6 + 58 + columns + 9).rows.iter().all(|x| has(x, "[█░]{8}")));
-    for width in [6 + 56 + columns, 73, 6 + NAME_OWED + columns] {
+    assert!(draw(&mut s, &list, 6 + 7 + 58 + columns + 9).rows.iter().all(|x| has(x, "[█░]{8}")));
+    for width in [6 + 7 + 56 + columns, 80, 6 + NAME_OWED + columns] {
         let d = draw(&mut s, &list, width);
         let l = &d.rows;
-        assert!(has(&l[0], r"^[ ▌]◐ #\d+ Rewrite the whole of the first-run scre[^…]*… +40% 12m left {2}PR#7 +2h$") && has(&l[1], r"^[ ▌]◐ #\d+ Fix login +55% {2}3m left {2}PR#35 +2h$"), "cut at {width}:\n{}", l.join("\n"));
+        assert!(has(&l[0], r"^[ ▌]◐ #\d+ \[運用\] Rewrite the whole of the first-r[^…]*… +40% 12m left {2}PR#7 +2h$") && has(&l[1], r"^[ ▌]◐ #\d+ \[運用\] Fix login +55% {2}3m left {2}PR#35 +2h$"), "cut at {width}:\n{}", l.join("\n"));
         let rest = skip(&l[0], d.lead);
-        assert!(rest.find('…').map(|b| at(&rest, b)).unwrap() + 1 >= NAME_OWED.min(room(width)), "the name keeps its first {NAME_OWED} cells at {width}");
+        assert!(rest.find('…').map(|b| at(&rest, b)).unwrap() + 7 + 1 >= NAME_OWED.min(room(width)), "the name keeps its first {NAME_OWED} cells at {width}");
     }
     let l = draw(&mut s, &list, 6 + NAME_OWED + columns - 1).rows;
-    assert!(has(&l[0], r"^[ ▌]◐ #\d+ Rewrite the whole of the first-run screen [^…]*… +PR#7 +2h$") && has(&l[1], r"^[ ▌]◐ #\d+ Fix login +PR#35 +2h$"), "under that the name wins: the percent and the minutes go, on both rows:\n{}", l.join("\n"));
+    assert!(has(&l[0], r"^[ ▌]◐ #\d+ \[運用\] Rewrite the whole of the first-r[^…]*… +PR#7 +2h$") && has(&l[1], r"^[ ▌]◐ #\d+ \[運用\] Fix login +PR#35 +2h$"), "under that the name wins: the percent and the minutes go, on both rows:\n{}", l.join("\n"));
     // A short name is never cut for a column: it is whole wherever one shows.
     for width in WIDTHS { let d = draw(&mut s, &list, width); if !places(&d.rows[1], d.lead).is_empty() { assert!(skip(&d.rows[1], d.lead).starts_with("Fix login "), "at {width}: {}", d.rows[1]); } }
 }

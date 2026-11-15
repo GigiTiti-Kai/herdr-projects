@@ -31,7 +31,7 @@ fn the_automations_are_a_group_of_the_main_list_with_keys_that_turn_fire_and_rem
     let lines = s.screen(120);
     // the top row, this machine's, then its groups a step in
     assert!(regex::Regex::new(r"^ ▾ \S+  1 project · 1 task$").unwrap().is_match(&lines[2]), "{lines:#?}");
-    assert_eq!(lines[3..9].to_vec(), vec!["   ▾ to do", "▌  ○ PRJ-1 Mine                                                                                                   0s ago", "   ▾ automations",
+    assert_eq!(lines[3..9].to_vec(), vec!["   ▾ to do", "▌  ○ PRJ-1 [運用] Mine                                                                                            0s ago", "   ▾ automations",
         "   ⟳ on    Look for old dependencies  every 2h                                                           next in  2h",
         "   ⟳ on    Release note after a merge  when a task is merged, in every repo                                  never fired",
         "   ⟳ off   Nightly audit  daily 03:00                                                                        never fired"]);
@@ -56,7 +56,7 @@ fn the_automations_are_a_group_of_the_main_list_with_keys_that_turn_fire_and_rem
     assert!(!s.text().contains("fired: PRJ-2 was added"), "{}", s.text());
     assert_eq!(task("proj/2").s("stage"), "starting");
     assert_eq!(s.s.sel, row_id(&all[0]));
-    assert!(regex::Regex::new(r"\n[ ▌] *. PRJ-2 Look for old dependencies \[auto\]").unwrap().is_match(&s.text()), "{}", s.text());
+    assert!(regex::Regex::new(r"\n[ ▌] *. PRJ-2 \[運用\] Look for old dependencies \[auto\]").unwrap().is_match(&s.text()), "{}", s.text());
     s.press(&["ctrl+s"]); assert!(s.text().contains("did not fire: its last task, PRJ-2, is still being worked on."));
     // a key that acts on a task does nothing here
     s.press(&["down"]); assert_eq!(s.s.sel, row_id(&all[1]));

@@ -22,7 +22,7 @@ fn a_yes_says_nothing_under_the_chat_its_row_says_it_and_the_menu_names_every_ke
     s.s.sel = id.clone(); s.load();
     s.press(&["ctrl+l", "y"]);
     // no confirmation under the chat: the row says what is under way
-    let merging = |s: &mut common::board::Board| has(&s.text(), r"PRJ-1 Make f[^\n]*\n[ ▌] +Merging");
+    let merging = |s: &mut common::board::Board| has(&s.text(), r"PRJ-1 \[自動\] Make f[^\n]*\n[ ▌] +Merging");
     assert!(!s.text().contains("approved, merging") && merging(&mut s), "{}", s.text());
     // the beats change nothing of it
     let now = sw::clock::now();
@@ -55,7 +55,7 @@ fn a_yes_says_nothing_under_the_chat_its_row_says_it_and_the_menu_names_every_ke
     assert!(!s.s.archive_view); assert!(!task("proj/2").b("archivedAt"), "ctrl+z takes the archiving back");
     // pinned: it stays under to do, with its pin mark
     s.s.sel = "proj/2".into(); s.load(); s.press(&["ctrl+p"]);
-    assert!(has(&s.screen(80).join("\n"), r"\n   ▾ to do *\n▌  ○ PRJ-2 Other ★ "), "{}", s.screen(80).join("\n"));
+    assert!(has(&s.screen(80).join("\n"), r"\n   ▾ to do *\n▌  ○ PRJ-2 \[運用\] Other ★ "), "{}", s.screen(80).join("\n"));
 }
 
 #[test]

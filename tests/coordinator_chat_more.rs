@@ -150,7 +150,7 @@ fn enter_goes_into_a_tasks_agent_the_chats_head_line_at_every_width_and_a_narrow
     // What it does now (the Watcher's "doing now" line) is its row's second line, as herdr's sidebar says it.
     sw::store::tasks::update(&u, |c| { c.put("msg", "Verifying the test run after the rebase onto main"); Ok(sw::store::tasks::Change::Write) }).unwrap(); g.load();
     let lines = g.screen(160);
-    assert!(has(&lines.join("\n"), r"PRJ-3 Still at it[^\n]*\n[ ▌] +Verifying the test run after the rebase onto main"), "{}", lines.join("\n"));
+    assert!(has(&lines.join("\n"), r"PRJ-3 \[自動\] Still at it[^\n]*\n[ ▌] +Verifying the test run after the rebase onto main"), "{}", lines.join("\n"));
     // However little room: the box's edge is cut, never wider than the window, and the box stays whole.
     for cols in [40, 29, 18] {
         let l = g.screen(cols); let at = l.iter().position(|x| x.starts_with("╭─")).unwrap();

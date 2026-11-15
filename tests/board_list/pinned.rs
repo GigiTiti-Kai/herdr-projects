@@ -71,7 +71,7 @@ fn the_pin_mark_is_a_yellow_star_one_column_wide_on_a_task_and_a_projects_row() 
     let star = |p: &[sw::shown::ink::Piece]| p.iter().any(|p| p.t == "★" && p.c == Ink::Yellow);
     // The task's row: its title plain, then a space and the star in yellow.
     let name = sw::board::view::row::row_name(&s.s, &task(&a), 60);
-    assert_eq!(name.0.iter().map(|p| p.t.as_str()).collect::<String>(), "Starred ★");
+    assert_eq!(name.0.iter().map(|p| p.t.as_str()).collect::<String>(), "[運用] Starred ★");
     assert!(star(&name.0) && name.0.iter().all(|p| p.t != "★" || p.c == Ink::Yellow), "{:?}", name.0);
     // The project's row under Pinned (by status it stands above its tasks), as the web board gets both.
     let web = common::board::web(&w, "show", json!({ "n": PINNED }));
