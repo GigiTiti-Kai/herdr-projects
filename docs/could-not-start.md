@@ -57,7 +57,15 @@ Two limits once made long text fail to start an agent, with no reason given. Bot
   newline, C-j: run)"): the agent's `export TMPDIR=…` and its start, typed right after, failed that way. The board now
   waits until the pane's last line no longer holds the export (at most 20 looks) before it starts the agent. Each
   export starts with a mark of its own (`HERDR_PROJECTS_EXPORT_AT=<time>`): a restarted agent's pane still shows the
-  export of the start before, which says nothing of this one.
+  export of the start before, which says nothing of this one. Why ble.sh does it: Enter only runs the line when fewer than 5 typed characters still wait
+  behind it (`bleopt accept_line_threshold`, its guard against a paste running by itself), so a start typed before it
+  has read the export turns that Enter into a new line.
+- **A command held as several lines is run, or cleared.** A pane that still holds one from before is cleared with C-c
+  before the export is typed. When the pane shows "-- MULTILINE --" with the export alone,
+  the board presses C-j once, which runs it. When a start fails with that line on the screen, the start had been typed
+  onto the command before it: the board clears the command with C-c, types the export again and starts the agent once
+  more as it was, with its hook. It used to try again without the hook, typed onto the same command: two start lines,
+  and the task failed (PRJ-21, PRJ-22, PRJ-23).
 - **Very long messages go in a file.** A message is one argument of `herdr agent prompt`, and Linux passes at most 128 KiB
   in one argument. A message longer than 100,000 bytes (a task's first prompt, a reply, a message to the Coordinator) is
   written to a file in the board's folder (`messages/`), and a line naming that file is typed in instead. Anything shorter

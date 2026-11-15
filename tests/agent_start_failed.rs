@@ -47,6 +47,55 @@ fn a_codex_worker_starts_once_in_a_shell_whose_line_editor_takes_the_export_late
     assert_eq!(starts(&w, "codex").len(), 1, "{:?}", calls(&w));
 }
 
+/// PRJ-23: a line editor held the export as a command of several lines (ble.sh's "-- MULTILINE --", where Enter only
+/// adds a line): the board runs it with C-j before it starts the program.
+#[test]
+fn an_export_held_as_several_lines_is_run_with_ctrl_j() {
+    let w = world_with(Opts { repo: true, settings: json!({ "review.when": "never" }), ..Default::default() });
+    w.patch(|s| s["multiline"] = json!(1));
+    w.script(json!({ "worker": [work()] }));
+    let id = w.add("Held export");
+    delegate(&id);
+    let t = settle(&id);
+    assert_eq!(t.s("stage"), "approval", "{} {}", t.s("msg"), t.at("failure"));
+    assert_eq!(starts(&w, "claude").len(), 1, "{:?}", calls(&w));
+    assert_eq!(w.state().arr("paneKeys").iter().map(|k| k.at("keys").clone()).collect::<Vec<_>>(), vec![json!(["control+j"])]);
+}
+
+/// PRJ-23: a start the line editor held as one more line of a command was tried again without its hook, and typed onto
+/// the same command: two start lines and still "-- MULTILINE --". The board clears the command with C-c, gives the
+/// shell the export again, and starts it once more as it was (with its hook, when it had one).
+#[test]
+fn a_start_held_as_several_lines_is_cleared_and_tried_again_as_it_was() {
+    let w = world_with(Opts { repo: true, settings: json!({ "review.when": "never" }), ..Default::default() });
+    w.patch(|s| s["multilineStart"] = json!(1));
+    w.script(json!({ "worker": [work()] }));
+    let id = w.add("Held start");
+    delegate(&id);
+    let t = settle(&id);
+    assert_eq!(t.s("stage"), "approval", "{} {}", t.s("msg"), t.at("failure"));
+    let s = starts(&w, "claude");
+    assert_eq!(s.len(), 2, "{s:?}");
+    assert_eq!(s[0], s[1], "started again as it was");
+    assert_eq!(w.state().arr("paneKeys").iter().map(|k| k.at("keys").clone()).collect::<Vec<_>>(), vec![json!(["control+c"])]);
+    assert_eq!(calls(&w).iter().filter(|c| c.starts_with("pane run") && c.contains("export HERDR_PROJECTS_EXPORT_AT=")).count(), 2, "the export again");
+}
+
+/// PRJ-23: a pane left holding the start lines of an earlier try as one command (ble.sh's "-- MULTILINE --"): the board
+/// clears it before it types the export, so C-j never runs those old lines.
+#[test]
+fn a_command_left_held_from_an_earlier_start_is_cleared_first() {
+    let w = world_with(Opts { repo: true, settings: json!({ "review.when": "never" }), ..Default::default() });
+    w.script(json!({ "worker": [work()] }));
+    let id = w.add("Left held");
+    w.patch(|s| { s["leftHeld"] = json!("claude --session-id old"); s["multiline"] = json!(1); }); // and the export typed now is held as well
+    delegate(&id);
+    let t = settle(&id);
+    assert_eq!(t.s("stage"), "approval", "{} {}", t.s("msg"), t.at("failure"));
+    assert_eq!(starts(&w, "claude").len(), 1, "{:?}", calls(&w));
+    assert_eq!(w.state().arr("paneKeys").iter().map(|k| k.at("keys").clone()).collect::<Vec<_>>(), vec![json!(["control+c"]), json!(["control+j"])], "dropped, then only the export run");
+}
+
 /// The same pane started again: the export of the last start is still on its screen, and is no sign that this one
 /// was taken.
 #[test]

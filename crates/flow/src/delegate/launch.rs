@@ -72,8 +72,11 @@ pub fn start_agent(id: &str, g: &mut Guard, prompt: &str, resume: Option<&str>) 
     // Its temporary folder, as TMPDIR and the rest: removed with all in it when the task ends (temp.rs).
     let tmp = crate::temp::made(&t);
     // Its own mark: a restart's pane still shows the export of the start before (shell_ready.rs).
-    let mark = format!("HERDR_PROJECTS_EXPORT_AT={}", now());
-    let _ = api.pane_run_taken(&pane, &crate::temp::export_line(&t, &mark), &mark);
+    let export = |again: &str| { let mark = format!("HERDR_PROJECTS_EXPORT_AT={}{again}", now()); let _ = api.pane_run_taken(&pane, &crate::temp::export_line(&t, &mark), &mark); };
+    // A command a line editor still holds from a start before (ble.sh's "-- MULTILINE --") is cleared first: the
+    // export would be typed onto it, and C-j would run all of it.
+    start_failed::tidy(&api, &pane, &start_failed::screen_of(&api, &pane));
+    export("");
     let mut used: Vec<String> = vec![]; // the arguments it was started on: built once a try (OpenCode 2 makes a conversation)
     let mut start_with = |with_hook: bool| -> Res<()> {
         used = args(with_hook)?;
@@ -85,9 +88,13 @@ pub fn start_agent(id: &str, g: &mut Guard, prompt: &str, resume: Option<&str>) 
         }
     };
     if let Err(e) = start_with(hooked) { // once more without the hook arguments, from a clean shell prompt
-        if !hooked || e.msg.contains("canonical mode") { return Err(e); } // its shell was never at its prompt: tried again already
-        start_failed::tidy(&api, &pane, &start_failed::screen_of(&api, &pane));
-        hooked = false; start_with(false)?;
+        let screen = start_failed::screen_of(&api, &pane);
+        // A line editor held the start as one more line of the command before it (ble.sh, PRJ-23): the hook was not why.
+        let held = crate::herdr::shell_ready::multiline(&screen);
+        if (!hooked && !held) || e.msg.contains("canonical mode") { return Err(e); } // its shell was never at its prompt: tried again already
+        start_failed::tidy(&api, &pane, &screen);
+        if held { export("r"); } else { hooked = false; }
+        start_with(hooked)?;
     }
     // herdr calls the program ready before it has drawn anything; text typed that early loses its enter (submit.rs).
     if !prompt.is_empty() && !blocked { let launch = std::iter::once(crate::agents::kinds::program(&kind).to_string()).chain(used).collect::<Vec<_>>().join(" "); crate::submit::settle(&api, &pane, &launch); }

@@ -90,8 +90,11 @@ pub fn log(file: &Path, kind: &str, text: &str) {
     let _ = std::fs::OpenOptions::new().create(true).append(true).open(file).and_then(|mut f| writeln!(f, "{} could not start {kind}:\n{text}\n", iso(now())));
 }
 /// A command the terminal cut off leaves the shell at its continuation prompt: an interrupt (the character a terminal
-/// sends for it) clears it for the next try.
-pub fn tidy(api: &Herdr, pane: &str, screen: &str) { if cut_off(screen) { let _ = api.pane_text(pane, "\u{3}"); } }
+/// sends for it) clears it for the next try. So does C-c a command of several lines a line editor holds (ble.sh's
+/// "-- MULTILINE --"), which the next start would be typed onto as one more line (PRJ-23).
+pub fn tidy(api: &Herdr, pane: &str, screen: &str) {
+    if cut_off(screen) { let _ = api.pane_text(pane, "\u{3}"); } else if crate::herdr::shell_ready::multiline(screen) { let _ = api.pane_keys(pane, &[crate::herdr::shell_ready::DROP_HELD]); }
+}
 /// For a start whose failure holds one line (a reviewer, the Coordinator): the reason and the next step, then what herdr
 /// said, with the whole account in `log`. The terminal is read before it is closed.
 pub fn say(api: &Herdr, s: &Start, pane: &str, said: &str, log_file: &Path) -> String {

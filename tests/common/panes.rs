@@ -93,12 +93,29 @@ pub fn pane(st: &mut Value, verb: &str, arg2: &str, argv: &[String], flag: &dyn 
                 // The shell takes the line and draws its prompt again. `lineEditorLag`: a line editor (ble.sh) that takes
                 // it only after that many reads of the pane.
                 st["panes"][pi]["pending"] = json!({ "line": argv[3..].join(" "), "reads": st.i("lineEditorLag") });
+                // `multiline`: that many lines a line editor holds as a command of several lines, its Enter read as one
+                // more line (ble.sh): C-j runs it, C-c drops it.
+                if st.i("multiline") > 0 {
+                    st["multiline"] = json!(st.i("multiline") - 1);
+                    let (cwd, line) = (st["panes"][pi].t("cwd"), argv[3..].join(" "));
+                    st["panes"][pi]["pending"] = json!({ "line": line, "multiline": true });
+                    st["panes"][pi]["screen"] = json!(format!("user@host:{cwd}$ {line}\n\n-- MULTILINE -- (RET or C-m: insert a newline, C-j: run)"));
+                }
             }
             ok(json!({ "type": "ok" }))
         }
         "read" => {
+            // `leftHeld`: the first pane read holds that line from an earlier start as a command of several lines.
+            if st.at("leftHeld").is_string() && !p.at("agent").is_object() {
+                let (cwd, line) = (p.t("cwd"), st.t("leftHeld"));
+                st["leftHeld"] = Value::Null;
+                st["panes"][pi]["pending"] = json!({ "line": line, "multiline": true });
+                st["panes"][pi]["screen"] = json!(format!("user@host:{cwd}$ {line}\n\n-- MULTILINE -- (RET or C-m: insert a newline, C-j: run)"));
+                return out(st["panes"][pi].s("screen"));
+            }
             let a = p.at("agent");
             let pending = p.at("pending");
+            if pending.b("multiline") { return out(p.s("screen")); }
             if pending.is_object() {
                 let (cwd, line) = (p.t("cwd"), pending.t("line"));
                 // the first of those reads finds the line not drawn yet: only the prompt
@@ -108,6 +125,16 @@ pub fn pane(st: &mut Value, verb: &str, arg2: &str, argv: &[String], flag: &dyn 
             }
             if a.i("boot") > 0 { st["panes"][pi]["agent"]["boot"] = json!(a.i("boot") - 1); let mut cmd = vec![a.t("kind")]; cmd.extend(a.arr("args").iter().map(text)); return out(&format!("user@host:{}$ {}\n", p.s("cwd"), cmd.join(" "))); }
             out(if a.b("screen") { a.s("screen") } else { p.s("screen") })
+        }
+        "send-keys" => {
+            arr(st, "paneKeys").push(json!({ "pane": arg2, "keys": argv[3..] }));
+            let cwd = p.t("cwd");
+            if p.at("pending").b("multiline") {
+                let line = p.at("pending").t("line");
+                if argv[3..].iter().any(|k| k == "control+j") { st["panes"][pi]["pending"] = Value::Null; st["panes"][pi]["screen"] = json!(format!("user@host:{cwd}$ {line}\nuser@host:{cwd}$ \n")); }
+                if argv[3..].iter().any(|k| k == "control+c") { st["panes"][pi]["pending"] = Value::Null; st["panes"][pi]["screen"] = json!(format!("user@host:{cwd}$ {line}^C\nuser@host:{cwd}$ \n")); }
+            }
+            ok(json!({ "type": "ok" }))
         }
         // The interrupt character clears a command its shell waits to see the end of.
         "send-text" => {
