@@ -4,7 +4,7 @@
      Autopilot · next check-in in 1h · 0 of 5 today
    ○ ▾ proj · PRJ [autopilot]
        Autopilot · next check-in in 6h · 1 of 5 today
-▌    ○ PRJ-1 Fix the docs index                                                               0s ago
+▌    ○ PRJ-1 [運用] Fix the docs index                                                        0s ago
 
 
 
@@ -21,7 +21,7 @@
      Autopilot · next check-in in 1h · 0 of 5 today
   ○ ▾ proj · PRJ [autopilot]
       Autopilot · next check-in in 6h · 1 of 5 today
-▌  ○ PRJ-1 Fix the docs index
+▌  ○ PRJ-1 [運用] Fix the docs index
 
 
 

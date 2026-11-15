@@ -1,19 +1,19 @@
 == the list
  herdr-projects
  All 18  tab next
-▌ ◐ Max length for
-▌   task titles
+▌ ◐ [運用] Max
+▌   length for task
+▌   titles
 ▌   Found the cause;
-▌   now checking ev…
 ────────────────────
 ❯ Add a task
 ────────────────────
   alt+o open its ag…
 == the task beside it
  herdr-projects
-▌ ◐ Max length for
-▌   task titles
-▌   Found the cause;
+▌ ◐ [運用] Max
+▌   length for task
+▌   titles
 ────────────────────
 ❯ Add a task
 ────────────────────
@@ -37,7 +37,7 @@
    ↑ ↓          move
                 bet…
                 tas…
- ↓ 280 more
+ ↓ 310 more
 ────────────────────
 ❯ Add a task
 ────────────────────
@@ -45,10 +45,10 @@
 == a draft
  herdr-projects
  All 18  tab next
-▌ ◐ Max length for
-▌   task titles
+▌ ◐ [運用] Max
+▌   length for task
+▌   titles
 ▌   Found the cause;
-▌   now checking ev…
 ────────────────────
 ❯ Hello 日本 🚀
 ────────────────────

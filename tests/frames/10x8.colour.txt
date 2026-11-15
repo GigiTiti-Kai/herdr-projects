@@ -2,14 +2,15 @@ a Rgb(205, 214, 244)
 b Rgb(137, 180, 250) on Rgb(49, 50, 68)
 c Rgb(205, 214, 244) on Rgb(49, 50, 68)
 d Rgb(249, 226, 175) on Rgb(49, 50, 68)
-e Rgb(126, 131, 155)
-f Rgb(166, 173, 200)
+e Rgb(126, 131, 155) on Rgb(49, 50, 68)
+f Rgb(126, 131, 155)
+g Rgb(166, 173, 200)
 --
 aaaaaaaaaa
-bcdccccccc
+bcdceeeeee
 bccccccccc
 bccccccccc
 aaaaaaaaaa
-aaaeeeeeee
+aaafffffff
 aaaaaaaaaa
-aafffffeee
+aagggggfff

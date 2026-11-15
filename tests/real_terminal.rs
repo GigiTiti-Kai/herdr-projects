@@ -74,7 +74,8 @@ fn real_programs_the_board_starts_takes_keys_resizes_and_leaves_nothing_behind()
     assert!(!has(&burst, "\x1b[2J"), "a key cleared the whole screen");
     assert!(has(&burst, "\x1b[?2026h") && has(&burst, "\x1b[?2026l"), "frames are drawn as one update");
     // only the cells that change are drawn: a line low on the screen, under the list's rows, shows whole
-    assert!(plain(&burst).contains("a page of tasks up or down"), "the ? menu showed");
+    // (a line below the rows' own: one beside a row may reuse that row's cells, which are then not drawn again)
+    assert!(plain(&burst).contains("send it back: tell the agent to fix it, or to continue"), "the ? menu showed");
     // resized: drawn again for the new size, also very small, and back
     for (c, r) in [(80, 24), (45, 12), (20, 6), (120, 40)] { let b = t.resize(c, r); assert!(!b.is_empty(), "nothing drawn at {c}×{r}"); }
     assert!(t.until("Fix the footer", 2000));
