@@ -63,7 +63,5 @@ were (`merge.checks: github`, [how work gets done](how-work-gets-done.md)).
 
 ## One heavy job at a time
 
-Where the machine has the shared lock `heavy-run` installed, the whole check and the shorter one run under it, one at a
-time on the whole machine and under its memory caps. Until the lock is free the task shows
-`Waiting for its turn`. A check of a few areas by name (`npm run check board-panel`) does not take it. Waiting for
-GitHub does not hold it either.
+Where the machine has the shared lock `heavy-run` installed, the whole check and the shorter one run on this machine
+under it ([one heavy job at a time](heavy-jobs.md)). Waiting for GitHub does not hold it.

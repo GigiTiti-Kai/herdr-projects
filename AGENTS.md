@@ -3,8 +3,8 @@
 Several agents change this repo at once. Before you add or change anything, look at the map: it says which file
 holds what, so that two tasks do not edit the same file.
 
-- Build the program once: `cargo build --profile quick` (the workspace setup, `scripts/setup.sh`, does it for you,
-  through the build cache every worktree shares). It is then `./target/quick/herdr-projects`.
+- Build the program once: `sh scripts/heavy.sh cargo build --profile quick` (the workspace setup, `scripts/setup.sh`,
+  does it for you, through the build cache every worktree shares). It is then `./target/quick/herdr-projects`.
 - `./target/quick/herdr-projects docs --where` prints all of the map; `… docs --where crates/board/src/board/view` only
   that folder.
 - It is also a page in your own folder, `docs/where-things-live.md`, written by the workspace setup and by
@@ -72,6 +72,11 @@ board: asked again, it answers at once.
 
 - **Run cargo through the check**: it builds through the one build cache every worktree shares and takes its share of
   the cores, all of them when it runs alone (`scripts/build-cache.sh`, `scripts/share-cores.sh`).
+- **Heavy jobs take the machine's shared lock**, one at a time across every repo (`heavy-run`, where it is installed):
+  the whole check, the shorter one and the setup's build take it by themselves; a cargo build or test of your own goes
+  through `sh scripts/heavy.sh cargo …`. `Waiting for its turn`, or a `wait lock` line in
+  `~/.local/state/memwatch/jobs.log`, is another job's turn: leave it. `Finished with result: oom-kill` is the memory
+  cap, not a failed test: do not run it again unchanged; say so in your report ([docs/heavy-jobs.md](docs/heavy-jobs.md)).
 - **While you work, run the tests of what you touched**: `npm run check board-panel` runs one area's test files
   (`tests/board_panel.rs` and `tests/board_panel_*.rs`), `npm run check gate sync` several. A name that is no area runs
   the tests whose own names hold it (`npm run check textbox`): a second or two after the build. With no name it runs
