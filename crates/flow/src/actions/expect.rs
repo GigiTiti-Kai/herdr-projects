@@ -44,9 +44,16 @@ impl Expect {
         }
         Ok(())
     }
-    /// What the approved merge stays held to (`mergeIntent.expect`): the reviewed commit and the review's round now.
+    /// What the yes stays held to until the work lands (`expectYes` on the task): the reviewed commit and the review's
+    /// round now. Only a new yes or the merge itself takes it off.
     pub fn bound(&self, t: &Task) -> Value { json!({ "head": t.at("reviewedHead"), "review": review_number(t) }) }
+    /// The yes a task holds to (`retry` of an approved merge is that yes again): none for a plain `approve`.
+    pub fn held(t: &Task) -> Expect {
+        let e = t.at("expectYes");
+        if e.is_object() { Expect { review: Some(e.i("review")), head: Some(e.t("head")) } } else { Expect::default() }
+    }
 }
 /// An approved merge held to what was judged, once what would land is another commit (`head`) or its review another
-/// round: the yes no longer stands, and the task waits for approval again with the new ones (pipeline_end.rs).
-pub fn broken(t: &Task, head: &str) -> bool { let e = t.at("mergeIntent").at("expect"); e.is_object() && (e.s("head") != head || e.i("review") != review_number(t)) }
+/// round: the yes no longer stands, and the task waits for approval again with the new ones (pipeline_end.rs). Never by
+/// itself either (`merge.by itself`): `expectYes` stays on it until a new yes.
+pub fn broken(t: &Task, head: &str) -> bool { let e = t.at("expectYes"); e.is_object() && t.at("mergeIntent").is_object() && (e.s("head") != head || e.i("review") != review_number(t)) }

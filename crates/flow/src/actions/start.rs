@@ -38,6 +38,7 @@ const FRESH: &[&str] = &[
     "doneWhy",
     "review",
     "reviewedHead",
+    "expectYes",
     "syncedTo",
     "syncSeen",
     "syncBranch",

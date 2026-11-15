@@ -135,3 +135,35 @@ fn approve_held_to_a_review_is_refused_for_another_machines_task_and_nothing_is_
     assert!(refused(&["approve", "vm-str:far/7", "--expect-head", "abcdef1"]).contains("hold only a task of this machine"));
     assert!(far.asked().is_empty(), "{:?}", far.asked());
 }
+
+#[test]
+fn a_held_yes_survives_a_failed_recheck_and_its_retry_merging_by_itself_or_retried_never_lands_another_commit() {
+    let w = world_with(Opts { repo: true, origin: true, settings: json!({ "review.rounds": 0, "check.command": "test ! -f main.txt" }), ..Default::default() });
+    w.script(json!({ "worker": [work_on("f.txt")], "reviewer": [pass(), pass()] }));
+    let id = to_approval(&w, "Held through a failure");
+    w.gh_says(json!({ "origin": w.base.join("origin.git").display().to_string() }));
+    let set = |k: &str, v: Value| { let t = task(&id); sw::store::settings::change::set_value(k, &v, &sw::store::settings::lookup::Scope::task(&t)).unwrap(); };
+    set("merge.by", json!("itself"));
+    let held = |id: &str| { let d = cli(&["details", id, "--json"]).unwrap().0; (d.at("task").i("reviewRound").to_string(), d.at("task").t("reviewedHead")) };
+    let (r, h) = held(&id);
+    ok(&["approve", &id, "--expect-review", &r, "--expect-head", &h]);
+    // main moves before it lands, and the check of the branch brought up to date with it fails: no merge, no review
+    std::fs::write(w.root.join("main.txt"), "main\n").unwrap(); git(&w.root, &["add", "-A"]); git(&w.root, &["commit", "-qm", "main moved"]); git(&w.root, &["push", "-q", "origin", "main"]);
+    assert_eq!(settle(&id).s("stage"), "failed");
+    // the check is put right and the step run again: checked and reviewed, it waits for you, by itself or not
+    set("check.command", json!("true"));
+    ok(&["retry", &id]);
+    let t = settle(&id);
+    assert_eq!(t.s("stage"), "approval", "{}", t.at("failure"));
+    assert!(!gh_log(&w).contains("pr merge"), "{}", gh_log(&w));
+    // the board's retry there (yes on what went wrong) is that yes again: held to the old commit, refused
+    let e = sw::actions::finish_line::retry(&id).unwrap_err().msg; assert!(e.contains(&format!("its reviewed commit is {} now, not {h}", held(&id).1)), "{e}");
+    assert!(!gh_log(&w).contains("pr merge"));
+    // a yes on the new ones merges them
+    let (r2, h2) = held(&id);
+    assert_ne!(h2, h);
+    ok(&["approve", &id, "--expect-review", &r2, "--expect-head", &h2]);
+    assert_eq!(settle(&id).s("stage"), "done");
+    assert!(gh_log(&w).contains(&format!("pr merge 7 --squash --match-head-commit {h2}")), "{}", gh_log(&w));
+    assert!(!task(&id).b("expectYes"));
+}

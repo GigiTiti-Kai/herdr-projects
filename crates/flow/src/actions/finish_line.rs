@@ -54,11 +54,12 @@ pub fn approve_expecting(id: &str, seen: Option<(Value, Value)>, expect: &Expect
         // Main moved and the board could not bring this branch up to date yet: what was reviewed is not what would land.
         if t.b("syncBlocked") { crate::fail!("{} is behind main and cannot be approved yet: {}. The board keeps trying to bring it up to date.", t.s("id"), t.at("syncBlocked").s("why")); }
         if runner_alive(t) { crate::fail!("{} is busy. Try again in a moment.", t.s("id")); }
-        t.put("stage", "merging"); t.put("msg", "Merging"); t.put("requireApproval", false); t.put("since", now()); t.put("mergeFailed", false);
+        t.put("stage", "merging"); t.put("msg", "Merging"); t.put("requireApproval", expect.any()); t.put("since", now()); t.put("mergeFailed", false);
         let mut mi = json!({ "approvedAt": now(), "repairs": t.at("mergeIntent").i("repairs"), "verifiedHead": t.at("reviewedHead") });
         // Merged in spite of GitHub's failed checks: they are not looked at again for this merge.
         if checks.is_some() { mi["anyway"] = json!(true); t.put("prFailure", Value::Null); }
-        if expect.any() { mi["expect"] = expect.bound(t); } // what the merge stays held to, through a repair or a sync (pipeline_end.rs)
+        // What this yes stays held to until it lands, through a repair, a sync or a failure and its retry (expect.rs).
+        let held = if expect.any() { expect.bound(t) } else { Value::Null }; t.put("expectYes", held);
         t.put("mergeIntent", mi); t.put("checksWait", Value::Null);
         Ok(Change::Write)
     })?;
@@ -203,7 +204,8 @@ pub fn retry(id: &str) -> Res<Said> {
     assert_unarchived(&cur)?;
     let cid = cur.t("id");
     // A merge that failed: the yes was given before it. Not one GitHub's failed checks stopped: that takes `--anyway`.
-    if cur.s("stage") == "approval" { return approve(&cid, None, cur.b("mergeFailed") && crate::land::checks::failed_on(&cur).is_none()); }
+    // One held to a review and a commit (approve --expect-…) stays held to them.
+    if cur.s("stage") == "approval" { return approve_expecting(&cid, None, &Expect::held(&cur), cur.b("mergeFailed") && crate::land::checks::failed_on(&cur).is_none()); }
     if stopped_at_limit(&cur) { return carry_on(&cid, false); }
     // The agent said it needs a login: you have signed in, and it is told to carry on.
     if cur.s("stage") == "asks" && cur.s("kind") == "auth" { return go_on(&cur); }

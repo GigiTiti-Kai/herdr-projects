@@ -158,7 +158,7 @@ pub fn after_review(c: Ctx, g: &mut Guard) -> Res<()> {
     if hold_pr_failure(g, &mut t)? { return Ok(()); }
     // A task that merges by itself (`merge.by`, read now) still wants a review that passed the gate.
     let skip = c.sync.map(|s| !sync::held_why(s).is_empty()).unwrap_or(false);
-    if by_itself(&t) && !t.b("requireApproval") && !t.b("chat") && !skip && (!review_needed || (review.is_some() && passed)) {
+    if by_itself(&t) && !t.b("requireApproval") && !t.b("expectYes") && !t.b("chat") && !skip && (!review_needed || (review.is_some() && passed)) {
         g.set(|t| { t.put("stage", "merging"); t.put("msg", "Merging"); t.put("mergeIntent", json!({ "approvedAt": now(), "repairs": 0, "verifiedHead": head_v, "auto": true })); })?;
         return crate::land::land_core(id, g);
     }

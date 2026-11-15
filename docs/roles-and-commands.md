@@ -96,7 +96,8 @@ before, and a try a moment later goes through) must still be that commit too. An
 that ran again or a commit that moved since, and nothing is merged: it fails with the reason and a non-zero exit. The
 yes stays held to them after it: when the work changes before it lands (the agent's repair, or main merged in), it is
 checked and reviewed again as always, and then waits for approval again instead of merging, with the new round and
-commit to judge. Either flag works alone; neither goes with `--anyway`, nor with another machine's task (run it on that
+commit to judge. A step on the way that fails and is run again changes nothing of that: until it lands or gets a new
+yes, it never merges by itself (`merge.by itself`), and the board's retry of the merge is that same held yes. Either flag works alone; neither goes with `--anyway`, nor with another machine's task (run it on that
 machine). Without them, `approve` is as it always was. It is for a program that decides before it approves
 (auto-ship): it reads the task, judges it, and passes what it read, so a change in between is caught instead of merged.
 

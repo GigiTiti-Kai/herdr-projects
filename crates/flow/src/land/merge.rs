@@ -56,7 +56,7 @@ pub(super) fn landed(id: &str, g: &mut Guard, t: &Task, msg: &str, head: &str, c
         let said = if t.b("checksUnread") { format!("{msg}. {}", t.s("checksUnread")) } else { msg.to_string() };
         let said = if closed.is_empty() { said } else { format!("{}. {closed}", said.trim_end_matches('.')) };
         t.put("stage", "done"); t.put("mergedAt", now()); t.put("tidy", mark.clone().unwrap_or(Value::Null)); t.put("msg", said);
-        for k in ["failure", "prFailure", "mergeIntent", "lineAt", "lineTurn", "checksWait"] { t.put(k, Value::Null); }
+        for k in ["failure", "prFailure", "mergeIntent", "lineAt", "lineTurn", "checksWait", "expectYes"] { t.put(k, Value::Null); }
         for k in ["autoMerge", "autoMergeLocal", "mergeFailed", "requireApproval"] { t.put(k, false); }
         if t.b("pr") { t.put("prMerged", true); t.put("prState", "merged"); }
     })?;
