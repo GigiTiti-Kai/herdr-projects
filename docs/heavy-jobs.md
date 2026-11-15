@@ -9,6 +9,8 @@ another machine), or inside a job that already holds the lock (`HEAVY_RUN_ACTIVE
   free the task shows `Waiting for its turn`. Waiting for GitHub does not hold it ([the check on GitHub](check-on-github.md)).
 - **The workspace setup's build** (`scripts/setup.sh`) takes it for the build alone: the build cache's server is started
   before it, outside the job, and stays up.
+- **The plugin's build step** (`sh bin/run.sh --fetch`) takes it when it builds from source (`cargo build --release`),
+  which it does only when it cannot download the program.
 - **A check of a few areas by name** (`npm run check board-panel`) does not take it.
 - **A cargo build or test of your own** goes through it: `sh scripts/heavy.sh cargo build --profile quick`.
 
