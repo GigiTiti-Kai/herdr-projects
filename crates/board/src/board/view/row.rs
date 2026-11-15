@@ -74,7 +74,7 @@ pub fn row_layout(s: &mut State, t: &Theme, records: &[crate::board::state::Rec]
     let cells = |ago: bool, cols: &[(&'static str, usize)]| -> Vec<Cell> { cols.iter().map(|(k, w)| Cell { key: k, w: match *k { "percent" => (*w).max(PERCENT_STEADY), "eta" => (*w).max(ETA_STEADY), "time" if ago => w + 4, _ => *w } }).collect() };
     let cols_of = |recs: &[crate::board::state::Rec]| if recs.first().map(|r| is_auto(r)).unwrap_or(false) { auto_cols.clone() } else { cols.clone() };
     let fit = |r: &Obj, f: Option<&F>, s: &State| Fit {
-        room: width_.saturating_sub(mark(t, r).width() + 2 + number_wide(s, r, num)), name: width(&bare_title(s, r)), // the kind chip owes nothing: the name gives way to keep the columns (view/kind.rs)
+        room: width_.saturating_sub(mark(t, r).width() + 2 + number_wide(s, r, num)), name: width(&row_title(s, r)), chip: width(&row_title(s, r)) - width(&bare_title(s, r)),
         has: ["bar", "percent", "eta", "review", "pr", "tag", "lead"].into_iter().filter(|k| f.map(|f| f.has(k)).unwrap_or(false)).chain(if tall { None } else { Some("time") }).collect(),
     };
     let field_for = |r: &Obj| records.iter().position(|x| x.s("id") == r.s("id")).and_then(|n| fmap.get(&n).copied());

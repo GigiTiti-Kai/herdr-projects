@@ -49,9 +49,9 @@ fn a_row_waiting_for_approval_says_the_advice_in_words_with_the_pr_on_the_right(
     m(&v.row(&with(&pr, json!({ "reviewRound": 3 })), 120), r" R#3 PR#12 {2}0s ago\n[ ▌] {5}Review failed · 3/5, reviewer says no$");
     // narrower, the verdict has its own line, so it stays whole while the columns beside the name go; a window
     // narrower than the verdict itself wraps it, red as it is
-    m(&v.row(&second, 55), r"^[ ▌]! #\d+ \[運用\] Build a flying game +R#2 PR#12 {2}0s ago\n[ ▌] {5}Review failed · 3/5, reviewer says no$");
-    m(&v.row(&second, 42), r"^[ ▌]! #\d+ \[運用\] Build a flying game +0s ago\n[ ▌] {5}Review failed · 3/5, reviewer says\n[ ▌] {5}no$");
-    m(&v.row(&pr, 34), r"^[ ▌]! #\d+ \[運用\] Build a flying game *\n[ ▌] {5}Review failed · 3/5,\n[ ▌] {5}reviewer says no$");
+    m(&v.row(&second, 48), r"^[ ▌]! #\d+ \[運用\] Build a flying … +R#2 PR#12 {2}0s ago\n[ ▌] {5}Review failed · 3/5, reviewer says no$");
+    m(&v.row(&second, 35), r"^[ ▌]! #\d+ \[運用\] Build a flyi… +0s ago\n[ ▌] {5}Review failed · 3/5, reviewer\n[ ▌] {5}says no$");
+    m(&v.row(&pr, 27), r"^[ ▌]! #\d+ \[運用\] Build a flyin… *\n[ ▌] {5}Review failed · 3/5,\n[ ▌] {5}reviewer says no$");
     m(&v.row(&pr, 20), r"^[ ▌]! \[運用\] Build a f…\n[ ▌] {2}Review failed ·\n[ ▌] {2}3/5, reviewer\n[ ▌] {2}says no$"); // too narrow for the task's number too: it went, and the name has its cells
     // a failed merge needs you: it says why, and the panel still has the score and which review gave it
     let failed_merge = with(&second, json!({ "mergeFailed": true, "review": { "score": 5, "recommend": true, "text": "Crashes." }, "msg": "The merge failed: conflict in src/game.js" }));
@@ -107,11 +107,11 @@ fn rows_that_need_you_say_what_blocks_them_whole_under_the_name() {
     // another row's long sentence or progress does not take the verdict away
     let pr = v.pr();
     m(&v.row_in(&pr, 80, &[pr.clone(), working.clone()]), r"^[ ▌]! #\d+ \[運用\] Build a flying game +R#1 PR#12 {2}0s ago\n[ ▌] {5}Review failed · 3/5, reviewer says no$");
-    for width in [34, 37, 47, 60, 80, 120] {
+    for width in [27, 30, 40, 60, 80, 120] {
         for r in [pr.clone(), v.plain(), base.clone()] {
             let line = v.row_in(&r, width, &[r.clone(), working.clone()]);
             assert!(line.split('\n').all(|l| sw::text::width(l) <= width), "fits {width}: {line}");
-            no(&line, r"Skylark|\*\*|Reviewed|approve to merge"); m(&line, r"^ \S #\d+ \[運用\] Build a flying game");
+            no(&line, r"Skylark|\*\*|Reviewed|approve to merge"); m(&line, r"^ \S #\d+ \[運用\] Build a ");
         }
     }
 }

@@ -74,14 +74,14 @@ fn every_row_has_its_tasks_number_after_the_mark_greyed_in_one_column_every_titl
 fn the_number_gives_way_last_before_the_rest_of_the_name_for_the_whole_list_at_once_and_is_not_counted_in_a_names_room() {
     let all = list4();
     let mut v = board(&all, false, "");
-    let mut r = |width: usize, title: &str| row(&lines(&mut v, width, 200), &title.chars().take(6).collect::<String>());
+    let mut r = |width: usize, title: &str| row(&lines(&mut v, width, 200), &title.chars().take(3).collect::<String>());
     // Wide: every column. Narrower: the columns go in their order (board_rows_fit.rs) and the number stays.
     assert!(has(&r(44, "Add an undo"), r"^[ ▌]◆ #134 \[運用\] Add an undo +R#1 PR#98 +2h$"), "{}", r(44, "Add an undo"));
-    assert!(has(&r(37, "Add an undo"), r"^[ ▌]◆ #134 \[運用\] Add an undo +2h ago$"), "{}", r(37, "Add an undo")); // the review tag and the pull request went, together
-    assert!(has(&r(33, "Blue while"), r"^[ ▌]✓ #7 {3}\[運用\] Blue while the re…$"), "{}", r(33, "Blue while")); // the time went, and the name is cut: the number is still there
+    assert!(has(&r(31, "Add an undo"), r"^[ ▌]◆ #134 \[運用\] Add an undo +2h$"), "{}", r(31, "Add an undo")); // the review tag and the pull request went, together (and the word "ago", which the chip no longer leaves room for at this width)
+    assert!(has(&r(26, "Blue while"), r"^[ ▌]✓ #7 {3}\[運用\] Blue while…$"), "{}", r(26, "Blue while")); // the time went, and the name is cut: the number is still there
     // It goes where it would leave a name fewer than NAME_LEFT cells with nothing beside it: mark (3), `#134` (4), a cell.
     let least = 3 + 4 + 1 + NAME_LEFT;
-    assert!(has(&r(least, "Add an undo"), r"^[ ▌]◆ #134 \[運用\] Add an")); assert!(has(&r(least - 1, "Add an undo"), r"^[ ▌]◆ \[運用\] Add an"), "{}", r(least - 1, "Add an undo"));
+    assert!(has(&r(least, "Add an undo"), r"^[ ▌]◆ #134 \[運用\] Ad")); assert!(has(&r(least - 1, "Add an undo"), r"^[ ▌]◆ \[運用\] Ad"), "{}", r(least - 1, "Add an undo"));
     for x in &all { assert!(!has(&r(least - 1, x.s("title")), r"#\d"), "on every row at once: {}", x.s("title")); }
     for width in [200, 100, 60, 44, 30, least, least - 1, 16, 10] { assert!(lines(&mut v, width, 200).iter().filter(|l| has(l, r"^ [!◐○✓] ")).all(|l| sw::text::width(l) <= width), "every row fits {width}"); }
     // Narrow screen (rows of three lines): the name wraps under itself, right of the number; the bar starts at the mark.

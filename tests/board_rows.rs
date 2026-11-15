@@ -53,21 +53,21 @@ fn a_tight_row_keeps_the_tasks_name_then_the_columns_on_the_right_what_a_live_ta
     let rows = draw(&mut s, &records, 75);
     assert!(has(&rows[0], r"\[運用\] Remove notification pop-ups +\S.* 95% +6m {4}$") && !has(&rows[0], r"Remov[^ ]* {2}Re"), "{rows:?}");
     assert!(has(&rows[1], r"\[運用\] Fix ugly blocked row on the board +█+░+ +55% {2}PR#3 {2}6m {4}$"), "{rows:?}");
-    let rows = draw(&mut s, &records, 66);
-    assert!(has(&rows[0], r"\[運用\] Remove notification pop-ups +95% +6m {4}$"), "{rows:?}");
-    assert!(has(&rows[1], r"\[運用\] Fix ugly blocked row on the board +55% {2}PR#3 +6m {4}$"), "{rows:?}");
-    assert!(has(&rows[2], r"\[運用\] Truncate long descriptions in sidebar +PR#2 +6m ago$"), "{rows:?}");
+    let rows = draw(&mut s, &records, 59);
+    assert!(has(&rows[0], r"\[運用\] Remove notification pop-u… +95% +6m {4}$"), "{rows:?}");
+    assert!(has(&rows[1], r"\[運用\] Fix ugly blocked row on t… +55% {2}PR#3 +6m {4}$"), "{rows:?}");
+    assert!(has(&rows[2], r"\[運用\] Truncate long descriptions in s… +PR#2 +6m ago$"), "{rows:?}");
     {
         let pair = [rec(json!({ "id": "proj/5", "state": "working", "title": "Still going", "at": at })), rec(json!({ "id": "proj/6", "state": "done", "title": "All done", "at": at }))];
         let l = lay(&mut s, &t, &pair, 50, 200);
         let (going, ended) = (row(&s, &t, &pair[0], 50, &l).text(), row(&s, &t, &pair[1], 50, &l).text());
         assert!(has(&going, r"^[ ▌]◐ #\d+ \[運用\] Still going +6m {4}$") && has(&ended, r"^[ ▌]✓ #\d+ \[運用\] All done +6m ago$"), "{going:?} {ended:?}");
     }
-    let rows = draw(&mut s, &records, 55);
+    let rows = draw(&mut s, &records, 48);
     assert!(has(&rows[0], r"\[運用\] Remove notification pop-ups +6m$") && !rows[0].contains('%'), "{rows:?}");
-    assert!(has(&rows[1], r"\[運用\] Fix ugly blocked row on the board +6m$") && has(&rows[2], r"\[運用\] Truncate long descriptions in sidebar +6m$"), "{rows:?}");
-    let rows = draw(&mut s, &records, 50);
-    assert!(has(&rows[0], r"^ \S #\d+ \[運用\] Remove notification pop-ups *$") && has(&rows[1], r"^ \S #\d+ \[運用\] Fix ugly blocked row on the board *$") && has(&rows[2], r"^ \S #\d+ \[運用\] Truncate long descriptions in sidebar$"), "{rows:?}");
+    assert!(has(&rows[1], r"\[運用\] Fix ugly blocked row on the b… +6m$") && has(&rows[2], r"\[運用\] Truncate long descriptions in… +6m$"), "{rows:?}");
+    let rows = draw(&mut s, &records, 43);
+    assert!(has(&rows[0], r"^ \S #\d+ \[運用\] Remove notification pop-ups *$") && has(&rows[1], r"^ \S #\d+ \[運用\] Fix ugly blocked row on the b…$") && has(&rows[2], r"^ \S #\d+ \[運用\] Truncate long descriptions in…$"), "{rows:?}");
     let rows = draw(&mut s, &records, 40);
     assert!(has(&rows[0], r"^ \S #\d+ \[運用\] Remove notification pop-ups$") && has(&rows[1], r"^ \S #\d+ \[運用\] Fix ugly blocked row on th…$"), "{rows:?}");
     {
@@ -77,11 +77,11 @@ fn a_tight_row_keeps_the_tasks_name_then_the_columns_on_the_right_what_a_live_ta
         assert!(has(&e[0], r"█+ +95% {3}3m left {8}6m {4}$"), "{e:?}"); assert_eq!(idx(&e[0], "3m"), idx(&e[1], "130m") + 2); assert!(has(&e[1], r"█+░+ +55% 130m left {2}PR#3 {2}6m {4}$"), "{e:?}");
         assert!(has(&e[2], r"sidebar +PR#2 {2}6m ago$") && has(&e[3], r"No guess yet +░+ {2}0% {18}6m {4}$"), "no guess: no \"m\", the percent stays in line: {e:?}");
         assert_eq!(idx(&e[0], "95%"), idx(&e[1], "55%"));
-        let e = draw(&mut s, &eta, 73);
-        assert!(has(&e[0], r"\[運用\] Remove notification pop-ups +95% {3}3m left +6m$") && has(&e[1], r"\[運用\] Fix ugly blocked row on the board +55% 130m left {2}PR#3 +6m$"), "{e:?}");
+        let e = draw(&mut s, &eta, 66);
+        assert!(has(&e[0], r"\[運用\] Remove notification pop-ups +95% {3}3m left +6m$") && has(&e[1], r"\[運用\] Fix ugly blocked row on th… +55% 130m left {2}PR#3 +6m$"), "{e:?}");
         assert!(has(&e[2], r"sidebar +PR#2 +6m$"), "the list gives up the word \"ago\" so that a row keeps its percent: {e:?}");
-        let e = draw(&mut s, &eta, 62);
-        assert!(has(&e[1], r"\[運用\] Fix ugly blocked row on the board +PR#3 +6m$") && has(&e[0], r"pop-ups +6m$") && has(&e[3], r"No guess yet +6m$"), "{e:?}");
+        let e = draw(&mut s, &eta, 55);
+        assert!(has(&e[1], r"\[運用\] Fix ugly blocked row on the boa… +PR#3 +6m$") && has(&e[0], r"pop-ups +6m$") && has(&e[3], r"No guess yet +6m$"), "{e:?}");
         assert_eq!(idx(&e[1], "PR#3"), idx(&e[2], "PR#2")); assert!(e.iter().all(|l| !has(l, r"%|\dm .*\dm")), "{e:?}");
         // The same colour as the percent, whatever the state: the review colour under review.
         let paint = |s: &mut State, r: &Rec| { let l = lay(s, &t, std::slice::from_ref(r), 120, 120); row(s, &t, r, 120, &l) };
@@ -90,10 +90,10 @@ fn a_tight_row_keeps_the_tasks_name_then_the_columns_on_the_right_what_a_live_ta
         let under = paint(&mut s, &with(&eta[1], json!({ "stage": "reviewing", "agent": "claude" })));
         assert!(ink_of(&under, "130m").is_some() && ink_of(&under, "130m") == ink_of(&under, "55%") && ink_of(&under, "130m") != Some(Ink::Yellow), "{under:?}");
         // Minutes left with no percent still show.
-        let only = rec(json!({ "id": "proj/7", "state": "working", "title": "Mins", "eta": 7, "at": at }));
+        let only = rec(json!({ "id": "proj/7", "state": "working", "title": "Only minutes", "eta": 7, "at": at }));
         let one = |s: &mut State, w: usize| { let l = lay(s, &t, std::slice::from_ref(&only), w, 200); row(s, &t, &only, w, &l).text() };
-        assert!(has(&one(&mut s, 60), r"^[ ▌]◐ #\d+ \[運用\] Mins +7m left +6m$"), "{}", one(&mut s, 60));
-        assert!(has(&one(&mut s, 21), r"^[ ▌]◐ \[運用\] Mins +6m$"), "{}", one(&mut s, 21));
+        assert!(has(&one(&mut s, 60), r"^[ ▌]◐ #\d+ \[運用\] Only minutes +7m left +6m$"), "{}", one(&mut s, 60));
+        assert!(has(&one(&mut s, 20), r"^[ ▌]◐ \[運用\] Only… +6m$"), "{}", one(&mut s, 20));
         let osc = sw::board::update::beat::osc;
         assert!(osc(&eta[1]).contains(":progress=55:eta=130:"), "{}", osc(&eta[1])); assert!(!osc(&eta[3]).contains("eta="));
     }
@@ -102,20 +102,20 @@ fn a_tight_row_keeps_the_tasks_name_then_the_columns_on_the_right_what_a_live_ta
         rec(json!({ "id": "proj/8", "state": "working", "title": "Fix login", "msg": "Tracing why the login form rejects valid passwords.", "progress": 55, "pr": 3, "at": at })),
         rec(json!({ "id": "proj/9", "state": "working", "title": "Fix layout for task names in narrow terminal board", "msg": "Working.", "progress": 20, "at": at })),
     ];
-    let rows = draw(&mut s, &records, 110);
+    let rows = draw(&mut s, &records, 103);
     assert!(has(&rows[0], r"\[運用\] Fix login +█+░+ +55% {2}PR#3 +6m$") && has(&rows[1], r"board +█+░+ +20% +6m$"), "{rows:?}");
-    let rows = draw(&mut s, &records, 82);
-    assert!(has(&rows[0], r"\[運用\] Fix login +55% {2}PR#3 +6m$") && has(&rows[1], r"\[運用\] Fix layout for task names in narrow terminal board +20% +6m$"), "the long name has no room for a bar: neither row has one: {rows:?}");
+    let rows = draw(&mut s, &records, 75);
+    assert!(has(&rows[0], r"\[運用\] Fix login +55% {2}PR#3 +6m$") && has(&rows[1], r"\[運用\] Fix layout for task names in narrow terminal … +20% +6m$"), "the long name has no room for a bar: neither row has one: {rows:?}");
     // All machines: the machine is the heading's, never in the row's tag (a long machine name takes nothing from it).
     s.scope = "*".into();
     let far = with(&records[0], json!({ "host": "very-long-machine-name-on-the-tailnet" }));
     let one = |s: &mut State, w: usize| { let l = lay(s, &t, std::slice::from_ref(&far), w, 200); row(s, &t, &far, w, &l).text() };
     assert!(has(&one(&mut s, 120), r"^ ◐ #8 \[運用\] Fix login +█"), "{}", one(&mut s, 120));
-    assert!(has(&one(&mut s, 60), r"^ ◐ #8 \[運用\] Fix login +(█+░+ +)?55% {2}PR#3 +6m$"), "{}", one(&mut s, 60));
-    assert!(has(&one(&mut s, 51), r"^ ◐ (#8 )?\[運用\] Fix login +(█+░+ +)?(55% {2})?PR#3 +6m$"), "{}", one(&mut s, 51));
-    assert!(has(&one(&mut s, 36), r"^ \S (#8 )?\[運用\] Fix login +(55% {2})?PR#3 +6m$"), "{}", one(&mut s, 36));
-    assert!(has(&one(&mut s, 34), r"^ \S (#8 )?\[運用\] Fix login +PR#3 +6m$"), "{}", one(&mut s, 34));
-    assert!(has(&one(&mut s, 21), r"^ \S \[運用\] Fix login *$"), "too narrow for the task's number: it went too: {}", one(&mut s, 21));
+    assert!(has(&one(&mut s, 53), r"^ ◐ #8 \[運用\] Fix login +(█+░+ +)?55% {2}PR#3 +6m$"), "{}", one(&mut s, 53));
+    assert!(has(&one(&mut s, 47), r"^ ◐ (#8 )?\[運用\] Fix login +(█+░+ +)?(55% {2})?PR#3 +6m$"), "{}", one(&mut s, 47));
+    assert!(has(&one(&mut s, 38), r"^ \S (#8 )?\[運用\] Fix login +(55% {2})?PR#3 +6m$"), "{}", one(&mut s, 38));
+    assert!(has(&one(&mut s, 30), r"^ \S (#8 )?\[運用\] Fix lo… +PR#3 +6m$"), "{}", one(&mut s, 30));
+    assert!(has(&one(&mut s, 21), r"^ \S \[運用\] Fix l… +6m$"), "too narrow for the task's number: it went too: {}", one(&mut s, 21));
     for width in [200, 60, 40, 30, 24, 16] { assert!(len(&one(&mut s, width)) <= width, "fits {width}"); }
 }
 

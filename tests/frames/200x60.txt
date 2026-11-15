@@ -64,41 +64,41 @@
  All 18   Coordinators 0   Needs you 5   Working 9   Ready 1   To do 2   Done 1   Automations 0   Pinned 0                      │  #5 Max length for task titles
  ▾ this machine  1 project · 18 tasks                                                                                           │
    ▾ needs you                                                                                                                  │  Status ─────────────────────────────────────────────────────────────
-   ? #9     [運用] Max length for task titles                                                                                1m │  State        ◐ working · for 1m
+   ? #9     [運用] Max length for task titles                                                                            1m ago │  State        ◐ working · for 1m
             Should the old settings file be removed, or kept for one more version so that nobody loses what they set?           │  Progress     ██████████████░░░░░░░░░░ 60% · 11m left
-   @ #10    [運用] Max length for task titles                                                                                1m │  Now          Found the cause; now checking every caller of the
+   @ #10    [運用] Max length for task titles                                                                            1m ago │  Now          Found the cause; now checking every caller of the
             Needs a login                                                                                                       │               resize handler for the same mistake
-   ! #12    [運用] Max length for task titles                                                                R#1 PR#123456   1m │  On it        claude
+   ! #12    [運用] Max length for task titles                                                            R#1 PR#123456   1m ago │  On it        claude
             The pull request's checks fail                                                                                      │
-   ✗ #13    [運用] Max length for task titles                                                                                1m │  Description ────────────────────────────────────────────────────────
+   ✗ #13    [運用] Max length for task titles                                                                            1m ago │  Description ────────────────────────────────────────────────────────
             Conflict with main                                                                                                  │  A task title should have a maximum length. A longer one is cut
-   ✗ #14    [運用] Max length for task titles                                                                                1m │  between words.
+   ✗ #14    [運用] Max length for task titles                                                                            1m ago │  between words.
             Stopped without a summary                                                                                           │  Second paragraph, with
    ▾ ready to approve                                                                                                           │  a/very/long/path/that/has/no/space/in/it/at/all/src/board/view/row-w
-   ◆ #11    [運用] Max length for task titles                                                                R#1 PR#60       1m │  rap.js and more words after it.
+   ◆ #11    [運用] Max length for task titles                                                            R#1 PR#60       1m ago │  rap.js and more words after it.
             Pass                                                                                                                │
    ▾ working                                                                                                                    │  Settings ───────────────────────────────────────────────────────────
-   ◐ #2     [運用] Max length for task titles                                                  40% 90m left                  1m │  Reading its settings…
+   ◐ #2     [運用] Max length for task titles                                              40% 90m left                  1m     │  Reading its settings…
             Drafting                                                                                                            │
-   ◇ #4     [運用] Max length for task titles                                                                                1m │  alt+t shows the whole task
+   ◇ #4     [運用] Max length for task titles                                                                            1m     │  alt+t shows the whole task
             Starting                                                                                                            │
-▌  ◐ #5     [運用] Max length for task titles                                                  60% 11m left                  1m │
+▌  ◐ #5     [運用] Max length for task titles                                              60% 11m left                  1m     │
 ▌           Found the cause; now checking every caller of the resize handler for the same mistake                               │
-   ◐ #12345 [運用] Max length for task titles                                                 100% 24h left                400d │
+   ◐ #12345 [運用] Max length for task titles                                             100% 24h left                400d     │
             xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx… │
-   ◇ #7     [運用] Max length for task titles                                                  65%  3m left                  1m │
+   ◇ #7     [運用] Max length for task titles                                              65%  3m left                  1m     │
             Running the check · tests 31 of 47                                                                                  │
-   ◑ #8     [運用] Max length for task titles                                                  35%  6m left  R#1             1m │
+   ◑ #8     [運用] Max length for task titles                                              35%  6m left  R#1             1m     │
             Reading the diff.                                                                                                   │
-   ◐ #17    [調査] Max length for task titles [research]                                                                     1m │
+   ◐ #17    [調査] Max length for task titles [research]                                                                 1m     │
             Reading the logs                                                                                                    │
-   ◐ #18    [運用] 日本語のタイトルはとても長いので二倍の幅になります 🚀🚀 and then some m…     5%                           1m │
+   ◐ #18    [運用] 日本語のタイトルはとても長いので二倍の幅になります 🚀🚀 and then so…     5%                           1m     │
             幅の広い文字 🎉 の行                                                                                                │
-   ◷ #3     [運用] Max length for task titles                                                  Q#2                           1m │
+   ◷ #3     [運用] Max length for task titles                                              Q#2                           1m     │
             Waiting for a free slot                                                                                             │
    ▾ to do                                                                                                                      │
-   ○ #1     [運用] Max length for task titles                                                                                1m │
-   ○ #19    [運用] TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT                                              1m │
+   ○ #1     [運用] Max length for task titles                                                                            1m ago │
+   ○ #19    [運用] TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT                                          1m ago │
    ▾ done                                                                                                                       │
      ↓ 1 done (alt+d shows them)                                                                                                │
                                                                                                                                 │
