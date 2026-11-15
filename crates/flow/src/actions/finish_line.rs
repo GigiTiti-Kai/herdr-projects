@@ -1,4 +1,5 @@
 //! The finish line's keys: approve, send the review or the failure back, finish anyway, retry.
+use super::expect::Expect;
 use super::limits::{carry_on, take_as_is};
 use super::plan::{approvable, approve_plan, awaits_plan, review_again};
 use super::shared::{say, Said};
@@ -19,20 +20,22 @@ use crate::status_words::{review_failed, review_tally};
 use crate::store::attempts::attempts_of;
 use crate::store::files::{data_dir, read_obj, write_json};
 use crate::store::handovers::{handover_line, handovers};
-use crate::store::reviews::{current_review, review_history};
+use crate::store::reviews::{current_review, review_history, review_number};
 use crate::store::tasks::{assert_unarchived, find, get, update, Change, Task};
 
 /// Approve: the one decision that ships finished work. An agent's own request for permission gets a yes instead.
 /// `seen`: what the human was shown when they said yes (pr, head): if the pull request or the reviewed commit is
 /// another one by now, nothing is merged. `anyway`: work whose last review failed, or whose GitHub checks failed, is merged only when asked for so.
-pub fn approve(id: &str, seen: Option<(Value, Value)>, anyway: bool) -> Res<Said> {
+pub fn approve(id: &str, seen: Option<(Value, Value)>, anyway: bool) -> Res<Said> { approve_expecting(id, seen, &Expect::default(), anyway) }
+/// The same, held to the review and commit the caller judged (expect.rs): checked again under the task's lock.
+pub fn approve_expecting(id: &str, seen: Option<(Value, Value)>, expect: &Expect, anyway: bool) -> Res<Said> {
     let cur = find(id)?;
     assert_unarchived(&cur)?;
     let moved = |t: &Task| -> Res<()> {
         if let Some((pr, head)) = &seen { if t.s("stage") == "approval" && (pr != t.at("pr") || head != t.at("reviewedHead")) { crate::fail!("{} changed while you were asked. Nothing was merged: look at it again, then approve.", t.s("id")); } }
-        Ok(())
+        expect.check(t)
     };
-    moved(&cur)?; crate::land::park::refuse_busy(&cur)?;
+    moved(&cur)?; expect.live(&cur)?; crate::land::park::refuse_busy(&cur)?;
     if cur.s("stage") == "asks" && cur.s("kind") == "permission" { return tell(cur.s("id"), "Yes, go ahead.", false); }
     if approvable(&cur) { return approve_plan(cur.s("id")); }
     if cur.s("stage") == "pick" { crate::fail!("{0} waits for you to pick one of its attempts, not for a merge: herdr-projects pick {0} <letter>", cur.s("id")); }
@@ -51,11 +54,13 @@ pub fn approve(id: &str, seen: Option<(Value, Value)>, anyway: bool) -> Res<Said
         // Main moved and the board could not bring this branch up to date yet: what was reviewed is not what would land.
         if t.b("syncBlocked") { crate::fail!("{} is behind main and cannot be approved yet: {}. The board keeps trying to bring it up to date.", t.s("id"), t.at("syncBlocked").s("why")); }
         if runner_alive(t) { crate::fail!("{} is busy. Try again in a moment.", t.s("id")); }
-        t.put("stage", "merging"); t.put("msg", "Merging"); t.put("requireApproval", false); t.put("since", now()); t.put("mergeFailed", false);
+        t.put("stage", "merging"); t.put("msg", "Merging"); t.put("requireApproval", expect.any()); t.put("since", now()); t.put("mergeFailed", false);
         // What the yes was given to: a review run anew on another commit later withdraws it (pipeline_end.rs).
-        let mut mi = json!({ "approvedAt": now(), "repairs": t.at("mergeIntent").i("repairs"), "verifiedHead": t.at("reviewedHead"), "approvedHead": t.at("reviewedHead"), "approvedRound": crate::store::reviews::review_number(t) });
+        let mut mi = json!({ "approvedAt": now(), "repairs": t.at("mergeIntent").i("repairs"), "verifiedHead": t.at("reviewedHead"), "approvedHead": t.at("reviewedHead"), "approvedRound": review_number(t) });
         // Merged in spite of GitHub's failed checks: they are not looked at again for this merge.
         if checks.is_some() { mi["anyway"] = json!(true); t.put("prFailure", Value::Null); }
+        // What this yes stays held to until it lands, through a repair, a sync or a failure and its retry (expect.rs).
+        let held = if expect.any() { expect.bound(t) } else { Value::Null }; t.put("expectYes", held);
         t.put("mergeIntent", mi); t.put("checksWait", Value::Null);
         Ok(Change::Write)
     })?;
@@ -200,7 +205,8 @@ pub fn retry(id: &str) -> Res<Said> {
     assert_unarchived(&cur)?;
     let cid = cur.t("id");
     // A merge that failed: the yes was given before it. Not one GitHub's failed checks stopped: that takes `--anyway`.
-    if cur.s("stage") == "approval" { return approve(&cid, None, cur.b("mergeFailed") && crate::land::checks::failed_on(&cur).is_none()); }
+    // One held to a review and a commit (approve --expect-…) stays held to them.
+    if cur.s("stage") == "approval" { return approve_expecting(&cid, None, &Expect::held(&cur), cur.b("mergeFailed") && crate::land::checks::failed_on(&cur).is_none()); }
     if stopped_at_limit(&cur) { return carry_on(&cid, false); }
     // The agent said it needs a login: you have signed in, and it is told to carry on.
     if cur.s("stage") == "asks" && cur.s("kind") == "auth" { return go_on(&cur); }
@@ -253,7 +259,7 @@ pub fn details(id: &str) -> Res<Value> {
     let t = find(id)?;
     let plan = if t.at("plan").is_object() { let mut p = t.o("plan").cloned().unwrap_or_default(); p.del("home"); p.put("text", crate::plan::read_plan(&t)); Value::Object(p) } else { Value::Null };
     let mut out = obj(json!({
-        "task": { "id": t.at("id"), "title": t.at("title"), "stage": t.at("stage"), "msg": t.at("msg"), "description": t.at("description") },
+        "task": { "id": t.at("id"), "title": t.at("title"), "stage": t.at("stage"), "msg": t.at("msg"), "description": t.at("description"), "reviewRound": review_number(&t), "reviewedHead": t.at("reviewedHead") },
         "failure": failure_of(&t),
         "review": current_review(&t).cloned(),
         "reviews": review_history(&t),

@@ -88,6 +88,19 @@ folders when herdr does not say what runs in its panes: then the agent and your 
 `approve` refuses work whose last review failed, and says what the review found. `approve <id> --anyway` merges it all
 the same. It is for when the human said so in so many words.
 
+`approve <id> --expect-review N --expect-head SHA` merges only what the caller judged: the task must still wait to
+merge, on review round `N`, with `SHA` its reviewed commit (the full sha, or its first 7 characters or more). These are
+`reviewRound` and `reviewedHead` in `details <id> --json` (under `task`) and in `list --json`. The branch in the task's
+worktree and the pull request's head on GitHub (asked with gh, once: right after a push GitHub may still name the commit
+before, and a try a moment later goes through) must still be that commit too. Anything else, a review
+that ran again or a commit that moved since, and nothing is merged: it fails with the reason and a non-zero exit. The
+yes stays held to them after it: when the work changes before it lands (the agent's repair, or main merged in), it is
+checked and reviewed again as always, and then waits for approval again instead of merging, with the new round and
+commit to judge. A step on the way that fails and is run again changes nothing of that: until it lands or gets a new
+yes, it never merges by itself (`merge.by itself`), and the board's retry of the merge is that same held yes. Either flag works alone; neither goes with `--anyway`, nor with another machine's task (run it on that
+machine). Without them, `approve` is as it always was. It is for a program that decides before it approves
+(auto-ship): it reads the task, judges it, and passes what it read, so a change in between is caught instead of merged.
+
 ### A flag a command does not know is refused
 
 Each command takes only its own flags, plus `--json` and `--help`. `add`, `delegate` and `automations` also take any

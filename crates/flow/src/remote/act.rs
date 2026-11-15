@@ -14,6 +14,8 @@ pub fn far_command(cmd: &str, pos: &[String], flags: &Obj, by_autopilot: bool) -
     let Some((label, rid)) = pos.get(1).and_then(|r| crate::after::far::split(r)) else { return Ok(None) };
     if crate::after::circle::is_me(&label) { return Ok(None); }
     let Some(m) = super::machines().into_iter().find(|m| m.label.eq_ignore_ascii_case(&label)) else { return Ok(None) };
+    // The machine there would not hold the yes to them (an older one drops what it does not know): refused, not merged unguarded.
+    if *action == "approve" && (flags.has("expect-review") || flags.has("expect-head")) { crate::fail!("--expect-review and --expect-head hold only a task of this machine: run approve on {label} itself."); }
     let text = pos.iter().skip(2).cloned().collect::<Vec<_>>().join(" ");
     // An autopilot turn's yes is an action of its own there, `pilot-approve`, which only a machine that checks it knows:
     // one that does not answers that it has no such action, and nothing is approved.

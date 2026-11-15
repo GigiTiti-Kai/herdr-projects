@@ -9,7 +9,7 @@ use crate::herdr::cli::current_socket;
 use crate::json::*;
 use crate::research::is_research;
 use crate::shown::queue::{queued, tag as queue_tag, words as queue_words};
-use crate::store::{keys::{repo_keys, tag_of}, reviews::{current_review, review_round}, tasks::find, titles::title_note};
+use crate::store::{keys::{repo_keys, tag_of}, reviews::{current_review, review_number}, tasks::find, titles::title_note};
 
 /// One task of `list`: named by its key (`HSW-134`), in a column of its own.
 fn line(t: &Obj, keys: &crate::store::keys::Keys) -> String {
@@ -24,7 +24,8 @@ fn brief(t: &Obj) -> Value {
     if !queue_tag(t).is_empty() { o.put("queue", t.i("queuePlace")); } // its place in the queue for a free slot: 1 gets the next
     if t.b("archivedAt") { o.put("archivedAt", t.at("archivedAt").clone()); }
     if let Some(rv) = current_review(t) { o.put("review", rv.clone()); }
-    if review_round(t) > 0 { o.put("reviewRound", review_round(t)); }
+    if review_number(t) > 0 { o.put("reviewRound", review_number(t)); } // what approve --expect-review is held to
+    if t.b("reviewedHead") { o.put("reviewedHead", t.at("reviewedHead").clone()); } // what approve --expect-head is held to
     o.retain(|k, v| !v.is_null() && !(k == "app" && *v == json!("")));
     Value::Object(o)
 }
@@ -123,7 +124,14 @@ pub fn command(cmd: &str, a: &Args) -> Res<(Value, String)> {
         "stop" => { let s = talk::stop(&need(1, "an id")?)?; (shown_of(s.task.s("id")), talk::stopped(&format!("{}: stopped", s.task.s("id")), &s.msg)) }
         "start" => { let t = filing::start_human(&need(1, "an id")?)?; (shown_of(t.s("id")), format!("{}: in progress", t.s("id"))) }
         "pick" => said(crate::attempts::settle::pick(&need(1, "an id")?, &pos.get(2).cloned().unwrap_or_default())?),
-        "approve" => said(finish_line::approve(&need(1, "an id")?, None, flags.at("anyway") == &json!(true))?),
+        "approve" => {
+            let anyway = flags.at("anyway") == &json!(true);
+            let given = |k: &str| -> Res<Option<String>> { if !flags.has(k) { return Ok(None); } flag(k).filter(|v| !v.trim().is_empty()).map(|v| Some(v.trim().to_string())).ok_or_else(|| crate::err::Error::new(format!("--{k} needs a value. Try: herdr-projects help"))) };
+            let review = given("expect-review")?.map(|v| v.parse::<i64>().map_err(|_| crate::err::Error::new(format!("--expect-review takes the review's round, a number (reviewRound in details or list --json), not {v}.")))).transpose()?;
+            let expect = crate::actions::expect::Expect { review, head: given("expect-head")? };
+            if expect.any() && anyway { crate::fail!("--expect-review and --expect-head do not go with --anyway: they are for a merge on the review the caller judged, --anyway merges in spite of it."); }
+            said(finish_line::approve_expecting(&need(1, "an id")?, None, &expect, anyway)?)
+        }
         "park" => { let id = need(1, "an id")?; let (t, msg) = if flags.b("forget") { crate::land::park::forget(&id)? } else { crate::land::park::park(&id)? }; (shown_of(t.s("id")), msg) }
         "review" => said(finish_line::send_review(&need(1, "an id")?)?),
         "retry" => said(finish_line::send_error_noted(&need(1, "an id")?, &rest(2))?),

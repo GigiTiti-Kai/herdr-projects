@@ -95,8 +95,16 @@ pub fn after_review(c: Ctx, g: &mut Guard) -> Res<()> {
     // A conflict with main that was repaired on the way here: one line in the record, with whether a review followed.
     let reviewed_anew = review_needed && !review.as_ref().map(|r| r.b("keptAt")).unwrap_or(false);
     g.set(|t| { sync::conflict_log::conflict_logged(t, reviewed_anew); })?;
-    // A merge the board itself was on its way to is only kept while that setting still says so.
-    t = g.set(|t| { t.put("failure", Value::Null); if t.at("mergeIntent").b("auto") && !by_itself(t) { t.put("mergeIntent", Value::Null); } })?;
+    let head = change.as_ref().map(|x| x.t("head")).filter(|h| !h.is_empty()).unwrap_or_else(|| flow::git::head_of(c.folder));
+    let head_v = if head.is_empty() { Value::Null } else { json!(head) };
+    // A merge the board itself was on its way to is only kept while that setting still says so. One you approved held
+    // to a review and a commit (approve --expect-…) only while what would land is still that: else it waits for you again.
+    let held = crate::actions::expect::broken(&t, &head);
+    t = g.set(|t| {
+        t.put("failure", Value::Null);
+        if held { t.put("requireApproval", true); t.put("autoMerge", false); t.put("autoMergeLocal", false); }
+        if held || (t.at("mergeIntent").b("auto") && !by_itself(t)) { t.put("mergeIntent", Value::Null); }
+    })?;
     // The loop: a review that fails the gate goes straight back, at most `review.rounds` times (0: never).
     let rounds = t.i("reviewRounds");
     let max = ch.i("review.rounds");
@@ -135,8 +143,6 @@ pub fn after_review(c: Ctx, g: &mut Guard) -> Res<()> {
         g.set(|t| t.put("review", stale.clone()))?;
         if hand_over(id, g, &format!("its work still failed review after {rounds} round{}", if rounds == 1 { "" } else { "s" }), "")? { return Ok(()); }
     } }
-    let head = change.as_ref().map(|x| x.t("head")).filter(|h| !h.is_empty()).unwrap_or_else(|| flow::git::head_of(c.folder));
-    let head_v = if head.is_empty() { Value::Null } else { json!(head) };
     // The yes was for another commit than the one just reviewed anew: it is withdrawn, and the task waits for one again
     // as any finished work does, below. A review that failed is said as such inside the block.
     let withdrawn = to_land && t.b("mergeIntent") && fresh && passed && approved_elsewhere(&t, &head);
@@ -163,14 +169,14 @@ pub fn after_review(c: Ctx, g: &mut Guard) -> Res<()> {
     if hold_pr_failure(g, &mut t)? { return Ok(()); }
     // A task that merges by itself (`merge.by`, read now) still wants a review that passed the gate.
     let skip = c.sync.map(|s| !sync::held_why(s).is_empty()).unwrap_or(false);
-    if by_itself(&t) && !t.b("requireApproval") && !t.b("chat") && !skip && (!review_needed || (review.is_some() && passed)) {
+    if by_itself(&t) && !t.b("requireApproval") && !t.b("expectYes") && !t.b("chat") && !skip && (!review_needed || (review.is_some() && passed)) {
         g.set(|t| { t.put("stage", "merging"); t.put("msg", "Merging"); t.put("mergeIntent", json!({ "approvedAt": now(), "repairs": 0, "verifiedHead": head_v, "auto": true })); })?;
         return crate::land::land_core(id, g);
     }
     // Finished work that waits for your yes is not done: it is blocked on you. Checked and reviewed, but not against where
     // it would land (your checkout is on another branch, or main could not be fetched): not approvable yet.
     let behind = c.sync.map(sync::held_why).unwrap_or_default();
-    let note = if withdrawn { format!("{} Reviewed again on a new commit after your approval: approve again to merge.", c.note) } else { c.note.clone() };
+    let note = if withdrawn || held { format!("{} Reviewed again on a new commit after your approval: approve again to merge.", c.note) } else { c.note.clone() };
     t = g.set(|t| { t.put("stage", "approval"); let m = if behind.is_empty() { approval_message_with(t, &note) } else { sync::behind_msg(&behind) }; t.put("msg", m); if !behind.is_empty() { t.put("syncBlocked", sync::blocked(&behind, c.sync)); } })?;
     flow::sidebar::tell_sidebar(&t);
     let _ = (c.keep_intent, c.reason);
