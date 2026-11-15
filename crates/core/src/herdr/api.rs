@@ -190,6 +190,8 @@ impl Herdr {
     pub fn agent_prompt(&self, target: &str, text: &str) -> HRes<Value> { self.call_t(args(&["agent", "prompt", target, text]), 60000) }
     /// Text typed into a pane as it is, with no enter.
     pub fn pane_text(&self, id: &str, text: &str) -> HRes<Value> { self.call(args(&["pane", "send-text", id, text])) }
+    /// Keys pressed in a pane, by herdr's names (`ctrl+j`), whatever runs there.
+    pub fn pane_keys(&self, id: &str, keys: &[&str]) -> HRes<Value> { let mut a = args(&["pane", "send-keys", id]); a.extend(args(keys)); self.call(a) }
     pub fn agent_keys(&self, target: &str, keys: &[&str]) -> HRes<Value> { let mut a = args(&["agent", "send-keys", target]); a.extend(args(keys)); self.call(a) }
     pub fn agent_focus(&self, target: &str) -> HRes<Value> { self.call(args(&["agent", "focus", target])) }
     pub fn agent_read(&self, target: &str, source: &str, lines: Option<i64>) -> HRes<String> {

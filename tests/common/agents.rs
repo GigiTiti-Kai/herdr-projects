@@ -37,9 +37,14 @@ pub fn agent(f: &F, verb: &str, arg2: &str, argv: &[String], flag: &dyn Fn(&str)
             let cwd = st["panes"][pi].t("cwd");
             // A line the pane's line editor has not taken yet (`lineEditorLag`): ble.sh reads both lines as one command of
             // two lines and runs neither.
-            if st["panes"][pi].at("pending").i("reads") > 0 {
-                let line = st["panes"][pi].at("pending").t("line");
-                st["panes"][pi]["screen"] = json!(format!("user@host:{cwd}$ {line}\n{typed}\n-- MULTILINE -- (RET or C-m: insert a newline, C-j: run)"));
+            // `multilineStart`: that many starts held so by the line editor, whatever came before.
+            let pend = st["panes"][pi].at("pending").clone();
+            let held = st.i("multilineStart") > 0;
+            if held { st["multilineStart"] = json!(st.i("multilineStart") - 1); }
+            if pend.i("reads") > 0 || pend.b("multiline") || held {
+                let before = if pend.is_object() { format!("user@host:{cwd}$ {}\n", pend.t("line")) } else { format!("user@host:{cwd}$ ") };
+                st["panes"][pi]["screen"] = json!(format!("{before}{typed}\n-- MULTILINE -- (RET or C-m: insert a newline, C-j: run)"));
+                st["panes"][pi]["pending"] = json!({ "line": format!("{}{typed}", before.trim_start_matches(&format!("user@host:{cwd}$ "))), "multiline": true });
                 return fail("timeout", "timed out waiting for agent startup");
             }
             if st.b("slowShell") && typed.len() > 4096 {
