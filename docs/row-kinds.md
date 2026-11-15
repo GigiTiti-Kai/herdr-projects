@@ -37,7 +37,8 @@ The board reads it off the task's own message (the `--msg` its agent or its coor
 | `OPS-46・OPS-47に委任` | `[委任先 OPS-46・未着手, OPS-47・完了]` |
 | `APP-38(app/38)に仕様ごと委任済み` | `[委任先 APP-38・完了]` |
 | `S2=DOC-7 … S2のみ委任` | nothing: no number stands right before `に委任` |
-| `APP-26に委任しない。手で続ける` | nothing: taken back right after (`しない`, `せず`, `を取り消し`, `をやめ` …) |
+| `APP-26に委任していません。手で続ける` | nothing: its clause (up to the next `。` or `、`) says no: `ない`, `ません`, `ず`, `禁止`, `拒否`, `取り消`, `やめ` … |
+| `APP-26に委任済み、手では回さない` | `[委任先 APP-26・作業中]`: the no is in the next clause |
 
 A task is named by the key its repo goes by now: a message written while the repo went by another key (`OLD-26`)
 still names that task, as every command takes it, and the tag says its key of now (`[委任先 APP-26・…]`).

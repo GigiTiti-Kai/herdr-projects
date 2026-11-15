@@ -25,8 +25,10 @@ pub fn handed(s: &State, r: &Obj) -> String {
     if r.b("host") { return String::new(); }
     // A row's `msg` is its shown note; the task's own message is `raw` (shown/states.rs: as_row).
     let said = if r.has("raw") { r.s("raw") } else { r.s("msg") };
-    // Each `…に委任` the message says, but not one it takes back right after (`に委任しない`, `に委任せず`, `に委任を取り消し`).
-    let no = crate::re!(r"^(?:し(?:ない|ません|なかった|てい?ない)|せず|せぬ|は?しない|を?(?:やめ|止め|取り?消|取りやめ|中止|解除|撤回|キャンセル))");
+    // Each `…に委任` the message says, but none whose own clause (up to the next 。 or 、) says no: `委任しない`,
+    // `委任していません`, `委任してはいけない`, `委任せず`, `委任は拒否された`, `委任を取り消した`. A wrong target is worse
+    // than none, so a clause with any of these words names nothing.
+    let no = crate::re!(r"^[^。、．，,.!?！？\n]*?(?:ない|ません|なかった|ず|ぬ|禁止|拒否|中止|取り?消|撤回|やめ|止め|解除|キャンセル|だめ|ダメ|不可|見送)");
     let named: Vec<String> = crate::re!(r"((?:[A-Z][A-Z0-9]{1,4}-\d+(?:\([^)]*\))?\s*[・、,と]?\s*)+)に[^。、\s]{0,6}委任").captures_iter(said)
         .filter(|c| !no.is_match(&said[c.get(0).map(|m| m.end()).unwrap_or(0)..]))
         .flat_map(|c| crate::re!(r"[A-Z][A-Z0-9]{1,4}-\d+").find_iter(c.get(1).map(|m| m.as_str()).unwrap_or("")).map(|m| m.as_str().to_string()).collect::<Vec<_>>())
