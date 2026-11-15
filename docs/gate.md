@@ -36,7 +36,8 @@ The severity says what the fault does:
   and nothing else is done. Add a task yourself for one you want fixed.
 - **Pass:** no finding of the task's own at or above `review.mustFix` (`major` by default). A pass is what "may merge"
   means everywhere: a task with `merge.by: itself` merges ([merging by itself](#merging-by-itself)), an approved merge
-  that was repaired goes through, and the board says `Pass`.
+  whose repair only merged main goes through, and the board says `Pass`. A repair reviewed anew on another commit
+  than the one you approved withdraws the yes: it waits for your approval again, and nothing merges before it.
 - **Fail:** the work goes back to the agent by itself, at most `review.rounds` times. Findings at or above the gate are
   sent as required, the rest as optional. When the cap is reached and it still fails, it stops and waits for you. With
   a fallback agent set (`worker.fallback`), the next agent on that list takes over first, with the open findings and

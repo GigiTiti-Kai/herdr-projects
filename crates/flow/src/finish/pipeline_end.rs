@@ -45,6 +45,13 @@ fn on_main_closes(t: &Obj, root: &Path) -> String {
     let closed = if t.s("doneWhy").starts_with("Already") { crate::land::closes::after_landing(t, root, "") } else { String::new() };
     if closed.is_empty() { closed } else { format!(" {closed}") }
 }
+/// A yes (not `merge.by itself`'s own intent) given to another commit than the one just reviewed anew: what was
+/// approved is not what would land. The head and round of the yes are `approvedHead`/`approvedRound` (approve).
+pub fn approved_elsewhere(t: &Task, head: &str) -> bool {
+    let mi = t.at("mergeIntent");
+    let at = if mi.b("approvedHead") { mi.t("approvedHead") } else { mi.t("verifiedHead") };
+    !mi.b("auto") && at != head
+}
 pub fn after_review(c: Ctx, g: &mut Guard) -> Res<()> {
     let id = c.id;
     let mut t = g.check()?;
@@ -92,9 +99,9 @@ pub fn after_review(c: Ctx, g: &mut Guard) -> Res<()> {
     let head_v = if head.is_empty() { Value::Null } else { json!(head) };
     // A merge the board itself was on its way to is only kept while that setting still says so. One you approved held
     // to a review and a commit (approve --expect-…) only while what would land is still that: else it waits for you again.
+    let held = crate::actions::expect::broken(&t, &head);
     t = g.set(|t| {
         t.put("failure", Value::Null);
-        let held = crate::actions::expect::broken(t, &head);
         if held { t.put("requireApproval", true); t.put("autoMerge", false); t.put("autoMergeLocal", false); }
         if held || (t.at("mergeIntent").b("auto") && !by_itself(t)) { t.put("mergeIntent", Value::Null); }
     })?;
@@ -136,6 +143,10 @@ pub fn after_review(c: Ctx, g: &mut Guard) -> Res<()> {
         g.set(|t| t.put("review", stale.clone()))?;
         if hand_over(id, g, &format!("its work still failed review after {rounds} round{}", if rounds == 1 { "" } else { "s" }), "")? { return Ok(()); }
     } }
+    // The yes was for another commit than the one just reviewed anew: it is withdrawn, and the task waits for one again
+    // as any finished work does, below. A review that failed is said as such inside the block.
+    let withdrawn = to_land && t.b("mergeIntent") && fresh && passed && approved_elsewhere(&t, &head);
+    if withdrawn { t = g.set(|t| { t.put("mergeIntent", Value::Null); t.put("requireApproval", true); t.put("autoMerge", false); t.put("autoMergeLocal", false); })?; }
     if t.b("mergeIntent") { // an approved merge being re-verified after a sync with main or a conflict repair
         if let Some(rv) = review.as_ref().filter(|_| fresh && !passed) {
             let mut f = failure("review", "Approved merge repair is not ready", &format!("A reviewer went through the repair and found it not ready: {}.\n\n{}", gate::result(rv, "merge"), gate::findings_text(rv, false)), "The agent could not make this repair pass review. Address the findings before retrying.");
@@ -165,7 +176,7 @@ pub fn after_review(c: Ctx, g: &mut Guard) -> Res<()> {
     // Finished work that waits for your yes is not done: it is blocked on you. Checked and reviewed, but not against where
     // it would land (your checkout is on another branch, or main could not be fetched): not approvable yet.
     let behind = c.sync.map(sync::held_why).unwrap_or_default();
-    let note = c.note.clone();
+    let note = if withdrawn || held { format!("{} Reviewed again on a new commit after your approval: approve again to merge.", c.note) } else { c.note.clone() };
     t = g.set(|t| { t.put("stage", "approval"); let m = if behind.is_empty() { approval_message_with(t, &note) } else { sync::behind_msg(&behind) }; t.put("msg", m); if !behind.is_empty() { t.put("syncBlocked", sync::blocked(&behind, c.sync)); } })?;
     flow::sidebar::tell_sidebar(&t);
     let _ = (c.keep_intent, c.reason);

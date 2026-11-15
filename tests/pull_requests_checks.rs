@@ -1,7 +1,8 @@
 //! GitHub's checks on the pull request, looked at before it merges (`merge.checks`): still running, the merge waits
 //! and says so; failed, nothing merges and the failure goes back to the agent with the check's name and its log,
 //! within `review.rounds`, then waits for you (`approve` refuses, `--anyway` merges); stuck past `check.timeout`, it
-//! waits for you; `none` merges as before. A check run again is judged by its newest run (#404).
+//! waits for you; `none` merges as before. A check run again is judged by its newest run (#404). A repair reviewed
+//! anew withdraws the approval it was given under.
 use crate::common;
 use common::*;
 use serde_json::{json, Value};
@@ -80,6 +81,33 @@ fn failed_checks_go_back_to_the_agent_with_the_name_and_the_log_and_the_approval
     assert!(sw::land::checks::failed_on(&t).is_none(), "a new commit is not refused for the old one's checks");
     w.gh_says(json!({ "origin": origin(&w), "view": failed(&head), "newer": rollup(passed(&head)) }));
     poll_prs();
+    let t = settle(&id);
+    assert_eq!(t.s("stage"), "done", "{}", t.at("failure")); assert!(merged(&w));
+}
+
+#[test]
+fn reviewed_anew_the_repair_of_failed_checks_withdraws_the_approval_and_waits_for_a_yes_as_any_finished_work() {
+    let w = pr_world(json!({ "review.when": "repos" }));
+    let id = to_approval(&w, "CI fails, reviewed");
+    let head = task(&id).t("prHead");
+    let first = (row(&id).t("state"), row(&id).at("asReview").clone());
+    w.script(json!({ "worker": [{ "files": { "f.txt": "fixed\n" }, "commit": "fix", "note": "Fixed CI." }] }));
+    w.gh_says(json!({ "origin": origin(&w), "view": failed(&head), "newer": rollup(running(&head)), "log": LOG }));
+    finish_line::approve(&id, None, false).unwrap();
+    let t = settle(&id);
+    assert_ne!(t.t("reviewedHead"), head);
+    assert!(t.at("review").at("pass") == &json!(true) && !t.at("review").b("keptAt"), "{}", t.at("review"));
+    // the yes was for the commit before the repair: it is gone, and the task waits for one like any finished work
+    assert_eq!(t.s("stage"), "approval", "{} {}", t.s("msg"), t.at("failure"));
+    assert!(!t.b("mergeIntent") && t.b("requireApproval") && !t.b("autoMerge") && !t.b("checksWait"), "{t:?}");
+    assert!(t.at("prFailure").is_null() && t.at("failure").is_null(), "{} {}", t.at("prFailure"), t.at("failure"));
+    assert!(t.s("msg").starts_with("Approve to merge?") && t.s("msg").ends_with("Reviewed again on a new commit after your approval: approve again to merge."), "{}", t.s("msg"));
+    assert_eq!((row(&id).t("state"), row(&id).at("asReview").clone()), first, "ready to approve, as before the first yes");
+    assert!(!merged(&w));
+    poll_prs(); assert_eq!(settle(&id).s("stage"), "approval", "nothing merges by itself"); assert!(!merged(&w));
+    // the next yes merges the repair once its checks pass
+    w.gh_says(json!({ "origin": origin(&w), "view": passed(&t.t("prHead")) }));
+    finish_line::approve(&id, None, false).unwrap();
     let t = settle(&id);
     assert_eq!(t.s("stage"), "done", "{}", t.at("failure")); assert!(merged(&w));
 }

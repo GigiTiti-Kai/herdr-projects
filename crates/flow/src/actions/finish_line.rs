@@ -55,7 +55,8 @@ pub fn approve_expecting(id: &str, seen: Option<(Value, Value)>, expect: &Expect
         if t.b("syncBlocked") { crate::fail!("{} is behind main and cannot be approved yet: {}. The board keeps trying to bring it up to date.", t.s("id"), t.at("syncBlocked").s("why")); }
         if runner_alive(t) { crate::fail!("{} is busy. Try again in a moment.", t.s("id")); }
         t.put("stage", "merging"); t.put("msg", "Merging"); t.put("requireApproval", expect.any()); t.put("since", now()); t.put("mergeFailed", false);
-        let mut mi = json!({ "approvedAt": now(), "repairs": t.at("mergeIntent").i("repairs"), "verifiedHead": t.at("reviewedHead") });
+        // What the yes was given to: a review run anew on another commit later withdraws it (pipeline_end.rs).
+        let mut mi = json!({ "approvedAt": now(), "repairs": t.at("mergeIntent").i("repairs"), "verifiedHead": t.at("reviewedHead"), "approvedHead": t.at("reviewedHead"), "approvedRound": review_number(t) });
         // Merged in spite of GitHub's failed checks: they are not looked at again for this merge.
         if checks.is_some() { mi["anyway"] = json!(true); t.put("prFailure", Value::Null); }
         // What this yes stays held to until it lands, through a repair, a sync or a failure and its retry (expect.rs).
