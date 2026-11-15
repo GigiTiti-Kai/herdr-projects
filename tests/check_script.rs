@@ -10,6 +10,8 @@ use std::process::{Child, Command};
 mod env_turn;
 /// The whole check on GitHub, as its own script runs it (scripts/check-cloud.sh).
 mod cloud;
+/// The whole check under the machine's shared lock for heavy jobs (scripts/heavy.sh).
+mod heavy;
 
 /// A copy of the check's scripts in a git repo of its own, an empty home, a machine of three cores, and a `cargo` that
 /// writes down what it was given and stops the check (exit 7, without a word), so only the check's start runs.
@@ -22,7 +24,7 @@ impl Bench {
         std::fs::create_dir_all(proj.join("scripts")).unwrap();
         std::fs::create_dir_all(base.join("home")).unwrap();
         std::fs::create_dir_all(base.join("bin")).unwrap();
-        for f in ["check.sh", "run-tests.sh", "build-cache.sh", "share-cores.sh"] {
+        for f in ["check.sh", "run-tests.sh", "build-cache.sh", "share-cores.sh", "heavy.sh"] {
             std::fs::copy(Path::new(env!("CARGO_MANIFEST_DIR")).join("scripts").join(f), proj.join("scripts").join(f)).unwrap();
         }
         let b = Bench { base, others: vec![] };

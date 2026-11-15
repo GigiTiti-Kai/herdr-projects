@@ -100,7 +100,9 @@ else : > "$failed" 2>/dev/null; fi
 
 if [ -n "$fetch_only" ] && command -v cargo >/dev/null 2>&1; then
   say "building it from source instead: cargo build --release (a few minutes)"
-  (cd "$root" && cargo build --release --locked) && exit 0
+  # A heavy job: under the machine's shared lock where it is installed (scripts/heavy.sh, docs/heavy-jobs.md).
+  heavy=""; if [ -f "$root/scripts/heavy.sh" ]; then heavy="sh scripts/heavy.sh"; fi
+  (cd "$root" && $heavy cargo build --release --locked) && exit 0
 fi
 [ -x "$built" ] && { say "using $built, which is older than its source: build it again (cd '$root' && cargo build --release)"; run "$built" "$@"; }
 [ -x "$prog" ] && { say "using the downloaded herdr-projects $(cat "$prog.version" 2>/dev/null), not $want"; run "$prog" "$@"; }

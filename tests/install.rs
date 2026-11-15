@@ -219,3 +219,22 @@ fn real_programs_run_sh_downloads_once_and_runs_it() {
     // --fetch only gets the program.
     assert_eq!(run_sh(&b, &["--fetch"]), (0, String::new(), String::new()));
 }
+
+#[test]
+fn real_programs_run_sh_builds_from_source_under_the_shared_heavy_job_lock() {
+    let (b, _one) = scratch();
+    let p = plugin(&b, "0.3.0");
+    write(&p.join("scripts/heavy.sh"), &read(&Path::new(env!("CARGO_MANIFEST_DIR")).join("scripts/heavy.sh")));
+    // a lock that writes down its job and runs it as its unit would, a setsid that only hands on, a cargo that says
+    // what it was given; no release of this version, so the build step builds
+    let bin = b.join("bin");
+    exec(&bin.join("heavy-run"), &format!("#!/bin/sh\necho \"$*\" >> '{}'\nwhile [ \"$1\" != -- ]; do shift; done; shift\nHEAVY_RUN_ACTIVE=1 exec \"$@\"\n", b.join("locks").display()));
+    exec(&bin.join("setsid"), "#!/bin/sh\n[ \"$1\" != -w ] || shift\nexec \"$@\"\n");
+    exec(&bin.join("cargo"), &format!("#!/bin/sh\necho \"$* in $PWD, active=${{HEAVY_RUN_ACTIVE-unset}}\" >> '{}'\n", b.join("cargo").display()));
+    let o = std::process::Command::new("sh").arg(p.join("bin/run.sh")).arg("--fetch").env("HERDR_PROJECTS_RELEASES", format!("file://{}/rel", b.display()))
+        .env("PATH", format!("{}:/usr/bin:/bin", bin.display())).env_remove("HEAVY_RUN_ACTIVE").output().unwrap();
+    let err = String::from_utf8_lossy(&o.stderr);
+    assert_eq!(o.status.code(), Some(0), "{err}");
+    assert_eq!(read(&b.join("locks")).lines().count(), 1, "the build took the lock once: {err}");
+    assert_eq!(read(&b.join("cargo")), format!("build --release --locked in {}, active=1\n", p.display()), "{err}");
+}

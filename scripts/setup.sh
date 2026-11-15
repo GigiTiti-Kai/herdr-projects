@@ -14,6 +14,8 @@ sc_join
 trap 'sc_leave' EXIT
 . scripts/warm-start.sh
 ws_seed
-sc_cargo build --profile quick
+# The build is a heavy job: under the machine's shared lock where it is installed (scripts/heavy.sh), its share of the
+# cores counted when it gets its turn. The build cache's server was started above, outside the job, so it stays up.
+sh scripts/heavy.sh sh -c '. scripts/share-cores.sh && sc_cargo build --profile quick'
 ws_keep
 ./target/quick/herdr-projects docs
