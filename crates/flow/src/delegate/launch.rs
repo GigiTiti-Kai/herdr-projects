@@ -113,8 +113,12 @@ pub fn start_agent(id: &str, g: &mut Guard, prompt: &str, resume: Option<&str>) 
         if plan::open(t) { t.obj_mut("plan").put("mode", boxed); } // in the mount: started again after the yes (plan/build.rs)
         if t.at("failure").s("stage") == "send" { t.put("failure", Value::Null); }
         let s = session.clone().map(Value::String).unwrap_or(Value::Null);
-        if s != *t.at("session") && !(s.is_null() && t.s("session").is_empty()) {
-            t.put("session", s); t.put("transcript", Value::Null);
+        let named = s != *t.at("session") && !(s.is_null() && t.s("session").is_empty());
+        if named { t.put("session", s); }
+        // A new conversation is never read in the file of the one before, even when herdr named it while the program
+        // started and the hook wrote that name already (PRJ-25: its words were looked for there, so "not started").
+        if named || resume.is_none() {
+            t.put("transcript", Value::Null);
             let h = t.obj_mut("handled"); h.put("msg", Value::Null); h.put("pos", 0);
         }
     })?;

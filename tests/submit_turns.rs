@@ -1,10 +1,14 @@
 //! A message an agent took in the middle of a long turn: delivered, even found only when it rests, and never retried
 //! as "not started" while its session lives; one only queued is not delivered; and an agent that exits with typed text
-//! not taken is not started with the text kept, whatever late report of its old turn comes in.
+//! not taken is not started with the text kept, whatever late report of its old turn comes in; a message taken in a
+//! new conversation is read from that conversation, even when herdr named it before the start was done (PRJ-25).
 use crate::common;
 use common::*;
 use serde_json::{json, Value};
+use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
+use sw::herdr::cli::{Fake, Ran};
 use sw::json::*;
 use sw::submit::{NOT_STARTED, TRIES};
 
@@ -164,4 +168,66 @@ fn an_agent_that_exits_with_typed_text_not_taken_is_not_started_and_a_late_repor
     sw::actions::finish_line::retry(&id).unwrap();
     settle(&id);
     assert_eq!(said_times(&w, &id, "GONE WITH IT"), 1);
+}
+
+/// The world's fake herdr, with a look at every call first (as cleanup_late.rs): `on` acts in the middle of a step.
+struct Hooked { inner: Rc<herdr::FakeHerdr>, on: RefCell<Option<Box<dyn Fn(&[String])>>>, busy: Cell<bool> }
+impl Fake for Hooked {
+    fn run(&self, args: &[String], input: &str) -> Ran {
+        if !self.busy.get() { if let Some(f) = self.on.borrow().as_ref() { self.busy.set(true); f(args); self.busy.set(false); } }
+        self.inner.run(args, input)
+    }
+    fn kids(&self, pid: i64) -> Vec<i64> { self.inner.kids(pid) }
+    fn wired_to(&self, pid: i64, group: &[i64]) -> Option<bool> { self.inner.wired_to(pid, group) }
+    fn kill(&self, pid: i64) { self.inner.kill(pid) }
+}
+
+#[test]
+fn a_message_taken_mid_turn_in_a_new_conversation_is_read_there_not_in_the_one_before() {
+    // As effortless/5 on 2026-11-15: its first conversation's file is on record; its program exits, and a reply starts
+    // a new conversation, which herdr names (the hook takes that name) while the board still waits for its screen.
+    let (w, id) = long_turn("New conversation");
+    let before = w.base.join("conversation-before.jsonl");
+    std::fs::write(&before, json!({ "type": "user", "message": { "role": "user", "content": "the first brief" }, "timestamp": sw::clock::iso(sw::clock::now()) }).to_string() + "\n").unwrap();
+    sw::store::tasks::patch(&id, |t| { t.put("transcript", before.display().to_string()); }).unwrap();
+    w.patch(|s| { for p in s["panes"].as_array_mut().unwrap() { p["agent"] = Value::Null; } });
+    w.script(json!({ "worker": [{ "status": "working" }, { "status": "working" }, { "status": "working" }] }));
+    let h = Rc::new(Hooked { inner: w.fake.clone(), on: RefCell::new(None), busy: Cell::new(false) });
+    sw::herdr::cli::set_fake(Some(h.clone()));
+    let started = Rc::new(Cell::new(0));
+    { let (w2, started, socket) = (w.fake.clone(), started.clone(), w.socket.clone()); *h.on.borrow_mut() = Some(Box::new(move |args| {
+        if args.len() > 1 && args[0] == "agent" && args[1] == "start" { started.set(1); return; }
+        if started.get() != 1 { return; }
+        let mut pane = String::new();
+        { let s = &mut *w2.st.borrow_mut(); for p in s["panes"].as_array_mut().unwrap() { let a = &mut p["agent"]; if !a.is_object() { continue; } let args: Vec<String> = a.arr("args").iter().map(text).collect(); if let Some(i) = args.iter().position(|x| x == "--session-id") { a["session"] = json!(args[i + 1]); pane = p.t("pane_id"); } } }
+        if !pane.is_empty() { started.set(2); sw::hook::on_pane(&socket, &pane); }
+    })); }
+    tell(&id, "START AGAIN WITH THIS");
+    drain();
+    settle(&id);
+    *h.on.borrow_mut() = None;
+    sw::herdr::cli::set_fake(Some(w.fake.clone()));
+    assert_eq!(started.get(), 2, "herdr named the new conversation during the start");
+    let t = task(&id);
+    assert_ne!(t.s("transcript"), before.display().to_string(), "the conversation before is not this one's");
+    // A message typed while it works, taken in the middle of its turn: in the new conversation's own file.
+    w.patch(|s| s["swallow"] = json!(1));
+    tell(&id, "TAKEN IN THE NEW ONE");
+    assert!(task(&id).at("sent").b("busy"));
+    let said = task(&id).at("sent").t("text");
+    let file = sw::agents::adapter::transcript("claude", t.s("session"), &sw::store::repos::cwd_of(&t)).unwrap_or_else(|| {
+        let dir = Path::new(&std::env::var("CLAUDE_CONFIG_DIR").unwrap()).join("projects").join(sw::store::repos::cwd_of(&t).canonicalize().unwrap().display().to_string().chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '-' }).collect::<String>());
+        std::fs::create_dir_all(&dir).unwrap(); dir.join(format!("{}.jsonl", t.s("session")))
+    });
+    let at = sw::clock::iso(sw::clock::now());
+    let lines = [json!({ "type": "attachment", "attachment": { "type": "queued_command", "commandMode": "prompt", "origin": { "kind": "human" }, "prompt": said }, "timestamp": at }),
+        json!({ "type": "assistant", "message": { "id": "msg_new", "role": "assistant", "content": [{ "type": "text", "text": "Done, with it." }], "stop_reason": "end_turn" }, "timestamp": at })];
+    use std::io::Write; std::fs::OpenOptions::new().create(true).append(true).open(&file).unwrap().write_all(lines.iter().map(|l| l.to_string() + "\n").collect::<String>().as_bytes()).unwrap();
+    first_agent(&w, |a| a["box"] = Value::Null);
+    note(&id, "Done, with it.");
+    rests(&w);
+    for _ in 0..(TRIES + 3) { pass(&w); settle(&id); }
+    let c = task(&id);
+    assert_ne!(row(&id).s("note"), NOT_STARTED, "{}", c.at("failure"));
+    assert!(!c.b("unsent") && c.at("failure").s("stage") != "send", "{}", c.at("failure"));
 }
