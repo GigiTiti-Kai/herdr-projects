@@ -62,7 +62,10 @@ Two limits once made long text fail to start an agent, with no reason given. Bot
   has read the export turns that Enter into a new line.
 - **A command held as several lines is run, or cleared.** A pane that still holds one from before is cleared with C-c
   before the export is typed. When the pane shows "-- MULTILINE --" with the export alone,
-  the board presses C-j once, which runs it. When a start fails with that line on the screen, the start had been typed
+  the board presses C-j once, which runs it. It reads rows enough for the whole export, so it finds the export's mark in
+  a narrow pane too, where the export wraps over many rows (a 533-byte export in a 60-column pane). An export still held
+  after C-j fails the start with "its terminal's shell held the line before the start and did not run it": the start is
+  not typed onto it, and the next start clears it. When a start fails with that line on the screen, the start had been typed
   onto the command before it: the board clears the command with C-c, types the export again and starts the agent once
   more as it was, with its hook. It used to try again without the hook, typed onto the same command: two start lines,
   and the task failed (PRJ-21, PRJ-22, PRJ-23).
