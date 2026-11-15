@@ -1,6 +1,6 @@
-//! An agent's turns: approve refusing work that changed after its review, an agent herdr cannot classify, an agent
-//! that says it is blocked, a verdict for another commit, a reviewer that touches the tree, and the words herdr's
-//! sidebar says of where a task stands.
+//! An agent's turns: approve refusing work that changed after its review (reviewed anew, it waits for a yes again), an
+//! agent herdr cannot classify, an agent that says it is blocked, a verdict for another commit, a reviewer that
+//! touches the tree, and the words herdr's sidebar says of where a task stands.
 use crate::common;
 use common::*;
 use serde_json::{json, Value};
@@ -22,8 +22,12 @@ fn approve_refuses_to_merge_work_that_changed_after_its_review_the_finish_line_r
     std::fs::write(std::path::Path::new(t.s("worktree")).join("extra.txt"), "late\n").unwrap(); // dirty tree behind the approval, no herdr event
     sw::actions::finish_line::approve(&id, None, false).unwrap();
     let t = settle(&id);
-    assert_eq!(t.s("stage"), "done", "{}", t.at("failure"));
-    assert_eq!(read(&w.root.join("extra.txt")), "late\n"); // committed, re-reviewed, then merged
+    // committed and reviewed anew: the yes was for the commit before it, so it waits for one again and nothing merged
+    assert_eq!((t.s("stage"), t.b("requireApproval")), ("approval", true), "{} {}", t.s("msg"), t.at("failure"));
+    assert!(!w.root.join("extra.txt").exists());
+    sw::actions::finish_line::approve(&id, None, false).unwrap();
+    assert_eq!(settle(&id).s("stage"), "done");
+    assert_eq!(read(&w.root.join("extra.txt")), "late\n");
 }
 
 #[test]
