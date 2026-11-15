@@ -37,6 +37,10 @@ The board reads it off the task's own message (the `--msg` its agent or its coor
 | `OPS-46・OPS-47に委任` | `[委任先 OPS-46・未着手, OPS-47・完了]` |
 | `APP-38(app/38)に仕様ごと委任済み` | `[委任先 APP-38・完了]` |
 | `S2=DOC-7 … S2のみ委任` | nothing: no number stands right before `に委任` |
+| `APP-26に委任しない。手で続ける` | nothing: taken back right after (`しない`, `せず`, `を取り消し`, `をやめ` …) |
+
+A task is named by the key its repo goes by now: a message written while the repo went by another key (`OLD-26`)
+still names that task, as every command takes it, and the tag says its key of now (`[委任先 APP-26・…]`).
 
 Where it stands is the other task's group on the board: 作業中 (working), 要対応 (needs you), 承認待ち (ready to
 approve), 完了 (done), 未着手 (to do), or アーカイブ済み. A number of a task the board does not list (archived and out

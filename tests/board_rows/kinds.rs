@@ -10,6 +10,8 @@ use sw::board::view::fields::{bare_title, name_ink, row_title};
 use sw::board::view::kind::{chip, handed};
 use sw::json::*;
 use sw::shown::ink::Ink;
+use sw::store::settings::change::set_value;
+use sw::store::settings::lookup::Scope;
 
 fn rec(v: Value) -> Rec { Arc::new(obj(v)) }
 fn state(items: Vec<Rec>) -> State {
@@ -47,6 +49,11 @@ fn a_task_its_message_hands_to_another_is_named_with_where_that_one_stands() {
     assert_eq!(handed(&s, &row("S2→S1 の順に(S2=DOC-7, S1=OPS-42)。S2のみ委任")), "");
     assert_eq!(handed(&s, &row("PRJ-26 を見ている")), "");
     assert_eq!(handed(&s, &row("別のボードに委任")), "");
+    // One it takes back right after names nothing; another one in the same message still does.
+    for no in ["PRJ-26に委任しない。手で続ける", "PRJ-26に委任せず手で回す", "PRJ-26に委任しません", "PRJ-26に委任を取り消した", "PRJ-26に委任をやめた", "PRJ-26への委任は中止"] {
+        assert_eq!(handed(&s, &row(no)), "", "{no}");
+    }
+    assert_eq!(handed(&s, &row("OPS-246に委任しない。PRJ-26に委任")), "[委任先 PRJ-26・作業中]");
     // Never itself, and not another machine's row (its keys are that machine's).
     assert_eq!(handed(&s, &obj(json!({ "id": "ops/201", "raw": "OPS-201に委任" }))), "");
     assert_eq!(handed(&s, &obj(json!({ "id": "far:ops/201", "rid": "ops/201", "host": "far", "raw": "PRJ-26に委任" }))), "");
@@ -86,6 +93,22 @@ fn on_the_board_a_ledger_row_shows_its_chip_and_whom_it_handed_to_whole_also_whe
     s.press(&["esc"]);
     let line = s.screen(160).into_iter().find(|l| l.contains("[運用] [順番待ち]")).unwrap_or_default();
     assert!(line.contains(&format!("[運用] [順番待ち] ログの保存先を新しい場所に移す [委任先 {n}・未着手]")), "{line}");
+}
+
+#[test]
+fn a_task_handed_to_by_a_key_its_repo_went_by_before_is_named_by_the_key_it_goes_by_now() {
+    let w = world();
+    let target = w.add("Move the logs to their new place");
+    let ledger = w.add("Keep the ledger");
+    let old = short(&target);
+    sw::store::tasks::patch(&ledger, |t| { t.put("msg", format!("{old}に委任")); }).unwrap();
+    let mut s = open(&w.root, 40);
+    assert!(s.screen(160).join("\n").contains(&format!("Keep the ledger [委任先 {old}・未着手]")));
+    set_value("repo.key", &json!("new"), &Scope::repo("proj")).unwrap(); s.load();
+    let now = short(&target);
+    assert!(now.starts_with("NEW-") && now != old, "{now}");
+    let text = s.screen(160).join("\n");
+    assert!(text.contains(&format!("Keep the ledger [委任先 {now}・未着手]")), "{text}");
 }
 
 #[test]
