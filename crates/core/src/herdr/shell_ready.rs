@@ -15,6 +15,18 @@ pub const RETRIES: u32 = 3;
 const LOOKS: u32 = 8;
 /// How many looks at the pane, a step apart, before the next line is typed without having seen the last one taken.
 const TAKEN_LOOKS: u32 = 20;
+/// ble.sh's mode line while its command holds more than one line: Enter (RET) only adds a line there, C-j runs it.
+const MULTILINE: &str = "-- MULTILINE --";
+
+/// Keys pressed in the shell's line editor, by herdr's names (not the board's keys): C-j runs the command it holds
+/// (herdr sends 0x0a), C-c drops it.
+pub const RUN_HELD: &str = "control+j";
+pub const DROP_HELD: &str = "control+c";
+/// What a line held so is said with: start_failed.rs knows it by these words.
+pub const HELD_WORDS: &str = "its shell held the line that gives it the task's folders as a command of several lines";
+/// Does the pane's line editor hold a command of several lines, which Enter does not run (ble.sh)?
+/// Its mode line is last, over two rows in a narrow pane.
+pub fn multiline(screen: &str) -> bool { screen.lines().map(str::trim).filter(|l| !l.is_empty()).rev().take(2).any(|l| l.starts_with(MULTILINE)) }
 
 /// Did herdr refuse the line because the pane's shell is not at its prompt yet?
 pub fn not_at_prompt(e: &HerdrError) -> bool { e.message.contains("canonical mode") || no_shell_yet(e) }
@@ -49,17 +61,26 @@ impl Herdr {
     /// Run `command` at the pane's shell, then wait until its shell has taken it: the pane shows `mark` (a word near
     /// the start of `command` that no earlier line holds), and its last line no longer holds what was typed. A line
     /// editor that reads the next typed line together with it takes both as one command of two lines and runs neither
-    /// (ble.sh: "-- MULTILINE --", PRJ-3). At most `TAKEN_LOOKS` looks.
+    /// (ble.sh: "-- MULTILINE --", PRJ-3). A line editor that holds this line alone as a command of several lines (its
+    /// Enter read as one more line) is told to run it: C-j, once. At most `TAKEN_LOOKS` looks; a line still held then
+    /// is an error, as the next line would be typed onto it.
     pub fn pane_run_taken(&self, pane: &str, command: &str, mark: &str) -> HRes<Value> {
         let r = self.pane_run(pane, command);
         let typed = command.trim();
+        // Rows enough for all of it in a pane 20 columns wide: the mark is near its start (PRJ-23, a 60-column pane).
+        let rows = 10 + typed.len() as i64 / 20;
+        let (mut pressed, mut held) = (false, false);
         for _ in 0..TAKEN_LOOKS {
-            let screen = self.pane_read(pane, "recent", Some(10)).unwrap_or_default();
+            let screen = self.pane_read(pane, "recent", Some(rows)).unwrap_or_default();
+            // a long line wraps: the mark may be cut across two rows, and the last row is a piece of it
+            let seen = screen.lines().map(str::trim_end).collect::<String>().contains(mark);
+            held = seen && multiline(&screen);
+            if held && !pressed { pressed = true; let _ = self.pane_keys(pane, &[RUN_HELD]); continue; }
             let line = screen.lines().map(str::trim).rfind(|l| !l.is_empty()).unwrap_or("");
-            // a long line wraps: its last row is a piece of it
-            if screen.contains(mark) && !line.contains(typed) && !typed.contains(line) { break; }
+            if seen && !held && !line.contains(typed) && !typed.contains(line) { break; }
             if step_ms() > 0 { crate::clock::sleep_ms(step_ms()); }
         }
+        if held { return Err(HerdrError { code: "held".into(), message: format!("{HELD_WORDS} (\"{MULTILINE}\") and did not run it, not even on C-j") }); }
         r
     }
     /// Wait until the pane shows the same last line twice in a row: its shell has drawn its prompt. A little longer
