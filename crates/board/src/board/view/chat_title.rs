@@ -74,25 +74,39 @@ pub fn title(s: &State, r: Option<&Obj>) -> Option<Title> {
 pub fn edge(t: &Title, width: usize, right: Inked) -> Inked {
     let e = |x: &str| Inked::of(x, t.edge);
     let avail = width.saturating_sub(2);
-    // Where room is short the steps above go first, the lit one last; then the ladder, then the scroll word is cut.
+    // Where room is short the steps above go first, then the kind after the lit one (a long machine name stays named),
+    // the lit one last; then the ladder, then the scroll word is cut.
     let mut suffix = if right.is_empty() { Inked::new() } else { Inked::plain(" ").add(right).add(Inked::plain(" ")) };
     let room = avail.saturating_sub(4 + suffix.width());
     let mut from = 0;
-    let mut ladder = steps_from(t, 0);
-    while ladder.width() > room && from + 1 < t.steps.len() { from += 1; ladder = steps_from(t, from); }
+    let mut ladder = steps_from(t, 0, true);
+    while ladder.width() > room && from + 1 < t.steps.len() { from += 1; ladder = steps_from(t, from, true); }
+    if ladder.width() > room { ladder = steps_from(t, from, false); }
     let mut inner = if ladder.width() <= room && room > 0 { e("─").add(Inked::plain(" ")).add(ladder).add(Inked::plain(" ")) } else { e("─") };
     if inner.width() + suffix.width() > avail { inner = e("─"); suffix = suffix.cut(avail.saturating_sub(1)); }
     let fill = avail.saturating_sub(inner.width() + suffix.width());
     e("╭").add(inner).add(e(&"─".repeat(fill))).add(suffix).add(e("╮"))
 }
-/// The ladder's steps from the `from`th on (`…` for those left out), the last one lit.
-fn steps_from(t: &Title, from: usize) -> Inked {
+/// The ladder's steps from the `from`th on (`…` for those left out), the last one lit, and with `kind` what kind it is.
+fn steps_from(t: &Title, from: usize, kind: bool) -> Inked {
     let mut ladder = if from > 0 { Inked::of("… ›", Ink::Muted).add(Inked::plain(" ")) } else { Inked::new() };
     for (n, step) in t.steps.iter().enumerate().skip(from) {
         let last = n + 1 == t.steps.len();
         ladder = ladder.add(if last { Inked::of(format!(" {step} "), t.edge).inv() } else { Inked::of(format!("{step} ›"), Ink::Muted) }).add(if last { Inked::new() } else { Inked::plain(" ") });
         // After the lit step, dim: the kind of agent it is (`· Project coordinator`).
-        if last { ladder = ladder.add(Inked::of(format!(" · {}", t.kind), Ink::Muted)); }
+        if last && kind { ladder = ladder.add(Inked::of(format!(" · {}", t.kind), Ink::Muted)); }
     }
     ladder
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn a_long_machine_name_stays_named_in_a_narrow_box_and_its_kind_gives_way_first() {
+        let t = Title { steps: vec!["ip-10-0-139-184".into()], edge: Ink::Text, fresh: false, kind: "Machine coordinator" };
+        let narrow = edge(&t, 44, Inked::new()).text();
+        assert!(narrow.contains(" ip-10-0-139-184 ") && !narrow.contains("coordinator"), "{narrow}");
+        assert!(edge(&t, 80, Inked::new()).text().contains(" ip-10-0-139-184  · Machine coordinator"));
+    }
 }
