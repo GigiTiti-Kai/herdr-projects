@@ -1,5 +1,6 @@
 //! A conflict with main caught before review, not after approval: sent to the agent by itself, its repairs capped,
-//! caught again by the last sync after an approval, and kept in the record of conflicts.
+//! caught again by the last sync after an approval, and kept in the record of conflicts. A repair reviewed anew after
+//! the approval withdraws it (back to waiting for a yes); one of only the conflicting files keeps its review and merges.
 use crate::common;
 use common::*;
 use serde_json::json;
@@ -118,4 +119,61 @@ fn the_record_of_conflicts_a_repair_that_conflicts_again_is_one_conflict_the_min
     at(t0 + 60 * 60000); conflict_found(&mut t, "d.js"); at(t0 + 60 * 60000 + 90000); conflict_repaired(&mut t); conflict_logged(&mut t, true);
     let all: Vec<_> = conflicts().iter().map(|c| (c.t("task"), strings(c.at("files")).join(","), c.f("minutes"), c.i("repairs"), c.b("review"))).collect();
     assert_eq!(all, vec![("proj/7".into(), "a.js,b.js,c.js".into(), 12.0, 2, false), ("proj/7".into(), "d.js".into(), 1.5, 1, true)]);
+}
+
+/// Approved, then main moves under it: the repair the agent makes after the yes. Its round and head as approved.
+fn approved_then_conflict(w: &World, repair: serde_json::Value) -> (String, String) {
+    w.script(json!({ "worker": [{ "files": { "a.txt": "from the agent\n" }, "commit": "agent", "note": "Changed a.txt." }] }));
+    let id = w.add("Approved");
+    delegate(&id);
+    let t = settle(&id);
+    assert_eq!(t.s("stage"), "approval", "{}", t.at("failure"));
+    let target = main_moves(w, "a.txt", "from main\n");
+    let mut step = repair; step["merge"] = json!(target);
+    w.script(json!({ "worker": [step] }));
+    finish_line::approve(&id, None, false).unwrap();
+    let mi = task(&id).at("mergeIntent").clone();
+    assert_eq!((mi.t("approvedHead"), mi.i("approvedRound")), (t.t("reviewedHead"), sw::store::reviews::review_number(&t)), "the yes keeps what it was given to");
+    (id, t.t("reviewedHead"))
+}
+
+#[test]
+fn a_review_run_anew_on_another_commit_after_the_approval_withdraws_it_and_nothing_merges_until_the_next_yes() {
+    let w = world_with(Opts { repo: true, settings: json!({ "workspace.cleanup": false }), ..Default::default() });
+    // the repair changes more than the conflicting file: it is reviewed anew
+    let (id, approved) = approved_then_conflict(&w, json!({ "files": { "a.txt": "merged\n", "b.txt": "more\n" }, "commit": "resolve", "note": "Resolved." }));
+    let mut t = settle(&id);
+    for _ in 0..2 { if t.s("stage") != "approval" { t = settle(&id); } }
+    assert_eq!(t.s("stage"), "approval", "{} {} {}", t.s("stage"), t.s("msg"), t.at("failure"));
+    assert!(t.at("mergeIntent").is_null() && t.b("requireApproval") && !t.b("autoMerge"), "{t:?}");
+    assert!(t.at("review").at("pass") == &json!(true) && !t.at("review").b("keptAt"), "a review that ran and passed: {}", t.at("review"));
+    assert_ne!(t.t("reviewedHead"), approved);
+    assert!(t.s("msg").starts_with("Approve to merge?") && t.s("msg").contains("Reviewed again on a new commit after your approval"), "{}", t.s("msg"));
+    assert_eq!(row(&id).at("asReview"), &json!(true), "ready to approve, as before the first yes");
+    assert_eq!(read(&w.root.join("a.txt")), "from main\n", "nothing merged");
+    assert!(!w.root.join("b.txt").exists());
+    // the next yes is for the new commit, and merges it
+    finish_line::approve(&id, None, false).unwrap();
+    assert_eq!(settle(&id).s("stage"), "done");
+    assert_eq!(read(&w.root.join("a.txt")), "merged\n");
+}
+
+#[test]
+fn a_repair_of_only_the_conflicting_files_keeps_its_review_and_the_approved_merge_goes_through_unreviewed() {
+    // with a check, a repair of only the conflicting files runs the tests instead of a new review
+    let w = world_with(Opts { repo: true, settings: json!({ "workspace.cleanup": false }), repo_settings: Some(json!({ "check.command": "true" })), ..Default::default() });
+    let (id, _) = approved_then_conflict(&w, json!({ "files": { "a.txt": "merged\n" }, "commit": "resolve", "note": "Resolved." }));
+    let mut t = settle(&id);
+    for _ in 0..2 { if t.s("stage") != "done" { t = settle(&id); } }
+    assert_eq!(t.s("stage"), "done", "{} {} {}", t.s("stage"), t.s("msg"), t.at("failure"));
+    assert_eq!(read(&w.root.join("a.txt")), "merged\n");
+}
+
+#[test]
+fn an_approval_is_withdrawn_only_for_another_commit_and_never_for_the_boards_own_merge() {
+    let elsewhere = |mi: serde_json::Value, head: &str| sw::finish::pipeline_end::approved_elsewhere(&obj(json!({ "mergeIntent": mi })), head);
+    assert!(!elsewhere(json!({ "approvedHead": "a1", "verifiedHead": "b2" }), "a1"), "the same commit as approved: merged as before");
+    assert!(elsewhere(json!({ "approvedHead": "a1", "verifiedHead": "b2" }), "b2"), "the yes was for a1, whatever was verified since");
+    assert!(!elsewhere(json!({ "verifiedHead": "a1" }), "a1") && elsewhere(json!({ "verifiedHead": "a1" }), "c3"), "a yes from before it was kept: the verified commit");
+    assert!(!elsewhere(json!({ "verifiedHead": "a1", "auto": true }), "c3"), "merge.by itself: no yes to withdraw");
 }
