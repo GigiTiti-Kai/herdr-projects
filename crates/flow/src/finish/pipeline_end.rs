@@ -92,7 +92,12 @@ pub fn after_review(c: Ctx, g: &mut Guard) -> Res<()> {
     let head_v = if head.is_empty() { Value::Null } else { json!(head) };
     // A merge the board itself was on its way to is only kept while that setting still says so. One you approved held
     // to a review and a commit (approve --expect-…) only while what would land is still that: else it waits for you again.
-    t = g.set(|t| { t.put("failure", Value::Null); if (t.at("mergeIntent").b("auto") && !by_itself(t)) || crate::actions::expect::broken(t, &head) { t.put("mergeIntent", Value::Null); } })?;
+    t = g.set(|t| {
+        t.put("failure", Value::Null);
+        let held = crate::actions::expect::broken(t, &head);
+        if held { t.put("requireApproval", true); t.put("autoMerge", false); t.put("autoMergeLocal", false); }
+        if held || (t.at("mergeIntent").b("auto") && !by_itself(t)) { t.put("mergeIntent", Value::Null); }
+    })?;
     // The loop: a review that fails the gate goes straight back, at most `review.rounds` times (0: never).
     let rounds = t.i("reviewRounds");
     let max = ch.i("review.rounds");

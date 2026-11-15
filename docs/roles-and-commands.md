@@ -91,7 +91,8 @@ the same. It is for when the human said so in so many words.
 `approve <id> --expect-review N --expect-head SHA` merges only what the caller judged: the task must still wait to
 merge, on review round `N`, with `SHA` its reviewed commit (the full sha, or its first 7 characters or more). These are
 `reviewRound` and `reviewedHead` in `details <id> --json` (under `task`) and in `list --json`. The branch in the task's
-worktree and the pull request's head on GitHub (asked with gh) must still be that commit too. Anything else, a review
+worktree and the pull request's head on GitHub (asked with gh, once: right after a push GitHub may still name the commit
+before, and a try a moment later goes through) must still be that commit too. Anything else, a review
 that ran again or a commit that moved since, and nothing is merged: it fails with the reason and a non-zero exit. The
 yes stays held to them after it: when the work changes before it lands (the agent's repair, or main merged in), it is
 checked and reviewed again as always, and then waits for approval again instead of merging, with the new round and

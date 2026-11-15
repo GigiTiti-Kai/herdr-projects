@@ -266,3 +266,25 @@ fn a_yes_held_to_a_review_and_a_commit_is_refused_when_the_branch_or_the_pull_re
     assert_eq!(settle(&id).s("stage"), "done");
     assert!(gh_log(&w).contains(&format!("pr merge 7 --squash --match-head-commit {h2}")), "{}", gh_log(&w));
 }
+
+#[test]
+fn a_yes_held_to_a_commit_waits_for_you_again_once_main_merged_in_before_it_lands_and_the_new_one_merges() {
+    let w = world_with(Opts { repo: true, origin: true, ..Default::default() });
+    let pass = json!({ "verdict": { "meets": true, "text": "Looked at it.", "findings": [] } });
+    w.script(json!({ "worker": [{ "files": { "f.txt": "v1\n" }, "commit": "v1", "note": "Did v1." }], "reviewer": [pass.clone(), pass] }));
+    let id = to_approval(&w, "Main moves");
+    w.gh_says(json!({ "origin": w.base.join("origin.git").display().to_string() }));
+    let held = |id: &str| { let d = cli(&["details", id, "--json"]).unwrap().0; (d.at("task").i("reviewRound").to_string(), d.at("task").t("reviewedHead")) };
+    let (r, h) = held(&id);
+    ok(&["approve", &id, "--expect-review", &r, "--expect-head", &h]);
+    // main moves before it lands: the board merges it in, checks, reviews and pushes it, and the yes no longer stands
+    std::fs::write(w.root.join("main.txt"), "main\n").unwrap(); git(&w.root, &["add", "-A"]); git(&w.root, &["commit", "-qm", "main moved"]); git(&w.root, &["push", "-q", "origin", "main"]);
+    let t = settle(&id);
+    assert_eq!(t.s("stage"), "approval", "{}", t.at("failure"));
+    assert!(!t.b("mergeIntent") && !gh_log(&w).contains("pr merge"), "{}", gh_log(&w));
+    let (r2, h2) = held(&id);
+    assert_ne!(h2, h);
+    ok(&["approve", &id, "--expect-review", &r2, "--expect-head", &h2]);
+    assert_eq!(settle(&id).s("stage"), "done");
+    assert!(gh_log(&w).contains(&format!("pr merge 7 --squash --match-head-commit {h2}")), "{}", gh_log(&w));
+}
