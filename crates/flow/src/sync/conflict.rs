@@ -17,7 +17,7 @@ pub fn conflict_failure(t: &Obj, tree: &str, r: &Synced) -> Obj {
         "title": format!("{} {}", if r.files.is_empty() { "Could not update task from" } else { "Merge conflict with" }, super::main_word(t)),
         "detail": format!("Conflicting files:\n{}\n\nTask branch: {}\nTarget branch: {}\nTarget commit: {}\nWorktree: {tree}\n\nGit output:\n{}\n\n{}", if r.files.is_empty() { "none reported" } else { &r.files }, t.s("branch"), r.base, r.target, r.out,
             if r.restored { "The private merge attempt was rolled back. The human's checkout is unchanged." } else { "The private merge could not be rolled back; inspect it before continuing." }),
-        "next": format!("In {tree} on {}, merge target commit {} ({}), resolve and commit the conflicts, then finish. The board checks the result again (and reviews it again, unless a review already passed and the merge is all that changed){}. Never alter the human's checkout.", t.s("branch"), r.target, r.base, if t.b("mergeIntent") { " and retries the approved merge" } else { "" }) }))
+        "next": format!("In {tree} on {}, merge target commit {} ({}), resolve and commit the conflicts, then finish. The board checks the result again (and reviews it again, unless a review already passed and the merge is all that changed){}. Never alter the human's checkout.", t.s("branch"), r.target, r.base, if t.b("mergeIntent") { " and retries the approved merge, unless it is reviewed anew: then it waits for the human's yes again" } else { "" }) }))
 }
 fn passed_before(t: &Obj) -> bool { passed_review(t).is_some() && !command_of(&setting("check.command", Some(t))).is_empty() && !crate::finish::auto_merge::merges_itself(t) }
 /// What the agent is told: the facts, and nothing else.
@@ -26,7 +26,7 @@ pub fn conflict_message(t: &Obj, tree: &str, r: &Synced) -> String {
     format!("Your branch {0} conflicts with {1}, so this is not done yet.\n\nConflicting files:\n{2}\n\nTarget commit: {3} ({1})\n\nIn your own worktree ({tree}), merge that commit into {0}, resolve the conflicts, commit, and finish again. The board's own merge attempt was rolled back, so your branch is as you left it. Do not touch the human's checkout.{4}{5}",
         t.s("branch"), r.base, files.join("\n"), r.target,
         if passed_before(t) { " Your work already passed its review: change only the conflicting files, in that one merge commit, and the board reruns the tests instead of reviewing everything again. Anything more is reviewed again." } else { "" },
-        if t.b("mergeIntent") { " The human already approved this merge: after your repair the board checks, reviews and merges it; do not push or merge it yourself." } else { "" })
+        if t.b("mergeIntent") { " The human already approved this merge: after your repair the board checks it and merges it, unless the repair needs a new review: then it waits for the human's yes again. Do not push or merge it yourself." } else { "" })
 }
 /// The conflict goes straight back to the task's agent, as the board's own turn (so an approved merge survives the
 /// repair), at most `review.rounds` times in a row; after that, or when it cannot be sent, the human is asked. `held`
