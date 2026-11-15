@@ -84,6 +84,10 @@ on the message is delivered: the turn's end, however much later, is the answer t
   found, enter was pressed three times into an empty box, and the task stood as "not started" with its work done and
   saved.
 - A program's note that the words only wait in its queue does not count: it has not read them yet.
+- The words are looked for in the conversation the agent has now. When a start opens a new conversation, the file of
+  the one before is forgotten, also when herdr names the new one while the program is still starting. It used to be
+  kept in that case: the board looked in the old file, did not find the words a reply put in mid-turn, and showed
+  "not started" for a message the agent had taken and answered (effortless/5, 2026-11-15).
 
 ## The waits
 
