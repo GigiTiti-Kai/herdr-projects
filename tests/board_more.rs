@@ -70,7 +70,7 @@ fn a_very_narrow_window_keeps_the_box_whole_with_the_message_in_it() {
     w.script(json!({ "coordinator": [{ "said": "Six tasks are in progress and nothing waits on you." }] }));
     let mut s = open(&w.root, 34);
     // Nothing said yet: the box's edge says who it is, and the placeholder is cut with …, inside the box.
-    for width in [27, 24, 16] { let c = crate::board_chat::chat(&mut s, width); assert!(c.framed, "at {width}"); assert_eq!(c.boxed.len(), 1); assert!(has(&c.boxed[0], "^❯ A.*…$"), "at {width}: {:?}", c.boxed); }
+    for width in [27, 24, 16] { let c = crate::board_chat::chat(&mut s, width); assert!(c.lines.iter().any(|l| l.starts_with("╭─") && l.ends_with('╮')), "the box is there at {width}: {:?}", c.lines); assert_eq!(c.boxed.len(), 1); assert!(has(&c.boxed[0], "^❯ A.*…$"), "at {width}: {:?}", c.boxed); }
     let me = sw::board::update::heads::label(&s.s, "");
     assert!(crate::board_chat::chat(&mut s, 80).boxed[0] == "❯ Ask it something, e.g. \"what's left to do here?\"" && crate::board_chat::chat(&mut s, 80).lines.iter().any(|l| l.starts_with("╭─") && l.contains(&format!(" {me} "))), "never ran: {:?}", crate::board_chat::chat(&mut s, 80).lines);
     s.typed("hi"); s.press(&["enter"]); drain(); s.load();
