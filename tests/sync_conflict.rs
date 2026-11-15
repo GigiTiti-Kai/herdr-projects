@@ -1,6 +1,6 @@
 //! A conflict with main caught before review, not after approval: sent to the agent by itself, its repairs capped,
 //! caught again by the last sync after an approval, and kept in the record of conflicts. A repair reviewed anew after
-//! the approval withdraws it (back to waiting for a yes); one that only merged main keeps its review and merges.
+//! the approval withdraws it (back to waiting for a yes); one of only the conflicting files keeps its review and merges.
 use crate::common;
 use common::*;
 use serde_json::json;
@@ -148,7 +148,8 @@ fn a_review_run_anew_on_another_commit_after_the_approval_withdraws_it_and_nothi
     assert!(t.at("mergeIntent").is_null() && t.b("requireApproval") && !t.b("autoMerge"), "{t:?}");
     assert!(t.at("review").at("pass") == &json!(true) && !t.at("review").b("keptAt"), "a review that ran and passed: {}", t.at("review"));
     assert_ne!(t.t("reviewedHead"), approved);
-    assert!(t.s("msg").contains("Reviewed again on a new commit after your approval"), "{}", t.s("msg"));
+    assert!(t.s("msg").starts_with("Approve to merge?") && t.s("msg").contains("Reviewed again on a new commit after your approval"), "{}", t.s("msg"));
+    assert_eq!(row(&id).at("asReview"), &json!(true), "ready to approve, as before the first yes");
     assert_eq!(read(&w.root.join("a.txt")), "from main\n", "nothing merged");
     assert!(!w.root.join("b.txt").exists());
     // the next yes is for the new commit, and merges it
@@ -158,7 +159,7 @@ fn a_review_run_anew_on_another_commit_after_the_approval_withdraws_it_and_nothi
 }
 
 #[test]
-fn a_repair_that_only_merges_main_keeps_its_review_and_the_approved_merge_goes_through() {
+fn a_repair_of_only_the_conflicting_files_keeps_its_review_and_the_approved_merge_goes_through_unreviewed() {
     // with a check, a repair of only the conflicting files runs the tests instead of a new review
     let w = world_with(Opts { repo: true, settings: json!({ "workspace.cleanup": false }), repo_settings: Some(json!({ "check.command": "true" })), ..Default::default() });
     let (id, _) = approved_then_conflict(&w, json!({ "files": { "a.txt": "merged\n" }, "commit": "resolve", "note": "Resolved." }));
