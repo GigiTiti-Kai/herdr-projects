@@ -16,7 +16,7 @@ if [ -n "${HEAVY_RUN_ACTIVE:-}" ] || [ -z "$hr" ]; then exec "$@"; fi
 # The rest is bash's (printf %q, a wait that a Ctrl-C ends): heavy-run is a bash program, so where it is, bash is.
 [ -n "${BASH_VERSION:-}" ] || exec bash "$0" "$@"
 
-# shellcheck disable=SC2016,SC3050 # $(cat) and the job's own lines are the unit's bash's; this is bash already
+# shellcheck disable=SC2016,SC3050,SC3001 # $(cat) and the job's own lines are the unit's bash's; this is bash already
 {
   export -p
   # A caller's empty HEAVY_RUN_ACTIVE would hide the unit's own: a nested job would then wait for this job's lock.
@@ -40,8 +40,10 @@ mib() { awk '{ printf "%d", $1 / 1048576 }' "$unit/$1" 2>/dev/null; }
 [ -z "$unit" ] || echo "heavy: rc=$rc memory.peak=$(mib memory.peak)MiB swap.peak=$(mib memory.swap.peak)MiB" >&2
 exit "$rc"
 EOF
-} | setsid -w "$hr" -- bash -c 'eval "$(cat)"' "$@" & # the trailing arguments only name the job in jobs.log
+} | setsid -w "$hr" -- bash -c 'eval "$(cat)"' "$@" > >(cat) 2> >(cat >&2) & # the trailing arguments only name the job in jobs.log
 # heavy-run holds the lock. In a session of its own, a stop of the caller's process group (the board's, or Ctrl-C)
 # does not reach it: it keeps the lock until the watcher has ended the unit. `wait` lets this script stop at once.
+# Its output goes through two `cat`s of the caller's group, never straight to the caller's own: a heavy-run still
+# waiting for the lock when the caller was stopped would hold that open (the board reads it to its end) until its turn.
 trap 'exit 130' INT
 wait "$!"
