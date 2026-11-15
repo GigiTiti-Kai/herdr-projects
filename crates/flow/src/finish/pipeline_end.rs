@@ -88,8 +88,11 @@ pub fn after_review(c: Ctx, g: &mut Guard) -> Res<()> {
     // A conflict with main that was repaired on the way here: one line in the record, with whether a review followed.
     let reviewed_anew = review_needed && !review.as_ref().map(|r| r.b("keptAt")).unwrap_or(false);
     g.set(|t| { sync::conflict_log::conflict_logged(t, reviewed_anew); })?;
-    // A merge the board itself was on its way to is only kept while that setting still says so.
-    t = g.set(|t| { t.put("failure", Value::Null); if t.at("mergeIntent").b("auto") && !by_itself(t) { t.put("mergeIntent", Value::Null); } })?;
+    let head = change.as_ref().map(|x| x.t("head")).filter(|h| !h.is_empty()).unwrap_or_else(|| flow::git::head_of(c.folder));
+    let head_v = if head.is_empty() { Value::Null } else { json!(head) };
+    // A merge the board itself was on its way to is only kept while that setting still says so. One you approved held
+    // to a review and a commit (approve --expect-…) only while what would land is still that: else it waits for you again.
+    t = g.set(|t| { t.put("failure", Value::Null); if (t.at("mergeIntent").b("auto") && !by_itself(t)) || crate::actions::expect::broken(t, &head) { t.put("mergeIntent", Value::Null); } })?;
     // The loop: a review that fails the gate goes straight back, at most `review.rounds` times (0: never).
     let rounds = t.i("reviewRounds");
     let max = ch.i("review.rounds");
@@ -128,8 +131,6 @@ pub fn after_review(c: Ctx, g: &mut Guard) -> Res<()> {
         g.set(|t| t.put("review", stale.clone()))?;
         if hand_over(id, g, &format!("its work still failed review after {rounds} round{}", if rounds == 1 { "" } else { "s" }), "")? { return Ok(()); }
     } }
-    let head = change.as_ref().map(|x| x.t("head")).filter(|h| !h.is_empty()).unwrap_or_else(|| flow::git::head_of(c.folder));
-    let head_v = if head.is_empty() { Value::Null } else { json!(head) };
     if t.b("mergeIntent") { // an approved merge being re-verified after a sync with main or a conflict repair
         if let Some(rv) = review.as_ref().filter(|_| fresh && !passed) {
             let mut f = failure("review", "Approved merge repair is not ready", &format!("A reviewer went through the repair and found it not ready: {}.\n\n{}", gate::result(rv, "merge"), gate::findings_text(rv, false)), "The agent could not make this repair pass review. Address the findings before retrying.");

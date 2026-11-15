@@ -35,7 +35,7 @@ pub fn approve_expecting(id: &str, seen: Option<(Value, Value)>, expect: &Expect
         if let Some((pr, head)) = &seen { if t.s("stage") == "approval" && (pr != t.at("pr") || head != t.at("reviewedHead")) { crate::fail!("{} changed while you were asked. Nothing was merged: look at it again, then approve.", t.s("id")); } }
         expect.check(t)
     };
-    moved(&cur)?; crate::land::park::refuse_busy(&cur)?;
+    moved(&cur)?; expect.live(&cur)?; crate::land::park::refuse_busy(&cur)?;
     if cur.s("stage") == "asks" && cur.s("kind") == "permission" { return tell(cur.s("id"), "Yes, go ahead.", false); }
     if approvable(&cur) { return approve_plan(cur.s("id")); }
     if cur.s("stage") == "pick" { crate::fail!("{0} waits for you to pick one of its attempts, not for a merge: herdr-projects pick {0} <letter>", cur.s("id")); }
@@ -58,6 +58,7 @@ pub fn approve_expecting(id: &str, seen: Option<(Value, Value)>, expect: &Expect
         let mut mi = json!({ "approvedAt": now(), "repairs": t.at("mergeIntent").i("repairs"), "verifiedHead": t.at("reviewedHead") });
         // Merged in spite of GitHub's failed checks: they are not looked at again for this merge.
         if checks.is_some() { mi["anyway"] = json!(true); t.put("prFailure", Value::Null); }
+        if expect.any() { mi["expect"] = expect.bound(t); } // what the merge stays held to, through a repair or a sync (pipeline_end.rs)
         t.put("mergeIntent", mi); t.put("checksWait", Value::Null);
         Ok(Change::Write)
     })?;

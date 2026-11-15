@@ -1,7 +1,10 @@
 //! A pull request merges only at the commit that was reviewed (a commit pushed from elsewhere stops it, also the
 //! remembered merge), and one that GitHub only queued is not taken for merged until GitHub says so, or closed. Main
-//! merged in after the review is pushed to the pull request before it merges (#307).
+//! merged in after the review is pushed to the pull request before it merges (#307). A yes held to a review and a
+//! commit (`approve --expect-…`) is refused when the branch or the pull request moved on before it, and dropped, the
+//! task waiting for you again, when they move on after it.
 use crate::common;
+use common::pilot::{cli, ok, refused};
 use common::*;
 use serde_json::{json, Value};
 use std::path::Path;
@@ -223,4 +226,43 @@ fn main_that_brought_the_same_change_in_after_the_review_ends_the_task_as_done_n
     let t = settle(&id);
     assert_eq!(t.s("stage"), "done", "{} {}", t.s("msg"), t.at("failure"));
     assert!(!t.s("msg").contains("not reviewed")); assert!(!gh_log(&w).contains("pr merge"));
+}
+
+#[test]
+fn a_yes_held_to_a_review_and_a_commit_is_refused_when_the_branch_or_the_pull_request_moved_and_dropped_when_they_move_after_it() {
+    let w = world_with(Opts { repo: true, origin: true, ..Default::default() });
+    let pass = json!({ "verdict": { "meets": true, "text": "Looked at it.", "findings": [] } });
+    w.script(json!({ "worker": [{ "files": { "f.txt": "v1\n" }, "commit": "v1", "note": "Did v1." }], "reviewer": [pass.clone(), pass] }));
+    let id = to_approval(&w, "Held");
+    w.gh_says(json!({ "origin": w.base.join("origin.git").display().to_string() }));
+    let (t, d) = (task(&id), cli(&["details", &id, "--json"]).unwrap().0);
+    let (tree, branch) = (std::path::PathBuf::from(t.s("worktree")), t.t("branch"));
+    let (r, h) = (d.at("task").i("reviewRound").to_string(), d.at("task").t("reviewedHead"));
+    let yes = |r: &str, h: &str| cli(&["approve", &id, "--expect-review", r, "--expect-head", h]).map(|x| x.1).map_err(|e| e.msg);
+    // the pull request moved on GitHub before the yes (pushed from elsewhere): refused, nothing merged
+    git(&w.root, &["push", "-q", "--force", "origin", &format!("main:refs/heads/{branch}")]);
+    assert!(yes(&r, &h).unwrap_err().contains("its pull request is at"));
+    git(&w.root, &["push", "-q", "--force", "origin", &format!("{h}:refs/heads/{branch}")]);
+    // the branch in its worktree moved on before the yes: refused
+    std::fs::write(tree.join("g.txt"), "more\n").unwrap(); git(&tree, &["add", "-A"]); git(&tree, &["commit", "-qm", "more"]);
+    assert!(yes(&r, &h).unwrap_err().contains("its branch is at"));
+    git(&tree, &["reset", "-q", "--hard", &h]);
+    assert_eq!(task(&id).s("stage"), "approval");
+    // both stand: the yes is taken. The branch and the pull request move on before it lands: the work is checked and
+    // reviewed again, and that yes no longer stands: it waits for you, with the new review and commit to judge
+    yes(&r, &h).unwrap();
+    std::fs::write(tree.join("g.txt"), "more\n").unwrap(); git(&tree, &["add", "-A"]); git(&tree, &["commit", "-qm", "more"]);
+    let moved = git(&tree, &["rev-parse", "HEAD"]);
+    git(&tree, &["push", "-q", "--force", "origin", &format!("HEAD:refs/heads/{branch}")]);
+    let t = settle(&id);
+    assert_eq!(t.s("stage"), "approval", "{}", t.at("failure"));
+    assert!(!t.b("mergeIntent") && !gh_log(&w).contains("pr merge"), "{}", gh_log(&w));
+    let d = cli(&["details", &id, "--json"]).unwrap().0;
+    let (r2, h2) = (d.at("task").i("reviewRound").to_string(), d.at("task").t("reviewedHead"));
+    assert!(r2 != r && h2 == moved, "{r2} {h2}");
+    // a yes on the new ones merges them, and only them
+    assert!(yes(&r, &h).is_err());
+    ok(&["approve", &id, "--expect-review", &r2, "--expect-head", &h2]);
+    assert_eq!(settle(&id).s("stage"), "done");
+    assert!(gh_log(&w).contains(&format!("pr merge 7 --squash --match-head-commit {h2}")), "{}", gh_log(&w));
 }
