@@ -22,7 +22,7 @@ export function rowEl(r, { selected, opened, onPick, onOpen }) {
     r.percent ? h("span.sw-num", r.percent) : null, r.eta ? h("span.sw-num", r.eta) : null);
   const says = said(r.says);
   // Enter on the selected row opens it, as its Open button does; on any other row it selects, as a tap does.
-  return h("li.sw-row", { className: `sw-row${selected ? " is-selected" : ""}${r.quiet ? " is-quiet" : ""}${r.archived ? " is-archived" : ""}${r.automation ? " is-automation" : ""}`, data: { id: r.id }, style: `--d:${r.depth || 0}`, role: "option", "aria-selected": selected ? "true" : "false", tabIndex: 0,
+  return h("li.sw-row", { className: `sw-row${selected ? " is-selected" : ""}${r.quiet ? " is-quiet" : ""}${r.archived ? " is-archived" : ""}${r.automation ? " is-automation" : ""}${r.whole ? " is-whole" : ""}`, data: { id: r.id }, style: `--d:${r.depth || 0}`, role: "option", "aria-selected": selected ? "true" : "false", tabIndex: 0,
     onclick: () => { if (!selected) onPick(r.id); }, onkeydown: (e) => { if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return; e.preventDefault(); if (selected && e.key === "Enter") onOpen(r.id); else onPick(r.id); } },
     markEl(r.mark, r.color, r.markDim),
     h("span.sw-main",

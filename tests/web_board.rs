@@ -7,6 +7,8 @@ use common::board::{open, web, web_as};
 mod design;
 // Open this task's agent on a space that was closed, and the web UI that does not show it yet.
 mod open;
+// A needs-you row says all of what it waits for you about: never two clamped lines.
+mod whole;
 use common::*;
 use serde_json::json;
 use sw::json::*;
