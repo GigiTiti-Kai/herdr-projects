@@ -1,4 +1,5 @@
 //! The finish line's keys: approve, send the review or the failure back, finish anyway, retry.
+use super::expect::Expect;
 use super::limits::{carry_on, take_as_is};
 use super::plan::{approvable, approve_plan, awaits_plan, review_again};
 use super::shared::{say, Said};
@@ -19,18 +20,20 @@ use crate::status_words::{review_failed, review_tally};
 use crate::store::attempts::attempts_of;
 use crate::store::files::{data_dir, read_obj, write_json};
 use crate::store::handovers::{handover_line, handovers};
-use crate::store::reviews::{current_review, review_history};
+use crate::store::reviews::{current_review, review_history, review_number};
 use crate::store::tasks::{assert_unarchived, find, get, update, Change, Task};
 
 /// Approve: the one decision that ships finished work. An agent's own request for permission gets a yes instead.
 /// `seen`: what the human was shown when they said yes (pr, head): if the pull request or the reviewed commit is
 /// another one by now, nothing is merged. `anyway`: work whose last review failed, or whose GitHub checks failed, is merged only when asked for so.
-pub fn approve(id: &str, seen: Option<(Value, Value)>, anyway: bool) -> Res<Said> {
+pub fn approve(id: &str, seen: Option<(Value, Value)>, anyway: bool) -> Res<Said> { approve_expecting(id, seen, &Expect::default(), anyway) }
+/// The same, held to the review and commit the caller judged (expect.rs): checked again under the task's lock.
+pub fn approve_expecting(id: &str, seen: Option<(Value, Value)>, expect: &Expect, anyway: bool) -> Res<Said> {
     let cur = find(id)?;
     assert_unarchived(&cur)?;
     let moved = |t: &Task| -> Res<()> {
         if let Some((pr, head)) = &seen { if t.s("stage") == "approval" && (pr != t.at("pr") || head != t.at("reviewedHead")) { crate::fail!("{} changed while you were asked. Nothing was merged: look at it again, then approve.", t.s("id")); } }
-        Ok(())
+        expect.check(t)
     };
     moved(&cur)?; crate::land::park::refuse_busy(&cur)?;
     if cur.s("stage") == "asks" && cur.s("kind") == "permission" { return tell(cur.s("id"), "Yes, go ahead.", false); }
@@ -252,7 +255,7 @@ pub fn details(id: &str) -> Res<Value> {
     let t = find(id)?;
     let plan = if t.at("plan").is_object() { let mut p = t.o("plan").cloned().unwrap_or_default(); p.del("home"); p.put("text", crate::plan::read_plan(&t)); Value::Object(p) } else { Value::Null };
     let mut out = obj(json!({
-        "task": { "id": t.at("id"), "title": t.at("title"), "stage": t.at("stage"), "msg": t.at("msg"), "description": t.at("description") },
+        "task": { "id": t.at("id"), "title": t.at("title"), "stage": t.at("stage"), "msg": t.at("msg"), "description": t.at("description"), "reviewRound": review_number(&t), "reviewedHead": t.at("reviewedHead") },
         "failure": failure_of(&t),
         "review": current_review(&t).cloned(),
         "reviews": review_history(&t),

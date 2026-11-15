@@ -3,6 +3,7 @@
 pub mod archive;
 pub mod archive_done;
 pub mod archive_project;
+pub mod expect;
 pub mod filing;
 pub mod finish_line;
 pub mod finish_stuck;

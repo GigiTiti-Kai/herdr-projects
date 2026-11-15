@@ -24,8 +24,12 @@ pub const HELP: &str = r#"herdr-projects: a work board for herdr
   herdr-projects after <id> [ID[,ID…] | --clear]   what a task waits for: shown, changed, or dropped (it starts then)
   herdr-projects tell <id> <text>              send a message to the task's agent
   herdr-projects stop <id>                     stop its agent
-  herdr-projects approve <id> [--anyway]       merge finished work that waits for approval (--anyway: also when its review
+  herdr-projects approve <id> [--anyway | --expect-review N --expect-head SHA]
+                                                merge finished work that waits for approval (--anyway: also when its review
                                                 or its pull request's checks on GitHub failed);
+                                                --expect-review N --expect-head SHA: merge only when its review is still
+                                                round N and its reviewed commit still SHA (reviewRound and reviewedHead in
+                                                details or list --json), else nothing is merged and it fails; not with --anyway;
                                                 on a task whose plan is ready (plan.approve you): yes to the plan, the build starts.
                                                 tell <id> <text> there sends the plan back with those words
   herdr-projects park <id> [--forget]          close out the agent of a task that waits for your approval or answer and

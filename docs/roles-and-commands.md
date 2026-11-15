@@ -88,6 +88,14 @@ folders when herdr does not say what runs in its panes: then the agent and your 
 `approve` refuses work whose last review failed, and says what the review found. `approve <id> --anyway` merges it all
 the same. It is for when the human said so in so many words.
 
+`approve <id> --expect-review N --expect-head SHA` merges only what the caller judged: the task must still wait to
+merge, on review round `N`, with `SHA` its reviewed commit (the full sha, or its first 7 characters or more). These are
+`reviewRound` and `reviewedHead` in `details <id> --json` (under `task`) and in `list --json`. Anything else, a review
+that ran again or a commit that moved since, and nothing is merged: it fails with the reason and a non-zero exit. Either
+flag works alone; neither goes with `--anyway`. Without them, `approve` is as it always was. It is for a program that
+decides before it approves (auto-ship): it reads the task, judges it, and passes what it read, so a change in between is
+caught under the task's lock instead of merged.
+
 ### A flag a command does not know is refused
 
 Each command takes only its own flags, plus `--json` and `--help`. `add`, `delegate` and `automations` also take any
