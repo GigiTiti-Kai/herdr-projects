@@ -5,10 +5,10 @@ board reads the kind off what the task already has.
 
 ```
  ▾ working
-   ◐ PRJ-26 [自動] heavy-run for the tests and the build              ███░░░░░ 40%   2h
-   ◐ HCM-138 [運用] [応募] three seats: search, draft, send                          5h
-   ◐ HCM-201 [運用] [順番待ち] heavy-run for herdr-projects… [委任先 PRJ-26・作業中]    1d
-   ◐ PRJ-31 [調査] Why is the build slow? [research]                                 4m
+   ◐ APP-26 [自動] Move the logs to their new place                  ███░░░░░ 40%   2h
+   ◐ OPS-38 [運用] Weekly invoices, worked by hand                                  5h
+   ◐ OPS-41 [運用] [順番待ち] Move the logs… [委任先 APP-26・作業中]                1d
+   ◐ APP-31 [調査] Why is the build slow? [research]                                4m
 ```
 
 | Chip | The task | Read off |
@@ -17,29 +17,31 @@ board reads the kind off what the task already has.
 | `[自動]` | an agent works it in a worktree of its own | a `worker.*` setting of its own, or a worktree, or its branch (which stays once the worktree is removed) |
 | `[運用]` | neither: a ledger you work through, a resident seat | everything else |
 
-`[research]` stays as it was: a research-only row has both. A task added and not started yet, with no `worker.*`
+The chip takes no room from the columns on the right: where a row is tight, its name is cut a little sooner, and
+the review tag, the pull request and the time stay where they were. `[research]` stays as it was: a research-only
+row has both. A task added and not started yet, with no `worker.*`
 setting, is `[運用]` until an agent is started on it.
 
 ## Where it was handed to
 
 **A task whose message says it was handed to another task names that task and where it stands**, after its name:
-`[委任先 PRJ-26・作業中]`. That is how a ledger row (say HCM-201) shows, without opening anything, how the work it
-handed to another repo's task (PRJ-26) is going.
+`[委任先 APP-26・作業中]`. That is how a ledger row (say OPS-41) shows, without opening anything, how the work it
+handed to another repo's task (APP-26) is going.
 
 The board reads it off the task's own message (the `--msg` its agent or its coordinator last gave): the task numbers right before
 `に委任` (a few words may stand between, as in `に仕様ごと委任済み`).
 
 | The message | Shown |
 | --- | --- |
-| `PRJ-26に委任` | `[委任先 PRJ-26・作業中]` |
-| `HCM-246・HCM-247に委任` | `[委任先 HCM-246・未着手, HCM-247・完了]` |
-| `TKN-38(auto-teikeikun/38)に仕様ごと委任済み` | `[委任先 TKN-38・完了]` |
-| `P5=FLS-70 … P5のみ委任` | nothing: no number stands right before `に委任` |
+| `APP-26に委任` | `[委任先 APP-26・作業中]` |
+| `OPS-46・OPS-47に委任` | `[委任先 OPS-46・未着手, OPS-47・完了]` |
+| `APP-38(app/38)に仕様ごと委任済み` | `[委任先 APP-38・完了]` |
+| `S2=DOC-7 … S2のみ委任` | nothing: no number stands right before `に委任` |
 
 Where it stands is the other task's group on the board: 作業中 (working), 要対応 (needs you), 承認待ち (ready to
 approve), 完了 (done), 未着手 (to do), or アーカイブ済み. A number of a task the board does not list (archived and out
 of view, or no repo has its key) is named without a state. A row of another machine names none: its numbers are that
-machine's.
+machine's. A task of the same repo is named too. Where the name is cut, the tag stays whole and the title gives way.
 
 When the message changes, so does the tag: a later message that no longer says `に委任` takes it off.
 

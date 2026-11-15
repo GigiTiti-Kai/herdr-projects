@@ -1,5 +1,5 @@
 //! A task row's kind chip and where it was handed to: `[調査]`, `[自動]` or `[運用]` before its title, worked out from what
-//! the task already has (no tagging by hand), and `[委任先 PRJ-26・作業中]` after it when its message says it was handed
+//! the task already has (no tagging by hand), and `[委任先 APP-26・作業中]` after it when its message says it was handed
 //! to another task, kept whole where the name is cut (docs/row-kinds.md).
 use crate::board::state::State;
 use crate::json::*;
@@ -17,8 +17,8 @@ pub fn chip(r: &Obj) -> &'static str {
     let worker = r.at("settings").as_object().is_some_and(|s| s.keys().any(|k| k.starts_with("worker.")));
     if worker || r.b("worktree") || r.b("branch") { "[自動]" } else { "[運用]" }
 }
-/// The tasks its message says it was handed to (`PRJ-26に委任`, `HCM-246・HCM-247に委任`, `TKN-38(…)に仕様ごと委任済み`),
-/// each with where it stands now: `[委任先 PRJ-26・作業中]`; "" when it names none. A task not on the board (archived, or
+/// The tasks its message says it was handed to (`APP-26に委任`, `OPS-46・OPS-47に委任`, `APP-38(…)に仕様ごと委任済み`),
+/// each with where it stands now: `[委任先 APP-26・作業中]`; "" when it names none. A task not on the board (archived, or
 /// a number no repo has) is named without a state.
 pub fn handed(s: &State, r: &Obj) -> String {
     // shortcut: another machine's row has that machine's keys, not ours; named there, not here, until rows carry them.
@@ -29,7 +29,7 @@ pub fn handed(s: &State, r: &Obj) -> String {
     let named: Vec<String> = crate::re!(r"[A-Z][A-Z0-9]{1,4}-\d+").find_iter(&c[1]).filter_map(|m| {
         let id = id_of_key(m.as_str(), Some(&s.data.keys));
         if id.is_empty() || id == r.s("id") { return None; }
-        Some(match s.items.iter().find(|x| x.s("id") == id) { Some(x) => format!("{}・{}", m.as_str(), stands(x)), None => m.as_str().to_string() })
+        Some(match s.data.items.iter().find(|x| x.s("id") == id) { Some(x) => format!("{}・{}", m.as_str(), stands(x)), None => m.as_str().to_string() })
     }).collect();
     if named.is_empty() { String::new() } else { format!("[委任先 {}]", named.join(", ")) }
 }
