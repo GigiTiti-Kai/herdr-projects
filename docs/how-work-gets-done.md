@@ -154,7 +154,8 @@ it merges:
   the reviewed commit, built by `merge.method`, never forced and never through your checkout;
 - **or locally**, squashed by default.
 
-A conflict found here goes back to the agent the same way, and the merge you approved is retried after its repair. A
+A conflict found here goes back to the agent the same way, and the merge you approved is retried after its repair. A repair
+that needed a new review (anything more than merging main) withdraws your yes: it waits for your approval again. A
 checkout with unsaved files is never forced. Merging without your yes: [merging by itself](gate.md#merging-by-itself).
 
 ### Closing GitHub issues
@@ -182,7 +183,7 @@ every repo the board merges in. `merge.checks: none` does not look at GitHub's c
 | GitHub's checks are | The board |
 |---|---|
 | still running | waits. The row says how far: `Waiting for GitHub checks · 2 of 3 passed`, with the board's own `◇` (nobody works on it meanwhile). It merges by itself once they pass |
-| failed | merges nothing. The failure goes back to the agent like a failed check of the board's own, with the failing check's name and the end of its log, within `review.rounds` (a merge you approved goes on once GitHub's checks pass on the repair). After that it waits for you, and `approve <id>` refuses and says why, as for a failed review, until `approve <id> --anyway` |
+| failed | merges nothing. The failure goes back to the agent like a failed check of the board's own, with the failing check's name and the end of its log, within `review.rounds` (a repair of a merge you approved is reviewed anew, so it waits for your yes again). After that it waits for you, and `approve <id>` refuses and says why, as for a failed review, until `approve <id> --anyway` |
 | not reporting, still running after `check.timeout` | waits for you, with that reason |
 | passed, or there are none | merges |
 

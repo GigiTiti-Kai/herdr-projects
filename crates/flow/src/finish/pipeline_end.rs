@@ -45,6 +45,24 @@ fn on_main_closes(t: &Obj, root: &Path) -> String {
     let closed = if t.s("doneWhy").starts_with("Already") { crate::land::closes::after_landing(t, root, "") } else { String::new() };
     if closed.is_empty() { closed } else { format!(" {closed}") }
 }
+/// A yes (not `merge.by itself`'s own intent) given to another commit than the one just reviewed anew: what was
+/// approved is not what would land. The head and round of the yes are `approvedHead`/`approvedRound` (approve).
+pub fn approved_elsewhere(t: &Task, head: &str) -> bool {
+    let mi = t.at("mergeIntent");
+    let at = if mi.b("approvedHead") { mi.t("approvedHead") } else { mi.t("verifiedHead") };
+    !mi.b("auto") && at != head
+}
+/// The approval is withdrawn: the task waits for a yes to its new review, and nothing merges until it is given.
+fn ask_again(g: &mut Guard, review: &Option<Value>, change: Option<&Value>, head: &Value) -> Res<()> {
+    let stat = change.map(|x| x.at("stat").clone()).unwrap_or(Value::Null);
+    let t = g.set(|t| {
+        t.put("review", review.clone().unwrap_or(Value::Null)); t.put("stat", stat.clone()); t.put("reviewedHead", head.clone()); t.put("mergeFailed", false);
+        t.put("stage", "approval"); t.put("since", now()); t.put("mergeIntent", Value::Null); t.put("requireApproval", true); t.put("autoMerge", false); t.put("autoMergeLocal", false);
+        let m = format!("Reviewed again on a new commit after your approval: approve again to merge. {}", approval_message_with(t, "")); t.put("msg", one_line(&m, 2048));
+    })?;
+    flow::sidebar::tell_sidebar(&t);
+    Ok(())
+}
 pub fn after_review(c: Ctx, g: &mut Guard) -> Res<()> {
     let id = c.id;
     let mut t = g.check()?;
@@ -137,6 +155,7 @@ pub fn after_review(c: Ctx, g: &mut Guard) -> Res<()> {
             fail(g, f, FailHow::default())?;
             return Ok(());
         }
+        if fresh && approved_elsewhere(&t, &head) { return ask_again(g, &review, change.as_ref(), &head_v); }
         let stat = change.as_ref().map(|x| x.at("stat").clone()).unwrap_or(Value::Null);
         t = g.set(|t| { t.put("review", review.clone().unwrap_or(Value::Null)); t.put("stat", stat.clone()); t.put("reviewedHead", head_v.clone()); t.obj_mut("mergeIntent").put("verifiedHead", head_v.clone()); })?;
         if hold_pr_failure(g, &mut t)? { return Ok(()); }
