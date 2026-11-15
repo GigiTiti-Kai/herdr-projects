@@ -115,7 +115,14 @@ pub fn pane(st: &mut Value, verb: &str, arg2: &str, argv: &[String], flag: &dyn 
             }
             let a = p.at("agent");
             let pending = p.at("pending");
-            if pending.b("multiline") { return out(p.s("screen")); }
+            // `paneWidth`: a pane that narrow, its long rows wrapped, and only the last `--lines` rows read.
+            if pending.b("multiline") {
+                let w = st.i("paneWidth").max(0) as usize;
+                if w == 0 { return out(p.s("screen")); }
+                let rows: Vec<String> = p.s("screen").lines().flat_map(|l| { let c: Vec<char> = l.chars().collect(); if c.is_empty() { vec![String::new()] } else { c.chunks(w).map(|r| r.iter().collect()).collect::<Vec<String>>() } }).collect();
+                let n = flag("--lines").and_then(|n| n.parse::<usize>().ok()).unwrap_or(rows.len()).min(rows.len());
+                return out(&rows[rows.len() - n..].join("\n"));
+            }
             if pending.is_object() {
                 let (cwd, line) = (p.t("cwd"), pending.t("line"));
                 // the first of those reads finds the line not drawn yet: only the prompt
@@ -131,7 +138,8 @@ pub fn pane(st: &mut Value, verb: &str, arg2: &str, argv: &[String], flag: &dyn 
             let cwd = p.t("cwd");
             if p.at("pending").b("multiline") {
                 let line = p.at("pending").t("line");
-                if argv[3..].iter().any(|k| k == "control+j") { st["panes"][pi]["pending"] = Value::Null; st["panes"][pi]["screen"] = json!(format!("user@host:{cwd}$ {line}\nuser@host:{cwd}$ \n")); }
+                // `heldStays`: a line editor that does not run it on C-j either
+                if argv[3..].iter().any(|k| k == "control+j") && !st.b("heldStays") { st["panes"][pi]["pending"] = Value::Null; st["panes"][pi]["screen"] = json!(format!("user@host:{cwd}$ {line}\nuser@host:{cwd}$ \n")); }
                 if argv[3..].iter().any(|k| k == "control+c") { st["panes"][pi]["pending"] = Value::Null; st["panes"][pi]["screen"] = json!(format!("user@host:{cwd}$ {line}^C\nuser@host:{cwd}$ \n")); }
             }
             ok(json!({ "type": "ok" }))

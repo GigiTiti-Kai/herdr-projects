@@ -62,6 +62,36 @@ fn an_export_held_as_several_lines_is_run_with_ctrl_j() {
     assert_eq!(w.state().arr("paneKeys").iter().map(|k| k.at("keys").clone()).collect::<Vec<_>>(), vec![json!(["control+j"])]);
 }
 
+/// PRJ-23 review: in a pane 60 columns wide the export wraps over more rows than the board read, its mark was never
+/// seen, and C-j never pressed. The board reads rows enough for all of it, and finds the mark across a wrapped row.
+#[test]
+fn a_held_export_in_a_narrow_pane_is_run_with_ctrl_j_too() {
+    let w = world_with(Opts { repo: true, settings: json!({ "review.when": "never" }), ..Default::default() });
+    w.patch(|s| { s["multiline"] = json!(1); s["paneWidth"] = json!(37); });
+    w.script(json!({ "worker": [work()] }));
+    let id = w.add("Narrow pane");
+    delegate(&id);
+    let t = settle(&id);
+    assert_eq!(t.s("stage"), "approval", "{} {}", t.s("msg"), t.at("failure"));
+    assert_eq!(starts(&w, "claude").len(), 1, "{:?}", calls(&w));
+    assert_eq!(w.state().arr("paneKeys").iter().map(|k| k.at("keys").clone()).collect::<Vec<_>>(), vec![json!(["control+j"])]);
+}
+
+/// PRJ-23 review: an export its shell still holds after C-j is no export taken: the start is not typed onto it, and
+/// the task says why.
+#[test]
+fn an_export_still_held_after_ctrl_j_fails_the_start_and_says_why() {
+    let w = world_with(Opts { repo: true, settings: json!({ "review.when": "never" }), ..Default::default() });
+    w.patch(|s| { s["multiline"] = json!(1); s["heldStays"] = json!(true); });
+    w.script(json!({ "worker": [work()] }));
+    let id = w.add("Held for good");
+    delegate(&id);
+    let t = settle(&id);
+    assert_eq!(t.s("stage"), "failed", "{}", t.s("msg"));
+    assert!(starts(&w, "claude").is_empty(), "nothing typed onto it: {:?}", calls(&w));
+    assert_eq!(t.s("msg"), "Could not start: its terminal's shell held the line before the start and did not run it", "{}", t.at("failure"));
+}
+
 /// PRJ-23: a start the line editor held as one more line of a command was tried again without its hook, and typed onto
 /// the same command: two start lines and still "-- MULTILINE --". The board clears the command with C-c, gives the
 /// shell the export again, and starts it once more as it was (with its hook, when it had one).

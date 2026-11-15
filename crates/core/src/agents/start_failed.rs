@@ -50,6 +50,9 @@ pub fn explain(s: &Start, said: &str, screen: &str) -> Why {
     }
     if said.contains("needs herdr's own integration") { return why(format!("{k} needs herdr's own integration"), format!("Run `herdr integration install {}`, then {again}.", super::kinds::kind(k).map(|a| a.integration).unwrap_or(k))); }
     if cut_off(screen) { return why("its start command was cut off: the terminal's shell was still starting".into(), format!("The board cleared the half-typed command: {again}.")); }
+    if said.contains(crate::herdr::shell_ready::HELD_WORDS) {
+        return why("its terminal's shell held the line before the start and did not run it".into(), format!("Its terminal shows \"-- MULTILINE --\": a line editor that runs nothing on Enter while more typed text waits (ble.sh's accept_line_threshold) does this. The board clears it at the next start: {again}."));
+    }
     if said.contains("canonical mode") {
         return why("its terminal's shell was not ready for the start command".into(), format!("The board waited for the shell's prompt and tried {} times. Wait until the task's terminal shows its prompt, then {again}. A shell that is slow to start (its startup file) causes this.", crate::herdr::shell_ready::RETRIES + 1));
     }
