@@ -109,7 +109,7 @@ fn the_third_line_is_there_under_80_columns_of_screen_and_gone_from_80_on_for_ev
     let find = |v: &[String], w: &str| v.iter().find(|l| l.contains(w)).cloned().unwrap_or_default();
     assert!(has(&find(&narrow, "Finished"), r"^[ ▌]✓ #\d+ \[運用\] Finished +R#1 PR#3$") && has(&find(&narrow, "Not begun"), r"^[ ▌]○ #\d+ \[運用\] Not begun *$"), "{}", narrow.join("\n"));
     assert!(has(&find(&wide, "Finished"), r"^[ ▌]✓ #\d+ \[運用\] Finished +R#1 PR#3 +2h$") && has(&find(&wide, "Not begun"), r"^[ ▌]○ #\d+ \[運用\] Not begun +2h$"), "{}", wide.join("\n"));
-    // At 80 the columns sit beside a name of 40 cells: the widest of each kind, bar and all. The task's number is not
+    // At 80 the columns sit beside a name of 40 cells (the kind chip and 33 more): the widest of each kind, bar and all. The task's number is not
     // counted in the 80: with it that is 83, and at 80 the bar is what gives way.
     let full = work(json!({ "id": "p/1", "title": "A".repeat(33), "msg": "Reading the panel and its tests.", "progress": 40, "eta": 120, "reviewRound": 12, "stage": "reviewing", "pr": 123 }));
     let one = std::slice::from_ref(&full);

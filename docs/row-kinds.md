@@ -17,9 +17,9 @@ board reads the kind off what the task already has.
 | `[自動]` | an agent works it in a worktree of its own | a `worker.*` setting of its own, or a worktree, or its branch (which stays once the worktree is removed) |
 | `[運用]` | neither: a ledger you work through, a resident seat | everything else |
 
-The chip takes no room from the columns on the right: where a row is tight, its name is cut a little sooner, and
-the review tag, the pull request and the time stay where they were. `[research]` stays as it was: a research-only
-row has both. A task added and not started yet, with no `worker.*`
+The chip is part of the name: where a row is tight, it counts toward the 40 cells a name keeps before the columns on
+the right give way, so on a narrow list a column goes up to 7 cells sooner than it did. `[research]` stays as it was:
+a research-only row has both. A task added and not started yet, with no `worker.*`
 setting, is `[運用]` until an agent is started on it.
 
 ## Where it was handed to

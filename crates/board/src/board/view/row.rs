@@ -4,7 +4,7 @@
 //! are laid out once for the whole list, so each starts at the same place on every row; what is shown of them is
 //! decided one section at a time (row_fit.rs). One cell between two columns, and one wider gap of two cells on a row:
 //! right of the progress (bar, percent, minutes left), before the review, the pull request and the time.
-use super::fields::{bare_title, fields, is_auto, mark, name_ink, row_title, says_beside, says_under, F};
+use super::fields::{fields, is_auto, mark, name_ink, row_title, says_beside, says_under, F};
 use super::row_fit::{label_room, shown_from, Cell, Fit, ETA_STEADY, PERCENT_MIN, PERCENT_STEADY};
 use super::row_tall::{tall_at, tall_layout, Third};
 use super::row_wrap::{is_red, red_under, wrapped_lines, wraps};
@@ -74,7 +74,7 @@ pub fn row_layout(s: &mut State, t: &Theme, records: &[crate::board::state::Rec]
     let cells = |ago: bool, cols: &[(&'static str, usize)]| -> Vec<Cell> { cols.iter().map(|(k, w)| Cell { key: k, w: match *k { "percent" => (*w).max(PERCENT_STEADY), "eta" => (*w).max(ETA_STEADY), "time" if ago => w + 4, _ => *w } }).collect() };
     let cols_of = |recs: &[crate::board::state::Rec]| if recs.first().map(|r| is_auto(r)).unwrap_or(false) { auto_cols.clone() } else { cols.clone() };
     let fit = |r: &Obj, f: Option<&F>, s: &State| Fit {
-        room: width_.saturating_sub(mark(t, r).width() + 2 + number_wide(s, r, num)), name: width(&row_title(s, r)), chip: width(&row_title(s, r)) - width(&bare_title(s, r)),
+        room: width_.saturating_sub(mark(t, r).width() + 2 + number_wide(s, r, num)), name: width(&row_title(s, r)),
         has: ["bar", "percent", "eta", "review", "pr", "tag", "lead"].into_iter().filter(|k| f.map(|f| f.has(k)).unwrap_or(false)).chain(if tall { None } else { Some("time") }).collect(),
     };
     let field_for = |r: &Obj| records.iter().position(|x| x.s("id") == r.s("id")).and_then(|n| fmap.get(&n).copied());

@@ -14,11 +14,9 @@ pub const PERCENT_MIN: usize = 3;
 /// Columns given up in one step, never one without the other.
 const TOGETHER: [(&str, &str); 3] = [("percent", "eta"), ("review", "pr"), ("lead", "time")];
 
-/// A row as the fit sees it: the cells right of its mark and number, its name's width, the cells of that its kind chip
-/// takes (view/kind.rs: they count for the name a bar must leave whole, never toward the room a column leaves it), which
-/// columns it has.
+/// A row as the fit sees it: the cells right of its mark and number, its name's width, which columns it has.
 #[derive(Clone, Debug)]
-pub struct Fit { pub room: usize, pub name: usize, pub chip: usize, pub has: Vec<&'static str> }
+pub struct Fit { pub room: usize, pub name: usize, pub has: Vec<&'static str> }
 /// One column of the list, left to right, at the width it is decided with.
 #[derive(Clone, Copy, Debug)]
 pub struct Cell { pub key: &'static str, pub w: usize }
@@ -31,12 +29,12 @@ pub fn label_room(row: &Fit, cells: &[Cell], from: usize) -> i64 { let at = own_
 /// Where a section's columns start (the same for every row of it), and what the section went without: the columns
 /// right of the bar it does not show, then the cells cut off its names.
 pub fn shown_from(rows: &[Fit], cells: &[Cell]) -> (usize, (usize, usize)) {
-    let fits = |from: usize, owed: usize| rows.iter().all(|row| own_from(row, cells, from) == cells.len() || label_room(row, cells, from) >= row.room.min(if cells.get(from).is_some_and(|c| c.key == "bar") { row.name } else { row.name - row.chip }).min(owed) as i64);
+    let fits = |from: usize, owed: usize| rows.iter().all(|row| own_from(row, cells, from) == cells.len() || label_room(row, cells, from) >= row.room.min(row.name).min(owed) as i64);
     let stops: Vec<usize> = (0..=cells.len()).filter(|n| !TOGETHER.iter().any(|(a, b)| cells.get(*n).map(|c| c.key == *b).unwrap_or(false) && *n > 0 && cells[n - 1].key == *a)).collect();
     // A bar is never worth a cut name: names are cut only for the columns right of it.
     let a = stops.iter().copied().find(|n| fits(*n, usize::MAX)).unwrap_or(cells.len());
     let b = stops.iter().copied().find(|n| cells.get(*n).map(|c| c.key != "bar").unwrap_or(true) && fits(*n, NAME_OWED)).unwrap_or(cells.len());
     let from = a.min(b);
-    let cut: usize = rows.iter().map(|row| (row.room.min(row.name - row.chip) as i64 - label_room(row, cells, from)).max(0) as usize).sum();
+    let cut: usize = rows.iter().map(|row| (row.room.min(row.name) as i64 - label_room(row, cells, from)).max(0) as usize).sum();
     (from, (from.max(if cells.first().map(|c| c.key == "bar").unwrap_or(false) { 1 } else { 0 }), if from < cells.len() { cut } else { 0 }))
 }

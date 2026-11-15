@@ -38,7 +38,7 @@ fn the_boards_own_steps_share_one_mark_and_the_reviewer_says_only_what_it_is_doi
     m(&v.row(&under, 120), r"^[ ▌]◑ #\d+ \[運用\] Other +█+░+ +50% {2}R#3 +0s\n[ ▌] {5}Running the tests\.$"); // no word "review", whichever review it is: the mark and the colour say it
     m(&v.row(&with(&under, json!({ "reviewRound": 1 })), 120), r"^[ ▌]◑ #\d+ \[運用\] Other [^\n]*\n[ ▌] {5}Running the tests\.$");
     m(&v.row(&with(&under, json!({ "reviewRound": 1, "msg": "Under review", "plain": true })), 120), r"^[ ▌]◑ #\d+ \[運用\] Other +█[^\n]*\n[ ▌] {5}Under review$"); // only the plain word to say: it says that, never an empty line or a bare "…"
-    m(&v.row(&under, 30), r"^[ ▌]◑ #\d+ \[運用\] O… +50% {2}R#3 +0s\n[ ▌] {5}Running the tests\.$");
+    m(&v.row(&under, 37), r"^[ ▌]◑ #\d+ \[運用\] Other +50% {2}R#3 +0s\n[ ▌] {5}Running the tests\.$");
     m(&v.row(&with(&under, json!({ "stage": "reviewneeds", "state": "blocked", "progress": null, "msg": "The reviewer shows a dialog" })), 120), r"^[ ▌]! #\d+ \[運用\] Other +R#3 {2}0s ago\n[ ▌] {5}The reviewer shows a dialog$");
     no(&v.row(&with(&working, json!({ "reviewRound": 3 })), 120), r"review|◑"); m(&v.row(&with(&working, json!({ "reviewRound": 3 })), 120), r"^[ ▌]◐ #\d+ \[運用\] Other "); // back with the agent: no review is running
     m(&v.page(&under, false), r"\n State {8}◑ reviewer is working · 3rd review · for 0s\n Progress {5}█+░+ 50%\n Now {10}Running the tests\.\n");
@@ -57,8 +57,8 @@ fn a_review_judged_by_the_gate_says_its_result_and_a_short_tally() {
     m(&v.row(&with(&gated, json!({ "reviewRound": 2 })), 120), r" R#2 PR#12 [^\n]*\n[ ▌] {5}Pass · 2 minor$");
     let mut none = tagged(); none["findings"] = json!([]);
     m(&v.row(&with(&gated, json!({ "review": none })), 120), r" R#1 PR#12 [^\n]*\n[ ▌] {5}Pass$");
-    m(&v.row(&with(&gated, json!({ "reviewRound": 2 })), 50), r"^[ ▌]◆ #\d+ \[運用\] Build a flying ga… +R#2 PR#12 {2}0s ago\n[ ▌] {5}Pass · 2 minor$");
-    m(&v.row(&with(&gated, json!({ "reviewRound": 2 })), 35), r"^[ ▌]◆ #\d+ \[運用\] Build a flyi… +0s ago\n[ ▌] {5}Pass · 2 minor$"); // whole on its own line, whatever the columns beside the name give up
+    m(&v.row(&with(&gated, json!({ "reviewRound": 2 })), 57), r"^[ ▌]◆ #\d+ \[運用\] Build a flying game +R#2 PR#12 {2}0s ago\n[ ▌] {5}Pass · 2 minor$");
+    m(&v.row(&with(&gated, json!({ "reviewRound": 2 })), 42), r"^[ ▌]◆ #\d+ \[運用\] Build a flying game +0s ago\n[ ▌] {5}Pass · 2 minor$"); // whole on its own line, whatever the columns beside the name give up
     m(&v.row(&bad, 33), r"\n[ ▌] {5}Review failed · 1 critical,\n[ ▌] {5}1 major, 1 minor, 1\n[ ▌] {5}pre-existing$"); // longer than the window: red, so it wraps
     assert_eq!(ink_of(&v.inked(&gated, 160, &[])[1..], "Pass"), Some(Ink::Green)); assert_eq!(ink_of(&v.inked(&bad, 160, &[])[1..], "Review failed"), Some(Ink::Red));
 }
@@ -111,6 +111,6 @@ fn the_review_tag_is_a_column_of_its_own_left_of_the_pr_and_its_colour_says_how_
     assert_eq!(at(&mut v, &running, &list, "PR#12"), at(&mut v, &ten, &list, "PR#12"));
     // narrow: the tag goes after the percent, together with the PR number, and the title stays whole
     let long = with(&fixing, json!({ "title": "Fix login" }));
-    m(&v.top(&long, 36, &[]), r"^[ ▌]◐ #\d+ \[運用\] F… +50% {2}R#2 PR#12 +0s$"); m(&v.top(&long, 35, &[]), r"^[ ▌]◐ #\d+ \[運用\] Fix lo… +R#2 PR#12 +0s$"); m(&v.top(&long, 30, &[]), r"^[ ▌]◐ #\d+ \[運用\] F… +R#2 PR#12 +0s$");
-    m(&v.top(&long, 29, &[]), r"^[ ▌]◐ #\d+ \[運用\] Fix login +0s$"); m(&v.top(&long, 23, &[]), r"^[ ▌]◐ #\d+ \[運用\] Fix … +0s$"); // never a tag with no PR beside it, nor a PR that lost its tag
+    m(&v.top(&long, 43, &[]), r"^[ ▌]◐ #\d+ \[運用\] Fix login +50% {2}R#2 PR#12 +0s$"); m(&v.top(&long, 42, &[]), r"^[ ▌]◐ #\d+ \[運用\] Fix login +R#2 PR#12 +0s$"); m(&v.top(&long, 37, &[]), r"^[ ▌]◐ #\d+ \[運用\] Fix login +R#2 PR#12 +0s$");
+    m(&v.top(&long, 36, &[]), r"^[ ▌]◐ #\d+ \[運用\] Fix login +0s$"); m(&v.top(&long, 30, &[]), r"^[ ▌]◐ #\d+ \[運用\] Fix login +0s$"); // never a tag with no PR beside it, nor a PR that lost its tag
 }

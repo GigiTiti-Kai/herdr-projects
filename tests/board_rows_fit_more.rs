@@ -100,14 +100,14 @@ fn what_a_one_line_row_says_shows_on_every_row_of_its_section_that_says_somethin
         todo(json!({ "id": "p/2", "title": "Fix layout for task names in narrow terminal board", "msg": "Writing the tests for every width." })),
         todo(json!({ "id": "p/3", "title": "Quiet" })),
     ];
-    let l = draw(&mut s, &list, 99).rows;
-    assert!(has(&l[0], r"^[ ▌]○ #\d+ \[運用\] Fix login {2}Tracing why the login form rejects valid passwords\. +PR#3") && has(&l[1], r"board {2}Writing the tests for e[^…]*… +2h ago$"), "each cut to its own room:\n{}", l.join("\n"));
-    let l = draw(&mut s, &list, 85).rows;
+    let l = draw(&mut s, &list, 106).rows;
+    assert!(has(&l[0], r"^[ ▌]○ #\d+ \[運用\] Fix login {2}Tracing why the login form rejects valid passwords\. +PR#3") && has(&l[1], r"board {2}Writing the tests for every w[^…]*… +2h ago$"), "each cut to its own room:\n{}", l.join("\n"));
+    let l = draw(&mut s, &list, 92).rows;
     assert!(has(&l[0], r"^[ ▌]○ #\d+ \[運用\] Fix login +PR#3 +2h ago$") && has(&l[1], r"board +2h ago$") && has(&l[2], r"^[ ▌]○ #\d+ \[運用\] Quiet +2h ago$"), "the long name leaves too little to say anything: the short one says nothing either:\n{}", l.join("\n"));
     for width in WIDTHS { let d = draw(&mut s, &list, width); shown(&list, &d, width); }
     // A row with nothing to say does not count: beside it the others still say what they do.
     let two = [list[0].clone(), list[2].clone()];
-    let l = draw(&mut s, &two, 85).rows;
+    let l = draw(&mut s, &two, 92).rows;
     assert!(has(&l[0], r"^[ ▌]○ #\d+ \[運用\] Fix login {2}Tracing why the login form rejects valid pa"), "{}", l[0]);
     // A live task never says anything beside its name, whatever the room.
     let l = draw(&mut s, &[work(json!({ "id": "p/4", "title": "Fix login", "msg": "Tracing why.", "progress": 55 }))], 200).rows;
@@ -142,13 +142,13 @@ fn minutes_left_are_never_wider_than_nine_cells_and_a_machines_name_beside_a_tas
     // The reviewer's case: 999m turning 1000m at a fixed width. From a thousand on they read as hours.
     let pair = |eta: i64| vec![work(json!({ "id": "p/1", "title": "A title that is forty cells long, exactly", "progress": 5, "eta": eta })), work(json!({ "id": "p/2", "title": "Fix login", "progress": 5, "eta": eta }))];
     assert_eq!(pair(1)[0].s("title").len(), 41);
-    for width in [67, 66, 58, 57, 50] {
+    for width in [74, 73, 65, 64, 57] {
         let sets: Vec<String> = [999, 1000, 1007, 999].iter().map(|eta| { let list = pair(*eta); let d = draw(&mut s, &list, width); format!("{:?}", shown(&list, &d, width)) }).collect();
         assert!(sets.iter().all(|x| *x == sets[0]), "999m to 1000m changes what shows at {width}");
     }
-    assert!(has(&draw(&mut s, &pair(999), 80).rows[1], r"% 999m left +2h$"));
-    assert!(has(&draw(&mut s, &pair(1000), 80).rows[1], r"% 17h left +2h$"));
-    assert!(has(&draw(&mut s, &pair(10_000_000), 80).rows[1], r"% 999h left +2h$"));
+    assert!(has(&draw(&mut s, &pair(999), 87).rows[1], r"% 999m left +2h$"));
+    assert!(has(&draw(&mut s, &pair(1000), 87).rows[1], r"% 17h left +2h$"));
+    assert!(has(&draw(&mut s, &pair(10_000_000), 87).rows[1], r"% 999h left +2h$"));
     // All machines: a machine's name is its heading's, never on a row, so it takes no room the row's words were promised.
     s.scope = "*".into();
     let far = vec![todo(json!({ "id": "p/1", "title": "A title that is forty cells long, exactly", "host": "long-machine-name", "msg": "X", "progress": 50, "eta": 1 })), todo(json!({ "id": "p/2", "title": "Fix login", "host": "long-machine-name", "msg": "X", "progress": 50, "eta": 1 }))];
