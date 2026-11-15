@@ -9,7 +9,7 @@ use crate::herdr::cli::current_socket;
 use crate::json::*;
 use crate::research::is_research;
 use crate::shown::queue::{queued, tag as queue_tag, words as queue_words};
-use crate::store::{keys::{repo_keys, tag_of}, reviews::{current_review, review_round}, tasks::find, titles::title_note};
+use crate::store::{keys::{repo_keys, tag_of}, reviews::{current_review, review_number}, tasks::find, titles::title_note};
 
 /// One task of `list`: named by its key (`HSW-134`), in a column of its own.
 fn line(t: &Obj, keys: &crate::store::keys::Keys) -> String {
@@ -24,7 +24,7 @@ fn brief(t: &Obj) -> Value {
     if !queue_tag(t).is_empty() { o.put("queue", t.i("queuePlace")); } // its place in the queue for a free slot: 1 gets the next
     if t.b("archivedAt") { o.put("archivedAt", t.at("archivedAt").clone()); }
     if let Some(rv) = current_review(t) { o.put("review", rv.clone()); }
-    if review_round(t) > 0 { o.put("reviewRound", review_round(t)); }
+    if review_number(t) > 0 { o.put("reviewRound", review_number(t)); } // what approve --expect-review is held to
     if t.b("reviewedHead") { o.put("reviewedHead", t.at("reviewedHead").clone()); } // what approve --expect-head is held to
     o.retain(|k, v| !v.is_null() && !(k == "app" && *v == json!("")));
     Value::Object(o)

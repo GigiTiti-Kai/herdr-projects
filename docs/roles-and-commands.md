@@ -90,9 +90,10 @@ the same. It is for when the human said so in so many words.
 
 `approve <id> --expect-review N --expect-head SHA` merges only what the caller judged: the task must still wait to
 merge, on review round `N`, with `SHA` its reviewed commit (the full sha, or its first 7 characters or more). These are
-`reviewRound` and `reviewedHead` in `details <id> --json` (under `task`) and in `list --json`. Anything else, a review
+`reviewRound` and `reviewedHead` in `details <id> --json` (under `task`) and in `list --json`; the reviewed commit is the
+one that merges, and the merge itself refuses a pull request whose head is another by then. Anything else, a review
 that ran again or a commit that moved since, and nothing is merged: it fails with the reason and a non-zero exit. Either
-flag works alone; neither goes with `--anyway`. Without them, `approve` is as it always was. It is for a program that
+flag works alone; neither goes with `--anyway`, nor with another machine's task (run it on that machine). Without them, `approve` is as it always was. It is for a program that
 decides before it approves (auto-ship): it reads the task, judges it, and passes what it read, so a change in between is
 caught under the task's lock instead of merged.
 

@@ -102,7 +102,7 @@ fn approve_held_to_a_review_and_a_commit_merges_only_when_both_still_stand() {
     sw::store::tasks::set(&id, json!({ "reviewRound": round })).unwrap();
     // the commit moved since
     assert!(refused(&["approve", &id, "--expect-review", &r, "--expect-head", &"0".repeat(40)]).contains(&format!("its reviewed commit is {head} now")));
-    assert!(refused(&["approve", &id, "--expect-head", &head[..6]]).contains("not merged"), "fewer than 7 characters say nothing");
+    assert!(refused(&["approve", &id, "--expect-head", &head[..6]]).contains("too short to name one commit"));
     // never with --anyway, never without a value, never a word for a round
     assert!(refused(&["approve", &id, "--expect-review", &r, "--anyway"]).contains("do not go with --anyway"));
     assert!(refused(&["approve", &id, "--expect-head"]).contains("--expect-head needs a value"));
@@ -126,4 +126,12 @@ fn approve_held_to_a_review_refuses_a_task_that_does_not_wait_to_merge() {
     let id = w.add("Asks");
     sw::store::tasks::set(&id, json!({ "stage": "asks", "kind": "permission" })).unwrap();
     assert!(refused(&["approve", &id, "--expect-review", "1"]).contains("not waiting for an approval to merge"));
+}
+
+#[test]
+fn approve_held_to_a_review_is_refused_for_another_machines_task_and_nothing_is_sent() {
+    let w = world_with(Opts { repo: true, settings: json!({ "board.machines": "vm-str" }), ..Default::default() });
+    let far = crate::far::Far::new(&w.base);
+    assert!(refused(&["approve", "vm-str:far/7", "--expect-head", "abcdef1"]).contains("hold only a task of this machine"));
+    assert!(far.asked().is_empty(), "{:?}", far.asked());
 }
