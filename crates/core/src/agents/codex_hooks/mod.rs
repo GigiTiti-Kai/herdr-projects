@@ -1,6 +1,7 @@
 //! Codex's "Hooks need review" dialog at a seat's start, answered by the board itself when every hook it asks about is
 //! the human's own and does nothing a hook of theirs should not; otherwise left for the human. The check stays on:
 //! nothing is skipped, and Codex's own "Review hooks" screen is never opened. More: docs/codex-hooks-trust.md.
+pub mod command;
 pub mod dialog;
 pub mod list;
 pub mod origin;
@@ -35,11 +36,12 @@ pub fn decide(shown: usize, hooks: &[Hook], a: &Allowed, config: &Path, home: &P
     for h in pending {
         let why = |e: String| format!("{} hook {} ({}): {e}", h.event, h.key, h.command.chars().take(120).collect::<String>());
         let (root, from) = if h.source == "plugin" { origin::plugin(h, a, &config) } else { origin::owned_file(&h.file, a) }.map_err(why)?;
-        let files = scan::files(&h.command, &root, home).map_err(why)?;
+        let plugin = h.source == "plugin";
+        let files = scan::files(&h.command, &root, seat, home, plugin).map_err(why)?;
         if let Some(f) = std::iter::once(&h.file).chain(files.iter().map(|(f, _)| f)).find(|f| in_seat(f)) { return Err(why(format!("{} is in the seat's own folder, the work under review", f.display()))); }
-        for (f, _) in &files {
-            let inside = if h.source == "plugin" { f.canonicalize().map(|p| p.starts_with(root.canonicalize().unwrap_or(root.clone()))).unwrap_or(false) } else { origin::owned_file(f, a).is_ok() };
-            if !inside { return Err(why(format!("it runs {}, which is not {}", f.display(), if h.source == "plugin" { "in the plugin's own folder" } else { "a tracked file of a repo you allowed, the same as on its default branch" }))); }
+        for f in std::iter::once(&h.file).chain(files.iter().map(|(f, _)| f)) {
+            let own = if plugin { origin::plugin_file(&root, f) } else { origin::owned_file(f, a).map(|_| ()) };
+            if let Err(e) = own { return Err(why(format!("it runs {}, which is not {} ({e})", f.display(), if plugin { "the plugin's own as committed" } else { "a tracked file of a repo you allowed, the same as on its default branch" }))); }
         }
         if let Some(bad) = scan::flag(&h.command) { return Err(why(format!("its command {bad}"))); }
         if let Some((f, bad)) = files.iter().find_map(|(f, text)| scan::flag(text).map(|b| (f, b))) { return Err(why(format!("{} {bad}", f.display()))); }

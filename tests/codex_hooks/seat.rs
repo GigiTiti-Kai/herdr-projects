@@ -60,13 +60,16 @@ fn a_reviewers_dialog_of_hooks_you_allowed_is_answered_and_the_review_goes_on() 
 }
 
 #[test]
-fn a_reviewers_dialog_whose_count_does_not_match_gets_no_key_and_says_why() {
+fn a_reviewers_dialog_the_board_did_not_trust_waits_for_you_past_the_reviews_time_and_goes_on_once_you_answered() {
     let (w, id) = seated("reviewer", &format!("{PLUGIN}={FROM}"), "untrusted");
-    w.patch(|s| s["dialogScreen"]["codex"] = json!(screen(2)));
+    // The screen counts 2, Codex's list 1: nothing is pressed. You answer it after many looks of the board, well past
+    // the review's 1s.
+    w.patch(|s| { s["dialogScreen"]["codex"] = json!(screen(2)); s["dialogThen"]["codex"] = json!({ "status": "idle", "screen": "› Ask Codex to do anything\n" }); s["dialogAfter"]["codex"] = json!(120); });
     delegate(&id);
+    let began = std::time::Instant::now();
     let t = settle(&id);
     assert!(typed(&w).is_empty(), "{:?}", typed(&w));
-    assert_eq!(t.s("stage"), "failed", "the review timed out with nobody answering: {}", t.at("failure"));
-    let l = log();
-    assert!(l.contains("not trusted: the screen counts 2 new or changed hooks, Codex's own list 1 (sessionStart)"), "{l}");
+    assert!(began.elapsed().as_millis() > 1000, "you answered within the review's own time");
+    assert_eq!(t.s("stage"), "approval", "the review waited for you instead of timing out: {}", t.at("failure"));
+    assert!(log().contains("not trusted: the screen counts 2 new or changed hooks, Codex's own list 1 (sessionStart)"), "{}", log());
 }

@@ -1,19 +1,20 @@
 //! What a hook runs, read for what a hook of the human's own has no business doing: sending over the network, reading
 //! secrets, deleting a tree, running code it hides. Read are its command and the files it runs: the files the command
 //! names, and those they name in turn (a `require('./x')`, a `path.join(__dirname, 'x.js')`, a script it starts).
-//! shortcut: a list of plain words, not a reading of the code: it catches the plain ways, not a hidden one, and not
-//! what a program it calls by name (one on PATH) does. Anything it finds stops the trust; a real reading is the human's.
+//! shortcut: a list of plain words, not a reading of the code: it catches the plain ways, not a hidden one, nor which
+//! programs a file (not the command: command.rs) starts. Anything it finds stops the trust; a real reading is the human's.
 use regex::Regex;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
-/// What is looked for, with what it means.
-const FLAGS: [(&str, &str); 6] = [
-    ("sends over the network", r"\b(curl|wget|nc|ncat|socat|telnet|ssh|scp|rsync|ftp)\s"),
+/// What is looked for, with what it means: secrets first, as `~/.ssh` also names a program.
+const FLAGS: [(&str, &str); 7] = [
+    ("reads secrets", r"\.ssh/|id_rsa|id_ed25519|\.netrc|\.aws/|\.git-credentials|auth\.json|credentials|gh auth token|\bbws\b|history\.jsonl|keychain|\.gnupg"),
+    ("sends over the network", r"\b(curl|wget|nc|ncat|socat|telnet|ssh|scp|sftp|rsync|ftp)\b"),
     ("sends over the network", r#"require\(\s*['"](node:)?(http|https|http2|net|tls|dgram)['"]"#),
     ("sends over the network", r"\bfetch\(|XMLHttpRequest|WebSocket|/dev/(tcp|udp)/|Invoke-(WebRequest|RestMethod)|\burllib\b|\brequests\.(get|post|put)\(|\bsocket\.|\bhttp\.client"),
-    ("reads secrets", r"\.ssh/|id_rsa|id_ed25519|\.netrc|\.aws/|\.git-credentials|auth\.json|credentials|gh auth token|\bbws\b|history\.jsonl|keychain|\.gnupg"),
-    ("deletes a tree or history", r"\brm\s+-[a-zA-Z]*[rR]|rmSync\([^)]*recursive|rmdirSync\([^)]*recursive|shutil\.rmtree|\brimraf\b|git\s+(push|reset\s+--hard|clean\s+-)|\bmkfs|\bdd\s+if=|\bshred\b"),
+    ("deletes a tree or history", r#"\brm\b[^\n]{0,80}?(\s|['"])(-[a-zA-Z]*[rR][a-zA-Z]*\b|--recursive)|\.rm\([^)]*recursive|\bfind\b[^\n]*\s-delete\b"#),
+    ("deletes a tree or history", r"rmSync\([^)]*recursive|rmdirSync\([^)]*recursive|shutil\.rmtree|\brimraf\b|git\s+(push|reset\s+--hard|clean\s+-)|\bmkfs|\bdd\s+if=|\bshred\b"),
     ("runs code it hides", r#"base64\s+(-d|--decode)|\batob\(|['"]base64['"]|\beval\(|new\s+Function\(|\|\s*(ba|z)?sh\b"#),
 ];
 static RES: LazyLock<Vec<(&str, Regex)>> = LazyLock::new(|| FLAGS.iter().map(|(w, r)| (*w, Regex::new(r).unwrap())).collect());
@@ -38,54 +39,35 @@ fn named(text: &str) -> Vec<String> {
         .chain(text.split_whitespace().map(|w| w.trim_matches(|c| c == '\'' || c == '"').to_string()).filter(|w| w.starts_with('/')))
         .collect()
 }
-/// A named path as a file, looked for beside `base` and in `root` (a plugin's own folder): with `.js` added for a
-/// `require('./x')`.
-fn file_of(name: &str, base: &Path, root: &Path, home: &Path) -> Option<PathBuf> {
-    let r = root.display().to_string();
-    let name = name.replace("${CLAUDE_PLUGIN_ROOT}", &r).replace("$CLAUDE_PLUGIN_ROOT", &r).replace("${PLUGIN_ROOT}", &r).replace("$PLUGIN_ROOT", &r);
-    let name = if let Some(rest) = name.strip_prefix("~/") { home.join(rest).display().to_string() } else { name };
-    if !(EXT.is_match(&name) || name.starts_with("./") || name.starts_with("../") || name.starts_with('/')) { return None; }
-    let places: Vec<PathBuf> = if name.starts_with('/') { vec![PathBuf::from(&name)] } else { vec![base.join(&name), root.join(&name)] };
-    places.into_iter().flat_map(|p| [p.clone(), PathBuf::from(format!("{}.js", p.display())), p.join("index.js")]).find(|p| p.is_file()).map(|p| clean(&p))
+/// Every file a named path may be, beside each of `bases`: with `.js` added for a `require('./x')`. All of them, as
+/// which one runs is the program's choice.
+fn files_of(name: &str, bases: &[&Path], home: &Path) -> Vec<PathBuf> {
+    let name = if let Some(rest) = name.strip_prefix("~/") { home.join(rest).display().to_string() } else { name.to_string() };
+    if !(EXT.is_match(&name) || name.starts_with("./") || name.starts_with("../") || name.starts_with('/')) { return vec![]; }
+    let places: Vec<PathBuf> = if name.starts_with('/') { vec![PathBuf::from(&name)] } else { bases.iter().map(|b| b.join(&name)).collect() };
+    places.into_iter().filter_map(|p| [p.clone(), PathBuf::from(format!("{}.js", p.display())), p.join("index.js")].into_iter().find(|p| p.is_file())).map(|p| clean(&p)).collect()
 }
 fn clean(p: &Path) -> PathBuf { p.components().fold(PathBuf::new(), |mut out, c| { match c { std::path::Component::ParentDir => { out.pop(); } std::path::Component::CurDir => {} c => out.push(c) } out }) }
 
-/// Every file the command runs, read: the command's own files and theirs in turn. Err: a file that does not read as
-/// text, or more files than a hook should have.
-pub fn files(command: &str, root: &Path, home: &Path) -> Result<Vec<(PathBuf, String)>, String> {
-    let mut todo: Vec<PathBuf> = named(command).iter().filter_map(|n| file_of(n, root, root, home)).collect();
-    todo.extend(runs(command, root, home)?);
+/// Every file the command runs, read: what it starts (command.rs), the files it names, and theirs in turn. A name is
+/// looked for in the seat's folder `cwd` (where Codex runs the hook), and for a plugin's hook that names its plugin's
+/// folder, also in `root`; in a file, beside that file too. Err: a part runs what cannot be read, a file that does not
+/// read as text, or more files than a hook should have.
+pub fn files(command: &str, root: &Path, cwd: &Path, home: &Path, plugin: bool) -> Result<Vec<(PathBuf, String)>, String> {
+    let mut todo = super::command::runs(command, root, cwd, home)?;
+    let in_root = plugin && (command.contains("PLUGIN_ROOT"));
+    let text = super::command::known(command, root, home);
+    let bases: Vec<&Path> = if in_root { vec![cwd, root] } else { vec![cwd] };
+    todo.extend(named(&text).iter().flat_map(|n| files_of(n, &bases, home)));
     let mut seen: Vec<(PathBuf, String)> = vec![];
     while let Some(f) = todo.pop() {
         if seen.iter().any(|(p, _)| *p == f) { continue; }
         if seen.len() >= MOST { return Err(format!("it runs more than {MOST} files")); }
         let text = std::fs::read_to_string(&f).map_err(|e| format!("{} does not read as text ({e})", f.display()))?;
         let base = f.parent().map(Path::to_path_buf).unwrap_or_default();
-        todo.extend(named(&text).iter().filter_map(|n| file_of(n, &base, root, home)));
+        let bases: Vec<&Path> = if plugin { vec![&base, cwd, root] } else { vec![&base, cwd] };
+        todo.extend(named(&text).iter().flat_map(|n| files_of(n, &bases, home)));
         seen.push((f, text));
     }
     Ok(seen)
-}
-
-/// Programs that run the file or the code they are given, which the board reads instead.
-const READERS: [&str; 12] = ["sh", "bash", "zsh", "dash", "node", "python", "python3", "ruby", "perl", "deno", "bun", "pwsh"];
-static RUNTIME: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"`|\$\(|\$\{?[A-Za-z_]").unwrap());
-
-/// The file the command starts, when it starts one: Err when what it runs cannot be read before it runs (a value
-/// only known then, a program called by name, a file that is not there), so nothing unread is ever trusted.
-fn runs(command: &str, root: &Path, home: &Path) -> Result<Option<PathBuf>, String> {
-    let r = root.display().to_string();
-    let h = home.display().to_string();
-    let known = command.replace("${CLAUDE_PLUGIN_ROOT}", &r).replace("$CLAUDE_PLUGIN_ROOT", &r).replace("${PLUGIN_ROOT}", &r).replace("$PLUGIN_ROOT", &r).replace("${HOME}", &h).replace("$HOME", &h);
-    if RUNTIME.is_match(&known) { return Err("what it runs is only known when it runs (a `$` value or a command inside it)".into()); }
-    let words: Vec<String> = known.split_whitespace().map(|w| w.trim_matches(|c| c == '\'' || c == '"').to_string()).skip_while(|w| w.contains('=') && !w.starts_with('-')).collect();
-    let find = |w: &str| file_of(w, root, root, home).or_else(|| [root.join(w), PathBuf::from(w)].into_iter().find(|p| p.is_file()).map(|p| clean(&p)));
-    let Some(first) = words.first() else { return Err("its command is empty".into()) };
-    let program = first.rsplit('/').next().unwrap_or(first);
-    if !READERS.contains(&program) { return find(first).map(Some).ok_or_else(|| format!("it runs `{first}`, which the board does not read")); }
-    match words.iter().skip(1).find(|w| !w.starts_with('-') || ["-e", "-c", "--eval"].contains(&w.as_str())) {
-        Some(w) if w.starts_with('-') => Ok(None), // its code is in the command itself, read as it is
-        Some(w) => find(w).map(Some).ok_or_else(|| format!("it runs {w}, which is not there to read")),
-        None => Err(format!("`{first}` reads what it runs from its input, which the board cannot read")),
-    }
 }

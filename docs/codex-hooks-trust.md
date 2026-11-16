@@ -26,21 +26,24 @@ and answers only when every one of them passes:
 3. Each of them must be yours:
    - **a plugin you allowed** (`board.trustHookPlugins`, as `id=git address`, Ponytail at first): enabled in Codex's
      config.toml, installed from that address, its checkout a clone of it with no change of its own and on its default
-     branch, and every file the hook runs inside it;
+     branch, and every file the hook runs inside it and on disk as at that commit;
    - **or a file of a repo you allowed** (`board.trustHookRepos`, `owner/name` on GitHub, `GigiTiti-Kai/dotfiles` at
      first): the hooks file and every file the hook runs tracked there, and on disk the same as on the repo's default
      branch at origin. Nothing in the repo the seat works in is trusted by the board: that is the work under review, and
      its git could be made to say anything. Nor is a hook in a file git does not keep (`~/.codex/hooks.json`).
-4. What each hook runs is read: its command, the files it names, and those they name in turn. A command whose target is
+4. What each hook runs is read: every part of its command (`a && b; c`), what it gives a shell (`sh -c '…'`, read as a
+   command again) or a program (`node -e '…'`, which may not start other programs), the files it names, and those they
+   name in turn. A name without a path is the seat's folder's, as Codex runs the hook there. A part whose target is
    known only when it runs (a `$` value other than the plugin's folder or `$HOME`, a command inside it), that calls a
-   program by name instead of a file (`make hook`), or names a file that is not there, is not trusted. A hook that sends over the
-   network, reads secrets (`~/.ssh`, `auth.json`, tokens, `history.jsonl`), deletes a tree or history, or runs hidden code
-   (`eval`, base64 into a shell) is not trusted.
+   program by name instead of a file (`make hook`, `rm`), or names a file that is not there, is not trusted. Nor is a
+   hook that sends over the network, reads secrets (`~/.ssh`, `auth.json`, tokens, `history.jsonl`), deletes a tree or
+   history, or runs hidden code (`eval`, base64 into a shell).
 5. All passed: the board types the number of "Trust all and continue", checks that line is the chosen one, and presses
    enter; then checks the dialog is gone. Codex writes the trust in its own config.toml, as when you press it.
 
-Anything else, and the board presses nothing: the seat waits for you, as before. A reviewer's row says why
-(`The reviewer's Codex asks to trust its hooks, and the board did not: …`); a worker's row says it needs you.
+Anything else, and the board presses nothing: the seat waits for you (needs you). A reviewer's row says why
+(`The reviewer's Codex asks to trust its hooks, and the board did not: …`), and its review waits however long you take:
+`review.timeout` counts again only once you answered. A worker's row says it needs you.
 
 Each judgement, trusted or not, is one line of `hooks-trust.log` in the board's data folder: the seat, its pane and
 folder, and for each hook its event, where it comes from and what was read, or the reason it was not trusted.

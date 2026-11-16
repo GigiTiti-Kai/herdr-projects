@@ -68,8 +68,9 @@ pub fn agent(f: &F, verb: &str, arg2: &str, argv: &[String], flag: &dyn Fn(&str)
             st["panes"][pi]["agent"] = a;
             if refused { return fail("invalid_input", &canonical); }
             let d = st.at("dialogs").i(&kind);
-            // `dialogScreen`: per kind, what the dialog shows (Codex's hooks review).
-            if d > 0 { st["dialogs"][&kind] = json!(d - 1); st["panes"][pi]["agent"]["status"] = json!("blocked"); if st.at("dialogScreen").b(&kind) { st["panes"][pi]["agent"]["screen"] = st["dialogScreen"][&kind].clone(); } return fail("agent_not_ready", &format!("agent {arg2} is blocked during startup and is not ready for prompts")); }
+            // `dialogScreen`: per kind, what the dialog shows (Codex's hooks review); `dialogThen`: what follows after
+            // `dialogAfter` looks at it (you answering it).
+            if d > 0 { st["dialogs"][&kind] = json!(d - 1); st["panes"][pi]["agent"]["status"] = json!("blocked"); if st.at("dialogScreen").b(&kind) { st["panes"][pi]["agent"]["screen"] = st["dialogScreen"][&kind].clone(); } if st.at("dialogThen").b(&kind) { let (then, n) = (st["dialogThen"][&kind].clone(), st.at("dialogAfter").i(&kind).max(1)); let a = &mut st["panes"][pi]["agent"]; a["then"] = then; a["thenIn"] = json!(n); } return fail("agent_not_ready", &format!("agent {arg2} is blocked during startup and is not ready for prompts")); }
             let p = st["panes"][pi].clone();
             return ok(json!({ "type": "agent_started", "agent": F::agent_out(&p) }));
         }

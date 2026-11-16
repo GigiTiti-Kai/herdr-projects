@@ -45,6 +45,15 @@ pub fn plugin(h: &Hook, a: &Allowed, config: &toml::Table) -> Result<(PathBuf, S
     Ok((root, format!("plugin {id} from {url}, its checkout clean at {head} on {main}")))
 }
 
+/// A file of a plugin's checkout, tracked, and on disk the same as at its commit: a change git is told to look away from
+/// (`--skip-worktree`), or a file it ignores, does not pass for the plugin's own.
+pub fn plugin_file(root: &Path, f: &Path) -> Result<(), String> {
+    let rel = real(f).strip_prefix(real(root)).map(|r| r.display().to_string()).map_err(|_| format!("{} is not in the plugin's own folder", f.display()))?;
+    let at = git_out(root, &["rev-parse", &format!("HEAD:{rel}")]).map_err(|_| format!("{rel} is not one of the plugin's own files at its commit"))?;
+    if git_out(root, &["hash-object", "--", &rel]).ok().as_deref() != Some(at.as_str()) { return Err(format!("{rel} is not as at the plugin's commit")); }
+    Ok(())
+}
+
 /// The repo's default branch at origin, as its remote-tracking ref: `origin/HEAD` only when it names one of origin's
 /// branches (a link of it to a local branch would make a work branch look like origin's).
 fn default_branch(top: &Path) -> Option<String> {

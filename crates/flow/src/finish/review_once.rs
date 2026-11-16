@@ -99,7 +99,8 @@ pub fn review_once(id: &str, g: &mut Guard, text: &str, change: Option<&Value>, 
             mark_cell.borrow().as_ref().and_then(|m| crate::submit::shown(&rkind, None, &s, &folder, m, &brief))
         };
         let reads = crate::agents::kinds::kind(&rkind).map(|k| k.reads_turn).unwrap_or(false);
-        let until = review_until(ch);
+        let mut until = review_until(ch);
+        let mut held_since: Option<i64> = None; // since when hooks the board did not trust wait for you
         let every = ms("HERDR_PROJECTS_POLL_MS", 3000);
         let (mut sent, mut sent_at, mut quiet_since, mut comp_at_send) = (false, 0i64, 0i64, Value::Null);
         let mut waited: Vec<i64> = vec![]; // its own turn-end reports while its helpers were still at work
@@ -127,7 +128,7 @@ pub fn review_once(id: &str, g: &mut Guard, text: &str, change: Option<&Value>, 
                     Err(e) => { error = crate::text::squash(&e.msg).chars().take(400).collect(); if error.is_empty() { error = "no valid verdict".into(); } break; }
                 }
             }
-            if until.is_some_and(|u| now() > u) { error = timed_out("review", ch); break; }
+            if held_since.is_none() && until.is_some_and(|u| now() > u) { error = timed_out("review", ch); break; }
             let cur = get(id).ok_or("the task is gone")?;
             // The reviewer's own turn-end report for this round, and still no verdict: the review failed, at once.
             let rev = pending_events(&cur).into_iter().find(|e| e.s("role") == "reviewer" && e.i("round") == round && !e.b("side") && e.i("at") >= started_at && !waited.contains(&e.i("n")));
@@ -148,6 +149,9 @@ pub fn review_once(id: &str, g: &mut Guard, text: &str, change: Option<&Value>, 
             if blocked && !sent && rkind == "codex" && hooks_said.is_none() { // only at its start, before its brief went in
                 match codex_hooks::press::answer(&api, &pane, &folder, &format!("{id} reviewer")) { Answer::Trusted => { hooks_said = Some(String::new()); blocked = false; } Answer::Refused(w) => hooks_said = Some(w), Answer::NotIt => {} }
             }
+            // Hooks the board did not trust wait for you, however long: the review's own time goes on once you answered.
+            let hold = blocked && hooks_said.as_deref().is_some_and(|w| !w.is_empty());
+            match (hold, held_since) { (true, None) => held_since = Some(now()), (false, Some(s)) => { until = until.map(|u| u + now() - s); held_since = None; } _ => {} }
             let dialog = match hooks_said.as_deref() { Some(w) if !w.is_empty() => format!("The reviewer's Codex asks to trust its hooks, and the board did not: {w}. Open it and answer"), _ => "The reviewer shows a dialog: open it and answer".into() };
             if blocked && (cur.s("stage") == "reviewing" || (cur.s("stage") == "reviewneeds" && cur.s("msg") != dialog)) { g.set(|t| { t.put("stage", "reviewneeds"); t.put("msg", dialog.clone()); })?; g.allow(&["reviewing"]); }
             else if !blocked && cur.s("stage") == "reviewneeds" { g.set(|t| { t.put("stage", "reviewing"); t.put("msg", "Under review"); })?; g.allow(&["reviewneeds"]); }

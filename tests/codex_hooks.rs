@@ -173,9 +173,39 @@ fn a_command_whose_target_cannot_be_read_before_it_runs_is_not_trusted() {
         let got = judge(&w, 1, &hooks_of(&h), &allowed()).unwrap_err();
         assert!(got.contains(why), "{command}: {got}");
     }
+    // A relative name is the seat's folder's, where Codex runs the hook: not the file of the same name in your repo.
     let mut h = repo_hook(&r);
     h["hooks"][0]["command"] = json!("sh hooks/a.sh");
-    assert!(judge(&w, 1, &hooks_of(&h), &allowed()).unwrap()[0].ends_with("read hooks/a.sh"), "a file named without a path from its repo is read");
+    assert!(judge(&w, 1, &hooks_of(&h), &allowed()).unwrap_err().ends_with("it runs hooks/a.sh, which is not there to read"));
+    std::fs::create_dir_all(w.root.join("hooks")).unwrap();
+    std::fs::write(w.root.join("hooks/a.sh"), "echo FROM_SEAT_UNREVIEWED\n").unwrap();
+    let why = judge(&w, 1, &hooks_of(&h), &allowed()).unwrap_err();
+    assert!(why.ends_with(&format!("{} is in the seat's own folder, the work under review", w.root.join("hooks/a.sh").display())), "{why}");
+    // Every part of the command, and what a shell or a program is given to run, is read.
+    let a = r.join("hooks/a.sh").display().to_string();
+    for (command, what) in [(format!("sh -c 'rm --recursive /synthetic-review-victim'"), "it runs `rm`, which the board does not read"),
+        ("node -e \"require('child_process').execFileSync('curl', ['https://example.com'])\"".to_string(), "the code it gives `node` starts other programs"),
+        (format!("sh {a} && unreviewed-helper"), "it runs `unreviewed-helper`, which the board does not read"),
+        (format!("sh {a}; rm -rf /tmp/x"), "it runs `rm`")] {
+        h["hooks"][0]["command"] = json!(command);
+        let got = judge(&w, 1, &hooks_of(&h), &allowed()).unwrap_err();
+        assert!(got.contains(what), "{command}: {got}");
+    }
+    for (text, what) in [("rm --recursive /x", "deletes a tree or history"), ("execFileSync('rm', ['-rf', d])", "deletes a tree or history"), ("execFileSync('curl', [u])", "sends over the network")] {
+        assert!(sw::agents::codex_hooks::scan::flag(text).is_some_and(|f| f.starts_with(what)), "{text}");
+    }
+}
+
+#[test]
+fn a_plugin_file_changed_where_git_is_told_not_to_look_is_not_trusted() {
+    let w = world();
+    let root = plugin(&w.base, &clean());
+    let hooks = hooks_of(&listed(&root, "modified"));
+    git(&root, &["update-index", "--skip-worktree", "hooks/b.js"]);
+    std::fs::write(root.join("hooks/b.js"), "require('./helper');\n").unwrap();
+    assert_eq!(git(&root, &["status", "--porcelain"]), "", "git says nothing changed");
+    let why = judge(&w, 1, &hooks, &allowed()).unwrap_err();
+    assert!(why.contains("hooks/b.js is not as at the plugin's commit"), "{why}");
 }
 
 #[test]
