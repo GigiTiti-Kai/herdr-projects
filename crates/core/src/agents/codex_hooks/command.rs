@@ -45,6 +45,9 @@ fn parts(s: &str) -> Result<Vec<Vec<String>>, String> {
     Ok(out)
 }
 
+/// Every word of the command, its quotes taken off: what the code it gives a program names is then in plain sight.
+pub fn words(command: &str) -> Vec<String> { parts(command).unwrap_or_default().into_iter().flatten().collect() }
+
 /// A name the command gives as a file: absolute, from home, or in the seat's folder.
 fn file(w: &str, cwd: &Path, home: &Path) -> Option<PathBuf> {
     let p = if let Some(rest) = w.strip_prefix("~/") { home.join(rest) } else if w.starts_with('/') { PathBuf::from(w) } else { cwd.join(w) };
@@ -73,6 +76,8 @@ pub fn runs(command: &str, root: &Path, cwd: &Path, home: &Path) -> Result<Vec<P
             Some("-c") if SHELLS.contains(&program) => out.extend(runs(rest, root, cwd, home)?),
             Some("-e" | "--eval") if program == "node" => {
                 if STARTS.is_match(rest) { return Err(format!("the code it gives `{program}` starts other programs or loads code by a name")); }
+                // A file it loads by a path is found the way node finds it (`.node`, `.json`, a folder's own), not read.
+                if let Some(n) = super::scan::loads(rest).into_iter().find(|n| n.starts_with('.') || n.starts_with('/')) { return Err(format!("the code it gives `{program}` loads {n}: give `{program}` the file itself, so it is read")); }
                 // Anything after its code that is an option is still `node`'s own (`--require ./x`).
                 if let Some(o) = words.iter().skip(3).find(|w| w.starts_with('-')) { return Err(format!("it gives `{program}` the option {o}, which the board does not judge")); }
             }

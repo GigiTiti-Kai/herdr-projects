@@ -204,7 +204,15 @@ fn a_command_whose_target_cannot_be_read_before_it_runs_is_not_trusted() {
         let got = judge(&w, 1, &hooks_of(&h), &allowed()).unwrap_err();
         assert!(got.contains(what), "{command}: {got}");
     }
-    for (text, what) in [("const h = require(`node:http`); h.get(u)", "sends over the network"), ("const http = require ('node:http'); http.get(u)", "sends over the network"), ("import('node:https').then(h => h.get(u))", "sends over the network"),
+    // Code given to node that loads a file by a path: node finds it its own way (`.node`, a folder), so it is refused.
+    std::fs::create_dir_all(w.root.join("lib")).unwrap();
+    std::fs::write(w.root.join("lib/hook.js"), "console.log('FROM_SEAT_UNREVIEWED')\n").unwrap();
+    h["hooks"][0]["command"] = json!("node -e \"require('./lib/hook')\"");
+    assert!(judge(&w, 1, &hooks_of(&h), &allowed()).unwrap_err().contains("the code it gives `node` loads ./lib/hook"));
+    h["hooks"][0]["command"] = json!("node -e \"require('fs').rmSync(require('path').join(require('os').homedir(),'x'),{recursive:true})\"");
+    assert!(judge(&w, 1, &hooks_of(&h), &allowed()).unwrap_err().contains("deletes a tree or history"));
+    for (text, what) in [("const { rm } = require('node:fs/promises'); await rm(d, { recursive: true })", "deletes a tree or history"), ("fs.promises.rmdir(d, { recursive: true })", "deletes a tree or history"),
+        ("require 'net/http'; Net::HTTP.post(u, d)", "sends over the network"), ("const h = require(`node:http`); h.get(u)", "sends over the network"), ("const http = require ('node:http'); http.get(u)", "sends over the network"), ("import('node:https').then(h => h.get(u))", "sends over the network"),
         ("import { request } from \"http\";", "sends over the network"), ("globalThis.fetch (u)", "sends over the network"), ("rm --recursive /x", "deletes a tree or history"), ("execFileSync('rm', ['-rf', d])", "deletes a tree or history"), ("execFileSync('curl', [u])", "sends over the network")] {
         assert!(sw::agents::codex_hooks::scan::flag(text).is_some_and(|f| f.starts_with(what)), "{text}");
     }
@@ -216,7 +224,7 @@ fn a_plugin_file_changed_where_git_is_told_not_to_look_is_not_trusted() {
     let root = plugin(&w.base, &clean());
     let hooks = hooks_of(&listed(&root, "modified"));
     git(&root, &["update-index", "--skip-worktree", "hooks/b.js"]);
-    std::fs::write(root.join("hooks/b.js"), "require('./helper');\n").unwrap();
+    std::fs::write(root.join("hooks/b.js"), "exports.go = () => 2;\n").unwrap();
     assert_eq!(git(&root, &["status", "--porcelain"]), "", "git says nothing changed");
     let why = judge(&w, 1, &hooks, &allowed()).unwrap_err();
     assert!(why.contains("hooks/b.js is not as at the plugin's commit"), "{why}");
@@ -225,10 +233,24 @@ fn a_plugin_file_changed_where_git_is_told_not_to_look_is_not_trusted() {
     git(&root, &["checkout", "--", "hooks/b.js"]);
     assert!(judge(&w, 1, &hooks, &allowed()).is_ok());
     git(&root, &["update-index", "--assume-unchanged", "hooks/a.js"]);
-    std::fs::write(root.join("hooks/a.js"), "require('./helper');\n").unwrap();
+    std::fs::write(root.join("hooks/a.js"), "exports.go = () => 2;\n").unwrap();
     assert_eq!(git(&root, &["status", "--porcelain"]), "");
     assert!(judge(&w, 1, &hooks, &allowed()).unwrap_err().contains("hooks/a.js is not as at the plugin's commit"));
+    git(&root, &["update-index", "--no-assume-unchanged", "hooks/a.js"]);
+    git(&root, &["checkout", "--", "hooks/a.js"]);
+    // A filter of the checkout's own that hands git the committed bytes, whatever is on disk.
+    std::fs::write(root.join(".git/info/attributes"), "hooks/b.js filter=same\n").unwrap();
+    git(&root, &["config", "filter.same.clean", "git cat-file blob HEAD:%f"]);
+    git(&root, &["update-index", "--skip-worktree", "hooks/b.js"]);
+    std::fs::write(root.join("hooks/b.js"), "exports.go = () => 2;\n").unwrap();
+    assert!(judge(&w, 1, &hooks, &allowed()).unwrap_err().contains("hooks/b.js is not as at the plugin's commit"), "through a filter");
     let r = own_repo(&w.base);
+    std::fs::write(r.join(".git/info/attributes"), "hooks/a.sh filter=same\n").unwrap();
+    git(&r, &["config", "filter.same.clean", "git cat-file blob HEAD:%f"]);
+    std::fs::write(r.join("hooks/a.sh"), "#!/bin/sh\necho through a filter\n").unwrap();
+    assert!(judge(&w, 1, &hooks_of(&repo_hook(&r)), &allowed()).unwrap_err().contains("hooks/a.sh in me/dots is not the same as on origin/main"), "repo through a filter");
+    git(&r, &["checkout", "--", "hooks/a.sh"]);
+    std::fs::remove_file(r.join(".git/info/attributes")).unwrap();
     git(&r, &["update-index", "--assume-unchanged", "hooks/a.sh"]);
     std::fs::write(r.join("hooks/a.sh"), "#!/bin/sh\necho changed\n").unwrap();
     assert!(judge(&w, 1, &hooks_of(&repo_hook(&r)), &allowed()).unwrap_err().contains("hooks/a.sh in me/dots is not the same as on origin/main"));
@@ -240,4 +262,15 @@ fn the_dialogs_words_higher_up_the_screen_are_not_the_dialog() {
     assert_eq!(dialog::count(&quoted), Some(3), "still the last ten lines");
     let far = format!("{}{}", screen(3), (1..=10).map(|n| format!("later line {n}\n")).collect::<String>());
     assert_eq!(dialog::count(&far), None);
+}
+
+#[test]
+fn a_file_loaded_as_something_node_finds_but_the_board_cannot_read_is_not_trusted() {
+    let w = world();
+    // A file it loads that node would find as something the board cannot read (a native `.node`).
+    let p2 = plugin(&w.base, &[("hooks/hooks.json", "{}"), ("hooks/a.js", "require('./native');\n"), ("hooks/native.node", "\u{0}\u{1}")]);
+    std::fs::write(p2.join("hooks/native.node"), [0xffu8, 0xfe, 0x00]).unwrap();
+    put(&p2, &[]);
+    publish(&p2);
+    assert!(judge(&w, 1, &hooks_of(&listed(&p2, "modified")), &allowed()).unwrap_err().contains("native.node does not read as text"));
 }

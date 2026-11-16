@@ -50,15 +50,18 @@ pub fn answer(api: &Herdr, pane: &str, cwd: &Path, who: &str) -> Answer {
     }
 }
 
+/// Why herdr did not take a key, never empty: an empty reason would read as trusted.
+fn said(e: crate::herdr::HerdrError) -> String { if e.message.trim().is_empty() { format!("herdr did not take the key ({})", e.code) } else { e.message } }
+
 fn press(api: &Herdr, pane: &str) -> Result<(), String> {
     let s = screen(api, pane);
     if dialog::count(&s).is_none() { return Err("the dialog went away before it was answered".into()); }
     let (number, chosen) = dialog::trust_line(&s).ok_or("its \"Trust all and continue\" line is not on the screen")?;
     if !chosen {
-        api.pane_text(pane, &number).map_err(|e| e.message)?;
+        api.pane_text(pane, &number).map_err(said)?;
         if !soon(|| { let s = screen(api, pane); dialog::count(&s).is_some() && dialog::trust_line(&s).is_some_and(|(_, c)| c) }) { return Err(format!("\"Trust all and continue\" was not chosen after {number} was typed, so nothing was confirmed")); }
     }
-    api.agent_keys(pane, &["enter"]).map_err(|e| e.message)?;
+    api.agent_keys(pane, &["enter"]).map_err(said)?;
     if !soon(|| dialog::count(&screen(api, pane)).is_none()) { return Err("enter was pressed on \"Trust all and continue\", and the dialog is still there".into()); }
     Ok(())
 }

@@ -26,7 +26,8 @@ and answers only when every one of them passes:
 3. Each of them must be yours:
    - **a plugin you allowed** (`board.trustHookPlugins`, as `id=git address`, Ponytail at first): enabled in Codex's
      config.toml, installed from that address, its checkout a clone of it with no change of its own and on its default
-     branch, and every file the hook runs inside it and on disk as at that commit;
+     branch, and every file the hook runs inside it and on disk, byte for byte (no filter or `--skip-worktree` of the
+     checkout in between), as at that commit;
    - **or a file of a repo you allowed** (`board.trustHookRepos`, `owner/name` on GitHub, `GigiTiti-Kai/dotfiles` at
      first): the hooks file and every file the hook runs tracked there, and on disk the same as on the repo's default
      branch at origin. Nothing in the repo the seat works in is trusted by the board: that is the work under review, and
@@ -38,8 +39,9 @@ and answers only when every one of them passes:
    file, and a name without one is the seat's folder's, as Codex runs the hook there. The files it names are read, and
    those they name in turn. Not trusted: a part known only when it runs (a `$` value other than the plugin's folder or
    `$HOME`, a command inside it), a program called by name (`make hook`, `rm`), a file that is not there, code given to
-   `node` that starts programs or imports, a module loaded by name that is not one of Node's own (it would be found
-   where the hook runs), a network module loaded any way (`require(`node:http`)`, `import('https')`), `fetch`, `curl`,
+   `node` that starts programs, imports, or loads a file by a path (give `node` the file instead, so it is read), a module loaded by name that is not one of Node's own (it would be found
+   where the hook runs), a network module loaded any way (`require(`node:http`)`, `import('https')`, Ruby's `net/http`), a removal with
+   `recursive` in it, a file it loads that is not there to read as text (a native `.node`), `fetch`, `curl`,
    secrets (`~/.ssh`, `auth.json`, tokens, `history.jsonl`), deleting a tree or history, or hidden code (`eval`,
    base64 into a shell).
 5. All passed: the board types the number of "Trust all and continue", checks that line is the chosen one, and presses

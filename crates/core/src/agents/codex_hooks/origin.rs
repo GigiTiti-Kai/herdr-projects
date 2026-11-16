@@ -50,7 +50,7 @@ pub fn plugin(h: &Hook, a: &Allowed, config: &toml::Table) -> Result<(PathBuf, S
 pub fn plugin_file(root: &Path, f: &Path) -> Result<(), String> {
     let rel = real(f).strip_prefix(real(root)).map(|r| r.display().to_string()).map_err(|_| format!("{} is not in the plugin's own folder", f.display()))?;
     let at = git_out(root, &["rev-parse", &format!("HEAD:{rel}")]).map_err(|_| format!("{rel} is not one of the plugin's own files at its commit"))?;
-    if git_out(root, &["hash-object", "--", &rel]).ok().as_deref() != Some(at.as_str()) { return Err(format!("{rel} is not as at the plugin's commit")); }
+    if git_out(root, &["hash-object", "--no-filters", "--", &rel]).ok().as_deref() != Some(at.as_str()) { return Err(format!("{rel} is not as at the plugin's commit")); }
     Ok(())
 }
 
@@ -64,7 +64,8 @@ fn default_branch(top: &Path) -> Option<String> {
 }
 
 /// A file in one of the human's repos, tracked, and on disk the same as on its default branch at origin: its repo's
-/// folder, and what shows it. What is on disk is compared, so a file git is told to look away from still counts.
+/// folder, and what shows it. The bytes on disk are compared (no filter of the repo's own in between), so a file git
+/// is told to look away from, or told to read through a filter, still counts as what it is.
 pub fn owned_file(f: &Path, a: &Allowed) -> Result<(PathBuf, String), String> {
     let dir = f.parent().unwrap_or(Path::new("/"));
     let top = git_out(dir, &["rev-parse", "--show-toplevel"]).map(PathBuf::from).map_err(|_| format!("{} is in no git repo", f.display()))?;
@@ -76,6 +77,6 @@ pub fn owned_file(f: &Path, a: &Allowed) -> Result<(PathBuf, String), String> {
     if git_out(&top, &["ls-files", "--error-unmatch", "--", &rel]).is_err() { return Err(format!("{rel} in {name} is not tracked by git")); }
     let main = default_branch(&top).ok_or_else(|| format!("{name} has no default branch at origin to compare {rel} with"))?;
     let on_main = git_out(&top, &["rev-parse", &format!("{main}:{rel}")]).ok();
-    if on_main.is_none() || on_main != git_out(&top, &["hash-object", "--", &rel]).ok() { return Err(format!("{rel} in {name} is not the same as on {main}")); }
+    if on_main.is_none() || on_main != git_out(&top, &["hash-object", "--no-filters", "--", &rel]).ok() { return Err(format!("{rel} in {name} is not the same as on {main}")); }
     Ok((top, format!("{rel} in {name}, the same as on {main}")))
 }
