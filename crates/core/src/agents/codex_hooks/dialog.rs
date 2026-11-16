@@ -7,10 +7,14 @@ static COUNT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\b(\d+) hooks? (?:
 static TRUST: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^[\s│]*(›)?\s*(\d)\.\s+Trust all and continue").unwrap());
 
 /// How many hooks the screen says are new or changed. None when the screen is not Codex's hooks review.
+/// The dialog is all of it, at the bottom of the screen: its title, its count and its three lines, so a screen that only
+/// shows those words higher up (an agent quoting them) is not it.
 pub fn count(screen: &str) -> Option<usize> {
-    if !screen.contains("Hooks need review") { return None; }
-    trust_line(screen)?;
-    COUNT.captures(screen)?.get(1)?.as_str().parse().ok()
+    let lines: Vec<&str> = screen.lines().filter(|l| !l.trim().is_empty()).collect();
+    let bottom = lines[lines.len().saturating_sub(10)..].join("\n");
+    if !["Hooks need review", "1. Review hooks", "3. Continue without trusting"].iter().all(|w| bottom.contains(w)) { return None; }
+    trust_line(&bottom)?;
+    COUNT.captures(&bottom)?.get(1)?.as_str().parse().ok()
 }
 
 /// The number of the screen's "Trust all and continue" line, and whether it is the chosen one (`›` in front of it).

@@ -145,7 +145,7 @@ pub fn review_once(id: &str, g: &mut Guard, text: &str, change: Option<&Value>, 
             let mut blocked = a.as_ref().map(|a| a.s("agent_status") == "blocked").unwrap_or(false);
             // Codex's hooks review is answered by the board when every hook is the human's own (agents/codex_hooks): once a stop.
             if !blocked { hooks_said = None; }
-            if blocked && rkind == "codex" && hooks_said.is_none() {
+            if blocked && !sent && rkind == "codex" && hooks_said.is_none() { // only at its start, before its brief went in
                 match codex_hooks::press::answer(&api, &pane, &folder, &format!("{id} reviewer")) { Answer::Trusted => { hooks_said = Some(String::new()); blocked = false; } Answer::Refused(w) => hooks_said = Some(w), Answer::NotIt => {} }
             }
             let dialog = match hooks_said.as_deref() { Some(w) if !w.is_empty() => format!("The reviewer's Codex asks to trust its hooks, and the board did not: {w}. Open it and answer"), _ => "The reviewer shows a dialog: open it and answer".into() };

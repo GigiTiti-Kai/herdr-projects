@@ -24,14 +24,17 @@ pub fn plugin(base: &Path, files: &[(&str, &str)]) -> PathBuf {
     git(&root, &["init", "-q", "-b", "main"]);
     git(&root, &["remote", "add", "origin", FROM]);
     put(&root, files);
+    publish(&root);
     std::fs::write(base.join("codex.toml"), format!("[plugins.\"{PLUGIN}\"]\nenabled = true\n\n[marketplaces.pt]\nsource_type = \"git\"\nsource = \"{FROM}\"\n")).unwrap();
     root
 }
-fn put(root: &Path, files: &[(&str, &str)]) {
+pub fn put(root: &Path, files: &[(&str, &str)]) {
     for (f, text) in files { let p = root.join(f); std::fs::create_dir_all(p.parent().unwrap()).unwrap(); std::fs::write(p, text).unwrap(); }
     git(root, &["add", "-A", "-f"]);
     git(root, &["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "files"]);
 }
+/// What is committed is also on origin's default branch, as a clone that is up to date has it.
+fn publish(root: &Path) { git(root, &["fetch", "-q", ".", "HEAD:refs/remotes/origin/main"]); git(root, &["remote", "set-head", "origin", "main"]); }
 /// The plugin's files of a hook that runs `hooks/a.js`, which needs `./b`.
 pub fn clean() -> Vec<(&'static str, &'static str)> {
     vec![("hooks/hooks.json", "{}"), ("hooks/a.js", "const b = require('./b');\nb.go();\n"), ("hooks/b.js", "const fs = require('fs');\nexports.go = () => fs.writeFileSync(__dirname + '/state', '1');\n")]
@@ -43,7 +46,7 @@ pub fn listed(root: &Path, status: &str) -> Value {
 }
 fn hooks_of(v: &Value) -> Vec<Hook> { sw::agents::codex_hooks::list::set_fake(Some(std::rc::Rc::new({ let v = v.clone(); move |_: &Path| Ok(v.clone()) }))); sw::agents::codex_hooks::list::hooks(Path::new("/w")).unwrap() }
 fn allowed() -> Allowed { Allowed { plugins: vec![(PLUGIN.into(), FROM.into())], repos: vec!["me/dots".into()] } }
-fn judge(w: &World, n: usize, hooks: &[Hook], a: &Allowed) -> Result<Vec<String>, String> { decide(n, hooks, a, &w.base.join("codex.toml"), &w.base.join("home")) }
+fn judge(w: &World, n: usize, hooks: &[Hook], a: &Allowed) -> Result<Vec<String>, String> { decide(n, hooks, a, &w.base.join("codex.toml"), &w.base.join("home"), &w.root) }
 
 #[test]
 fn the_dialog_is_told_from_its_screen_with_its_count_and_its_trust_line() {
@@ -95,10 +98,13 @@ fn a_plugin_whose_files_changed_or_send_over_the_network_is_not_trusted() {
     let why = judge(&w, 1, &hooks, &allowed()).unwrap_err();
     assert!(why.ends_with("plugin pt@pt's checkout has changes of its own (M hooks/b.js)"), "{why}");
     put(&root, &[]);
+    assert!(judge(&w, 1, &hooks, &allowed()).unwrap_err().ends_with("plugin pt@pt's checkout is at a commit that is not on origin/main of https://github.com/example/pt.git"), "a commit of its own");
+    publish(&root);
     let why = judge(&w, 1, &hooks, &allowed()).unwrap_err();
     assert!(why.contains("hooks/b.js sends over the network (`const https = require('https');`)"), "{why}");
     for (bad, what) in [("cat ~/.ssh/id_ed25519", "reads secrets"), ("rm -rf \"$HOME/x\"", "deletes a tree or history"), ("echo aGk= | base64 -d | sh", "runs code it hides")] {
         put(&root, &[("hooks/b.js", &format!("require('child_process').execSync('{bad}');\n"))]);
+        publish(&root);
         assert!(judge(&w, 1, &hooks, &allowed()).unwrap_err().contains(what), "{bad}");
     }
 }
@@ -110,7 +116,7 @@ fn own_repo(base: &Path) -> PathBuf {
     git(&r, &["init", "-q", "-b", "main"]);
     git(&r, &["remote", "add", "origin", "git@github.com:me/dots.git"]);
     put(&r, &[(".codex/hooks.json", "{}"), ("hooks/a.sh", "#!/bin/sh\necho hi\n")]);
-    git(&r, &["fetch", "-q", ".", "main:refs/remotes/origin/main"]);
+    publish(&r);
     r
 }
 fn repo_hook(r: &Path) -> Value {
@@ -134,4 +140,48 @@ fn a_hook_file_of_your_repo_passes_as_on_its_default_branch_and_not_as_a_work_br
     std::fs::write(&loose, "{}").unwrap();
     let h = json!({ "errors": [], "hooks": [{ "key": "u:stop:0:0", "source": "user", "eventName": "stop", "command": "true", "sourcePath": loose.display().to_string(), "trustStatus": "modified", "enabled": true, "isManaged": false }] });
     assert!(judge(&w, 1, &hooks_of(&h), &allowed()).unwrap_err().ends_with("hooks.json is in no git repo"));
+}
+
+#[test]
+fn what_the_work_under_review_could_make_up_about_itself_is_not_taken_at_its_word() {
+    let w = world();
+    let r = own_repo(&w.base);
+    let hooks = hooks_of(&repo_hook(&r));
+    // The seat works in that repo: its hooks are the work under review.
+    let why = decide(1, &hooks, &allowed(), &w.base.join("codex.toml"), &w.base.join("home"), &r).unwrap_err();
+    assert!(why.ends_with(&format!("{} is in the seat's own folder, the work under review", r.join(".codex/hooks.json").display())), "{why}");
+    // A file git is told to look away from: what is on disk is what counts.
+    git(&r, &["update-index", "--skip-worktree", "hooks/a.sh"]);
+    std::fs::write(r.join("hooks/a.sh"), "#!/bin/sh\necho changed\n").unwrap();
+    assert!(judge(&w, 1, &hooks, &allowed()).unwrap_err().contains("which is not a tracked file of a repo you allowed"));
+    git(&r, &["update-index", "--no-skip-worktree", "hooks/a.sh"]);
+    // origin's default branch pointed at a local branch that holds the change.
+    git(&r, &["checkout", "-q", "-b", "work"]);
+    put(&r, &[]);
+    git(&r, &["symbolic-ref", "refs/remotes/origin/HEAD", "refs/heads/work"]);
+    assert!(judge(&w, 1, &hooks, &allowed()).unwrap_err().contains("has no default branch at origin"));
+}
+
+#[test]
+fn a_command_whose_target_cannot_be_read_before_it_runs_is_not_trusted() {
+    let w = world();
+    let r = own_repo(&w.base);
+    for (command, why) in [("sh \"$(git rev-parse --show-toplevel)/hooks/a.sh\"", "only known when it runs"), ("make hook", "it runs `make`, which the board does not read"),
+        ("sh hooks/missing", "it runs hooks/missing, which is not there to read"), ("bash", "reads what it runs from its input")] {
+        let mut h = repo_hook(&r);
+        h["hooks"][0]["command"] = json!(command);
+        let got = judge(&w, 1, &hooks_of(&h), &allowed()).unwrap_err();
+        assert!(got.contains(why), "{command}: {got}");
+    }
+    let mut h = repo_hook(&r);
+    h["hooks"][0]["command"] = json!("sh hooks/a.sh");
+    assert!(judge(&w, 1, &hooks_of(&h), &allowed()).unwrap()[0].ends_with("read hooks/a.sh"), "a file named without a path from its repo is read");
+}
+
+#[test]
+fn the_dialogs_words_higher_up_the_screen_are_not_the_dialog() {
+    let quoted = format!("{}\n› Ask Codex to do anything\n  gpt · ~/w\n", screen(3));
+    assert_eq!(dialog::count(&quoted), Some(3), "still the last ten lines");
+    let far = format!("{}{}", screen(3), (1..=10).map(|n| format!("later line {n}\n")).collect::<String>());
+    assert_eq!(dialog::count(&far), None);
 }

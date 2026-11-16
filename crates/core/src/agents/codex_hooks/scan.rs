@@ -54,6 +54,7 @@ fn clean(p: &Path) -> PathBuf { p.components().fold(PathBuf::new(), |mut out, c|
 /// text, or more files than a hook should have.
 pub fn files(command: &str, root: &Path, home: &Path) -> Result<Vec<(PathBuf, String)>, String> {
     let mut todo: Vec<PathBuf> = named(command).iter().filter_map(|n| file_of(n, root, root, home)).collect();
+    todo.extend(runs(command, root, home)?);
     let mut seen: Vec<(PathBuf, String)> = vec![];
     while let Some(f) = todo.pop() {
         if seen.iter().any(|(p, _)| *p == f) { continue; }
@@ -64,4 +65,27 @@ pub fn files(command: &str, root: &Path, home: &Path) -> Result<Vec<(PathBuf, St
         seen.push((f, text));
     }
     Ok(seen)
+}
+
+/// Programs that run the file or the code they are given, which the board reads instead.
+const READERS: [&str; 12] = ["sh", "bash", "zsh", "dash", "node", "python", "python3", "ruby", "perl", "deno", "bun", "pwsh"];
+static RUNTIME: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"`|\$\(|\$\{?[A-Za-z_]").unwrap());
+
+/// The file the command starts, when it starts one: Err when what it runs cannot be read before it runs (a value
+/// only known then, a program called by name, a file that is not there), so nothing unread is ever trusted.
+fn runs(command: &str, root: &Path, home: &Path) -> Result<Option<PathBuf>, String> {
+    let r = root.display().to_string();
+    let h = home.display().to_string();
+    let known = command.replace("${CLAUDE_PLUGIN_ROOT}", &r).replace("$CLAUDE_PLUGIN_ROOT", &r).replace("${PLUGIN_ROOT}", &r).replace("$PLUGIN_ROOT", &r).replace("${HOME}", &h).replace("$HOME", &h);
+    if RUNTIME.is_match(&known) { return Err("what it runs is only known when it runs (a `$` value or a command inside it)".into()); }
+    let words: Vec<String> = known.split_whitespace().map(|w| w.trim_matches(|c| c == '\'' || c == '"').to_string()).skip_while(|w| w.contains('=') && !w.starts_with('-')).collect();
+    let find = |w: &str| file_of(w, root, root, home).or_else(|| [root.join(w), PathBuf::from(w)].into_iter().find(|p| p.is_file()).map(|p| clean(&p)));
+    let Some(first) = words.first() else { return Err("its command is empty".into()) };
+    let program = first.rsplit('/').next().unwrap_or(first);
+    if !READERS.contains(&program) { return find(first).map(Some).ok_or_else(|| format!("it runs `{first}`, which the board does not read")); }
+    match words.iter().skip(1).find(|w| !w.starts_with('-') || ["-e", "-c", "--eval"].contains(&w.as_str())) {
+        Some(w) if w.starts_with('-') => Ok(None), // its code is in the command itself, read as it is
+        Some(w) => find(w).map(Some).ok_or_else(|| format!("it runs {w}, which is not there to read")),
+        None => Err(format!("`{first}` reads what it runs from its input, which the board cannot read")),
+    }
 }

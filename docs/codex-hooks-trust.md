@@ -16,7 +16,8 @@ Codex making its plugin cache again, is enough to bring it back for hooks you tr
 
 ## What the board does
 
-When a seat's Codex shows this dialog at its start (the reviewer's, or a worker's), the board judges the hooks itself
+When a seat's Codex shows this dialog at its start (the reviewer's, or a worker's), before the seat has been given
+its brief, and the dialog is the whole bottom of its screen, the board judges the hooks itself
 and answers only when every one of them passes:
 
 1. It asks Codex for the hooks of the seat's folder (`codex app-server`, `hooks/list`): each hook's event, command, file,
@@ -24,13 +25,15 @@ and answers only when every one of them passes:
 2. The hooks Codex counts as new or changed must be as many as the screen says. Any other number: nothing is pressed.
 3. Each of them must be yours:
    - **a plugin you allowed** (`board.trustHookPlugins`, as `id=git address`, Ponytail at first): enabled in Codex's
-     config.toml, installed from that address, its checkout a clone of it with no change of its own, and every file the
-     hook runs inside it;
+     config.toml, installed from that address, its checkout a clone of it with no change of its own and on its default
+     branch, and every file the hook runs inside it;
    - **or a file of a repo you allowed** (`board.trustHookRepos`, `owner/name` on GitHub, `GigiTiti-Kai/dotfiles` at
-     first): the hooks file and every file the hook runs tracked there, with nothing uncommitted, and the same as on the
-     repo's default branch at origin. A hook a work branch added or changed is never trusted by the board, nor one in a
-     file git does not keep (`~/.codex/hooks.json`).
-4. What each hook runs is read: its command, the files it names, and those they name in turn. A hook that sends over the
+     first): the hooks file and every file the hook runs tracked there, and on disk the same as on the repo's default
+     branch at origin. Nothing in the repo the seat works in is trusted by the board: that is the work under review, and
+     its git could be made to say anything. Nor is a hook in a file git does not keep (`~/.codex/hooks.json`).
+4. What each hook runs is read: its command, the files it names, and those they name in turn. A command whose target is
+   known only when it runs (a `$` value other than the plugin's folder or `$HOME`, a command inside it), that calls a
+   program by name instead of a file (`make hook`), or names a file that is not there, is not trusted. A hook that sends over the
    network, reads secrets (`~/.ssh`, `auth.json`, tokens, `history.jsonl`), deletes a tree or history, or runs hidden code
    (`eval`, base64 into a shell) is not trusted.
 5. All passed: the board types the number of "Trust all and continue", checks that line is the chosen one, and presses
@@ -49,7 +52,9 @@ The board never turns the check off and never starts Codex with `--dangerously-b
 The reading in step 4 looks for plain words, not for what the code does: it stops the plain ways of doing those things,
 not a hidden one, and not what a program the hook calls by name does. It can also stop a hook that only names such a
 thing (a guard script that lists `git push --force` to block it): that one waits for you. The trust rests on where the
-hook comes from first; add to the two lists only what you would trust without reading.
+hook comes from first; add to the two lists only what you would trust without reading. Which commit is origin's default
+branch is read from the local copy of origin's branches, which a program on this machine could move; asking GitHub
+itself would close that.
 
 ## Claude Code
 

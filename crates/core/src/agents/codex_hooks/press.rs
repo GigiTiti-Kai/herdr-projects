@@ -15,8 +15,8 @@ fn screen(api: &Herdr, pane: &str) -> String { read_screen(api, pane, Some("bloc
 /// What the screen shows now, read again a few times over two seconds: a terminal draws what a key did a moment later.
 fn soon(mut ok: impl FnMut() -> bool) -> bool { (0..10).any(|i| { if i > 0 { sleep(200); } ok() }) }
 
-/// One look at a pane's dialog at a time: a second (the seat's own start and the board's watch both seeing it) waits
-/// for nothing and does nothing. A mark older than two minutes is from a look that died.
+/// One look at a pane's dialog at a time: a second (two runs of the board seeing the same seat) waits for nothing and
+/// does nothing. A mark older than two minutes is from a look that died.
 struct Lock(PathBuf);
 impl Lock {
     fn take(pane: &str) -> Option<Lock> {
@@ -41,7 +41,7 @@ pub fn log(who: &str, pane: &str, cwd: &Path, what: &str) {
 pub fn answer(api: &Herdr, pane: &str, cwd: &Path, who: &str) -> Answer {
     let Some(n) = dialog::count(&screen(api, pane)) else { return Answer::NotIt };
     let Some(_lock) = Lock::take(pane) else { return Answer::NotIt };
-    match list::hooks(cwd).and_then(|hs| decide(n, &hs, &allowed(), &codex_file(), &user_home())) {
+    match list::hooks(cwd).and_then(|hs| decide(n, &hs, &allowed(), &codex_file(), &user_home(), cwd)) {
         Err(why) => { log(who, pane, cwd, &format!("not trusted: {why}")); Answer::Refused(why) }
         Ok(found) => match press(api, pane) {
             Ok(()) => { log(who, pane, cwd, &format!("trusted {n}: {}", found.join(" | "))); Answer::Trusted }
@@ -56,7 +56,7 @@ fn press(api: &Herdr, pane: &str) -> Result<(), String> {
     let (number, chosen) = dialog::trust_line(&s).ok_or("its \"Trust all and continue\" line is not on the screen")?;
     if !chosen {
         api.pane_text(pane, &number).map_err(|e| e.message)?;
-        if !soon(|| dialog::trust_line(&screen(api, pane)).is_some_and(|(_, c)| c)) { return Err(format!("\"Trust all and continue\" was not chosen after {number} was typed, so nothing was confirmed")); }
+        if !soon(|| { let s = screen(api, pane); dialog::count(&s).is_some() && dialog::trust_line(&s).is_some_and(|(_, c)| c) }) { return Err(format!("\"Trust all and continue\" was not chosen after {number} was typed, so nothing was confirmed")); }
     }
     api.agent_keys(pane, &["enter"]).map_err(|e| e.message)?;
     if !soon(|| dialog::count(&screen(api, pane)).is_none()) { return Err("enter was pressed on \"Trust all and continue\", and the dialog is still there".into()); }
