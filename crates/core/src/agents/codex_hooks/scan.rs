@@ -11,26 +11,36 @@ use std::sync::LazyLock;
 const FLAGS: [(&str, &str); 7] = [
     ("reads secrets", r"\.ssh/|id_rsa|id_ed25519|\.netrc|\.aws/|\.git-credentials|auth\.json|credentials|gh auth token|\bbws\b|history\.jsonl|keychain|\.gnupg"),
     ("sends over the network", r"\b(curl|wget|nc|ncat|socat|telnet|ssh|scp|sftp|rsync|ftp)\b"),
-    ("sends over the network", r#"['"](node:)?(http|https|http2|net|tls|dgram|dns|undici)['"]"#), // a module, however it is loaded (`require (…)`, `import(…)`, `from …`)
+    ("sends over the network", r#"['"`](node:)?(http|https|http2|net|tls|dgram|dns|undici)['"`]"#), // a module, however it is loaded (`require (…)`, `import(…)`, `from …`)
     ("sends over the network", r"\bfetch\s*\(|XMLHttpRequest|WebSocket|/dev/(tcp|udp)/|Invoke-(WebRequest|RestMethod)|\burllib\b|\brequests\.(get|post|put)\(|\bsocket\.|\bhttp\.client"),
     ("deletes a tree or history", r#"\brm\b[^\n]{0,80}?(\s|['"])(-[a-zA-Z]*[rR][a-zA-Z]*\b|--recursive)|\.rm\([^)]*recursive|\bfind\b[^\n]*\s-delete\b"#),
     ("deletes a tree or history", r"rmSync\([^)]*recursive|rmdirSync\([^)]*recursive|shutil\.rmtree|\brimraf\b|git\s+(push|reset\s+--hard|clean\s+-)|\bmkfs|\bdd\s+if=|\bshred\b"),
     ("runs code it hides", r#"base64\s+(-d|--decode)|\batob\s*\(|['"]base64['"]|\beval\s*\(|\bFunction\s*\(|\|\s*(ba|z)?sh\b"#),
 ];
 static RES: LazyLock<Vec<(&str, Regex)>> = LazyLock::new(|| FLAGS.iter().map(|(w, r)| (*w, Regex::new(r).unwrap())).collect());
-static QUOTED: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"['"]([^'"\n]{1,300})['"]"#).unwrap());
+static QUOTED: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"['"`]([^'"`\n]{1,300})['"`]"#).unwrap());
 static SCRIPT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[\w./~-]+\.(?:js|cjs|mjs|ts|sh|bash|py|rb|pl|ps1)\b").unwrap());
 static EXT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\.(js|cjs|mjs|ts|tsx|sh|bash|py|rb|pl|ps1)$").unwrap());
 /// More files than this read for one hook: not a hook the board judges by itself.
 const MOST: usize = 200;
 
+/// Node's own modules a hook may load by name; any other name is found where it runs (a seat's `node_modules`) and
+/// not read. Those that send over the network are in FLAGS.
+const BUILTIN: [&str; 22] = ["fs", "fs/promises", "path", "os", "crypto", "util", "events", "stream", "string_decoder", "vm", "url", "readline", "assert", "buffer", "zlib", "timers", "process", "worker_threads", "perf_hooks", "querystring", "module", "child_process"];
+static LOADS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"(?m)(?:\b(?:require|import)\s*\(\s*|\bfrom\s*|^\s*import\s+)['"`]([\w@./:-]+)['"`]"#).unwrap());
+
 /// What the text has that a hook of the human's own should not: the first thing found, with the line it is on.
 pub fn flag(text: &str) -> Option<String> {
-    RES.iter().find_map(|(what, re)| re.find(text).map(|m| {
+    let found = RES.iter().find_map(|(what, re)| re.find(text).map(|m| {
         let from = text[..m.start()].rfind('\n').map(|i| i + 1).unwrap_or(0);
         let to = text[m.start()..].find('\n').map(|i| m.start() + i).unwrap_or(text.len());
         format!("{what} (`{}`)", text[from..to].trim().chars().take(120).collect::<String>())
-    }))
+    }));
+    if found.is_some() { return found; }
+    if let Some(name) = LOADS.captures_iter(text).map(|c| c[1].to_string()).find(|n| !(n.starts_with('.') || n.starts_with('/') || BUILTIN.contains(&n.strip_prefix("node:").unwrap_or(n)))) {
+        return Some(format!("loads the module `{name}` by its name, found where it runs and not read"));
+    }
+    None
 }
 
 /// The paths a text names that may be files it runs: in quotes, or a script's name.

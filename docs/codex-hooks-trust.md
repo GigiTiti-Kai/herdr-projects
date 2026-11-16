@@ -31,14 +31,17 @@ and answers only when every one of them passes:
      first): the hooks file and every file the hook runs tracked there, and on disk the same as on the repo's default
      branch at origin. Nothing in the repo the seat works in is trusted by the board: that is the work under review, and
      its git could be made to say anything. Nor is a hook in a file git does not keep (`~/.codex/hooks.json`).
-4. What each hook runs is read: every part of its command (`a && b; c`), what it gives a shell (`sh -c '…'`, read as a
-   command again) or a program (`node -e '…'`, which may not start other programs), the files it names, and those they
-   name in turn. A name without a path is the seat's folder's, as Codex runs the hook there. A part whose target is
-   known only when it runs (a `$` value other than the plugin's folder or `$HOME`, a command inside it), that calls a
-   program by name instead of a file (`make hook`, `rm`), or names a file that is not there, is not trusted. Only a bare
-   name is a shell or `node` and the like; one with a path (`./node`) is a file, read and judged as any other. Nor is a
-   hook that sends over the network (a network module loaded any way, `fetch`, `curl`), reads secrets (`~/.ssh`, `auth.json`, tokens, `history.jsonl`), deletes a tree or
-   history, or runs hidden code (`eval`, base64 into a shell).
+4. What each hook runs is read, and only plain shapes pass. Each part of the command (`a && b; c`) is a program by
+   its bare name with nothing set before it (`PATH=. node …` does not pass), or a file. A shell takes `-c '…'` (read
+   as a command again) or a script; `node` takes `-e '…'` or a script, with no other option before or after
+   (`--require` does not pass); `python3`, `ruby` and the like take a script only. A name with a path (`./node`) is a
+   file, and a name without one is the seat's folder's, as Codex runs the hook there. The files it names are read, and
+   those they name in turn. Not trusted: a part known only when it runs (a `$` value other than the plugin's folder or
+   `$HOME`, a command inside it), a program called by name (`make hook`, `rm`), a file that is not there, code given to
+   `node` that starts programs or imports, a module loaded by name that is not one of Node's own (it would be found
+   where the hook runs), a network module loaded any way (`require(`node:http`)`, `import('https')`), `fetch`, `curl`,
+   secrets (`~/.ssh`, `auth.json`, tokens, `history.jsonl`), deleting a tree or history, or hidden code (`eval`,
+   base64 into a shell).
 5. All passed: the board types the number of "Trust all and continue", checks that line is the chosen one, and presses
    enter; then checks the dialog is gone. Codex writes the trust in its own config.toml, as when you press it.
 
@@ -56,7 +59,8 @@ The board never turns the check off and never starts Codex with `--dangerously-b
 The reading in step 4 looks for plain words, not for what the code does: it stops the plain ways of doing those things,
 not a hidden one, and not what a program the hook calls by name does. It can also stop a hook that only names such a
 thing (a guard script that lists `git push --force` to block it): that one waits for you. The trust rests on where the
-hook comes from first; add to the two lists only what you would trust without reading. Which commit is origin's default
+hook comes from first; add to the two lists only what you would trust without reading. What Codex's own environment
+hands the hook (`NODE_OPTIONS`, a `PATH` that holds the seat's folder) is not the hook's, and not judged. Which commit is origin's default
 branch is read from the local copy of origin's branches, which a program on this machine could move; asking GitHub
 itself would close that.
 

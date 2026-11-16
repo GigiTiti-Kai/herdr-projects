@@ -6,10 +6,10 @@ use regex::Regex;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
-/// Shells: `-c` gives them a command, a file their script.
+/// Shells: `-c` gives them a command, a file their script; no other option is taken.
 const SHELLS: [&str; 4] = ["sh", "bash", "zsh", "dash"];
-/// Programs that run code: `-e`/`-c`/`--eval` gives them the code itself, a file their script.
-const CODE: [&str; 8] = ["node", "python", "python3", "ruby", "perl", "deno", "bun", "pwsh"];
+/// Programs that run a script file given first, with no option before it. Only `node` also takes code (`-e`).
+const SCRIPTS: [&str; 7] = ["node", "python", "python3", "ruby", "perl", "deno", "bun"];
 static LATER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"`|\$\(|\$\{?[A-Za-z_]").unwrap());
 /// Code given inline that starts other programs or loads code by a name: which is not read.
 static STARTS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"child_process|\bspawn|\bexec\w*\s*\(|subprocess|os\.system|popen|\bsystem\s*\(|\bimport\s*\(").unwrap());
@@ -57,29 +57,29 @@ pub fn runs(command: &str, root: &Path, cwd: &Path, home: &Path) -> Result<Vec<P
     if LATER.is_match(&text) { return Err("what it runs is only known when it runs (a `$` value or a command inside it)".into()); }
     let mut out = vec![];
     for words in parts(&text)? {
-        let words: Vec<&String> = words.iter().skip_while(|w| w.split_once('=').is_some_and(|(k, _)| !k.is_empty() && k.chars().all(|c| c.is_alphanumeric() || c == '_'))).collect();
+        // Only what the board knows a command's shape by: no variable set for it (`PATH=.`), a program by its bare
+        // name (one with a path, `./node`, is a file like any other), and no option it does not judge (`--require`).
         let Some(first) = words.first() else { continue };
-        // A program is one by its name alone, found on PATH; a name with a path (`./node`) is a file like any other.
+        if let Some((k, _)) = first.split_once('=').filter(|(k, _)| !k.is_empty() && k.chars().all(|c| c.is_alphanumeric() || c == '_')) {
+            return Err(format!("it sets {k} for what it runs, which the board does not judge"));
+        }
         let program = first.as_str();
-        let (shell, code) = (SHELLS.contains(&program), CODE.contains(&program));
-        if !shell && !code {
+        if !SHELLS.contains(&program) && !SCRIPTS.contains(&program) {
             out.push(file(first, cwd, home).ok_or_else(|| format!("it runs `{first}`, which the board does not read"))?);
             continue;
         }
-        let mut args = words.iter().skip(1);
-        let script = loop {
-            match args.next().map(|w| w.as_str()) {
-                Some("-c") if shell => { out.extend(runs(args.next().map(|w| w.as_str()).unwrap_or(""), root, cwd, home)?); break None; }
-                Some("-e" | "--eval" | "-c" | "-Command") if code => {
-                    if STARTS.is_match(args.next().map(|w| w.as_str()).unwrap_or("")) { return Err(format!("the code it gives `{program}` starts other programs or loads code by a name")); }
-                    break None;
-                }
-                Some(w) if w.starts_with('-') => continue,
-                Some(w) => break Some(w),
-                None => return Err(format!("`{program}` reads what it runs from its input, which the board cannot read")),
+        let (opt, rest) = (words.get(1).map(|w| w.as_str()), words.get(2).map(|w| w.as_str()).unwrap_or(""));
+        match opt {
+            Some("-c") if SHELLS.contains(&program) => out.extend(runs(rest, root, cwd, home)?),
+            Some("-e" | "--eval") if program == "node" => {
+                if STARTS.is_match(rest) { return Err(format!("the code it gives `{program}` starts other programs or loads code by a name")); }
+                // Anything after its code that is an option is still `node`'s own (`--require ./x`).
+                if let Some(o) = words.iter().skip(3).find(|w| w.starts_with('-')) { return Err(format!("it gives `{program}` the option {o}, which the board does not judge")); }
             }
-        };
-        if let Some(s) = script { out.push(file(s, cwd, home).ok_or_else(|| format!("it runs {s}, which is not there to read"))?); }
+            Some(o) if o.starts_with('-') => return Err(format!("it gives `{program}` the option {o}, which the board does not judge")),
+            Some(s) => out.push(file(s, cwd, home).ok_or_else(|| format!("it runs {s}, which is not there to read"))?),
+            None => return Err(format!("`{program}` reads what it runs from its input, which the board cannot read")),
+        }
     }
     if out.is_empty() && parts(&text)?.is_empty() { return Err("its command is empty".into()); }
     Ok(out)
