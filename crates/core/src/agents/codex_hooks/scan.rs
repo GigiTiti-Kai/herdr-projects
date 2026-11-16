@@ -30,6 +30,9 @@ const BUILTIN: [&str; 22] = ["fs", "fs/promises", "path", "os", "crypto", "util"
 static LOADS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"(?m)(?:\b(?:require|import)\s*\(\s*|\bfrom\s*|^\s*import\s+)['"`]([\w@./:-]+)['"`]"#).unwrap());
 
 static REMOVES: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\b(rm|rmdir|rmSync|rmdirSync|rimraf)\s*\(").unwrap());
+static COMPUTED: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"\b(?:require|import)\s*\(\s*[^'"`\s)]|\bcreateRequire\b|\bModule\._load\b|\bprocess\.dlopen\b"#).unwrap());
+/// The names a text has in quotes.
+pub fn quoted(text: &str) -> Vec<String> { QUOTED.captures_iter(text).filter_map(|c| c.get(1).or(c.get(2)).or(c.get(3)).map(|m| m.as_str().to_string())).collect() }
 /// The modules a text loads by a name written in it.
 pub fn loads(text: &str) -> Vec<String> { LOADS.captures_iter(text).map(|c| c[1].to_string()).collect() }
 
@@ -86,6 +89,9 @@ pub fn files(command: &str, root: &Path, cwd: &Path, home: &Path, plugin: bool) 
         let base = f.parent().map(Path::to_path_buf).unwrap_or_default();
         let bases: Vec<&Path> = if plugin { vec![&base, cwd, root] } else { vec![&base, cwd] };
         todo.extend(named(&text).iter().flat_map(|n| files_of(n, &bases, home)));
+        // A module named by what it works out when it runs (`require(path.join(__dirname, 'pkg'))`): which file that is,
+        // or which package folder's entry, is not known here.
+        if let Some(m) = COMPUTED.find(&text) { return Err(format!("{} loads a module whose name it works out when it runs (`{}`)", f.display(), m.as_str())); }
         // A folder it loads as a package: node runs what its package.json names, which is not followed here.
         if let Some(n) = loads(&text).into_iter().find(|n| (n.starts_with('.') || n.starts_with('/')) && base.join(n).join("package.json").is_file()) { return Err(format!("{} loads the package folder {n}, whose own entry the board does not follow", f.display())); }
         // A file it loads by a path that is not there to read: whatever node would take for it is not judged.

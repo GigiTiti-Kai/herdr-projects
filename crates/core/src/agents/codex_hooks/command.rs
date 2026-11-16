@@ -76,6 +76,9 @@ pub fn runs(command: &str, root: &Path, cwd: &Path, home: &Path) -> Result<Vec<P
             Some("-c") if SHELLS.contains(&program) => out.extend(runs(rest, root, cwd, home)?),
             Some("-e" | "--eval") if program == "node" => {
                 if STARTS.is_match(rest) { return Err(format!("the code it gives `{program}` starts other programs or loads code by a name")); }
+                // A folder it names (a path it joins to load, `'hooks/pkg'`): node would run what its package.json says.
+                let dir = |n: &str| !n.chars().all(|c| c == '.' || c == '/') && [cwd.join(n), root.join(n)].iter().any(|p| p.is_dir());
+                if let Some(n) = super::scan::quoted(rest).into_iter().find(|n| dir(n)) { return Err(format!("the code it gives `{program}` names the folder {n}, whose own entry the board does not follow")); }
                 // A file it loads by a path is found the way node finds it (`.node`, `.json`, a folder's own), not read.
                 if let Some(n) = super::scan::loads(rest).into_iter().find(|n| n.starts_with('.') || n.starts_with('/')) { return Err(format!("the code it gives `{program}` loads {n}: give `{program}` the file itself, so it is read")); }
                 // Anything after its code that is an option is still `node`'s own (`--require ./x`).

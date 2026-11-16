@@ -41,8 +41,9 @@ and answers only when every one of them passes:
    `$HOME`, a command inside it), a program called by name (`make hook`, `rm`), a file that is not there, code given to
    `node` that starts programs, imports, or loads a file by a path (give `node` the file instead, so it is read), a module loaded by name that is not one of Node's own (it would be found
    where the hook runs), a network module loaded any way (`require(`node:http`)`, `import('https')`, Ruby's `net/http`), a removal with
-   `recursive` in it, a file it loads that is not there to read as text (a native `.node`), a package folder it loads (its
-   `package.json` names what runs), `fetch`, `curl`,
+   `recursive` in it, a file it loads that is not there to read as text (a native `.node`), a package folder it loads or names
+   (its `package.json` says what runs), a module loaded by a name worked out when it runs (`require(path.join(…))` in a
+   file), `fetch`, `curl`,
    secrets (`~/.ssh`, `auth.json`, tokens, `history.jsonl`), deleting a tree or history, or hidden code (`eval`,
    base64 into a shell).
 5. All passed: the board reads the screen again (it must still count as many hooks as were judged), types the number
