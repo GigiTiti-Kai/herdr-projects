@@ -80,6 +80,9 @@ pub fn report(id: &str, r: Report) -> Res<Task> {
             "idle" => { t.put("stage", if agent { "stopped" } else { "todo" }); if !agent { t.put("app", Value::Null); } }
             "working" => {
                 if agent { crate::fail!("{} has an agent. Reply to it, or delegate it again, to make it work.", t.s("id")); }
+                // When it began to be worked by hand: new from to do or done, kept across its reports and its waits for
+                // you (shown/ongoing.rs). One already at work before this was kept has none: its age is its task's.
+                if ["todo", "done"].contains(&t.s("stage")) || (!t.b("progressFrom") && t.s("stage") != "progress") { t.put("progressFrom", crate::clock::now()); }
                 t.put("stage", "progress"); let owner = t.at("owner").clone(); t.put("app", owner); t.put("since", crate::clock::now());
                 if r.progress.is_some() || r.eta.is_some() { // one given alone keeps the other
                     let p = r.progress.as_ref().map(|p| json!(clamp_pct(p))).unwrap_or_else(|| t.at("watch").at("progress").clone());

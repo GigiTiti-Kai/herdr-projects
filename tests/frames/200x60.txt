@@ -232,7 +232,7 @@
    ◆            ready to approve
    ✓            done
    ○            to do
-   ○            said to be at work, no agent on it (エージェントなし); a day after it was added, under 運用中
+   ○            said to be at work, no agent on it (any row with none says エージェントなし); a day on, under 運用中
    ⟳            an automation (dimmed while it is off; the word after it says on or off)
    65% 2m left  how far it is, and the time left; the time after it is how long it has worked, or how long ago it stopped
    R#2          the review it is on or last had, coloured by where it stands: passed, failed, the reviewer working

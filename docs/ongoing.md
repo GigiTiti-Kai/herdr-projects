@@ -23,17 +23,21 @@ says so first.
   says `エージェントなし` (no agent), never that nobody is on it. Its time on the right is how long ago it was last said
   to be at work (each report starts it again).
 - With nothing said, line 2 is `エージェントなし` alone.
+- **A row that waits for you says it too**: a question, an OK or an error on a task no agent is on reads
+  `エージェントなし · Which floor first?`; on one whose agent asks, only the question. An agent is on a task when one is
+  named on it or its pane is linked to it. A queued row says it waits, not this: its agent is on its way.
 
 ## 運用中
 
-**A row no agent of the board's works, added more than a day ago, stands under its own heading, `運用中`, right after
-`working`.** Those are the rows whose end is not coming: a seat's daily pass that runs on, a ledger kept by hand. `working`
+**A row worked by hand for more than a day stands under its own heading, `運用中`, right after `working`.** Those are the rows whose end is not coming: a seat's daily pass that runs on, a ledger kept by hand. `working`
 keeps what is on its way to done: the agents' rows, the reviewer's, the board's own steps, the queued ones, and a row
 said to be at work for less than a day.
 
-- The day is counted from when the task was added. A task that waited long in to do goes under `運用中` as soon as it is
-  said to be at work.
-- It moves by itself, a day after it was added; a row that waits for you, is done or archived never stands there.
+- **The day is counted from when it began to be worked by hand**: its first `report --state working` out of to do (or
+  out of done). Its later reports and its waits for you keep that time; put back in to do and begun again, it counts
+  from then. How long it waited in to do never counts. A task already at work by hand before the board kept that time
+  counts from when it was added.
+- It moves by itself, a day after it began; a row that waits for you, is done or archived never stands there.
 - The heading is in the brighter grey (Herdr's `subtext0`). It folds as every heading does
   ([list headings](list-headings.md)).
 - Grouped by repo or by machine, where there are no status headings, these rows come after the working ones.

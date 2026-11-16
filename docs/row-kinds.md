@@ -55,4 +55,5 @@ When the message changes, so does the tag: a later message that no longer says `
 Both are in the `?` menu, under **on a row**.
 
 A row said to be at work with no agent of the board's on it (most `[運用]` rows) has `○` for a mark and says
-`エージェントなし` first; a day after it was added it stands under its own heading, `運用中` ([運用中](ongoing.md)).
+`エージェントなし` first, as any row no agent is on does; a day after it began to be worked by hand it stands under its own
+heading, `運用中` ([運用中](ongoing.md)).

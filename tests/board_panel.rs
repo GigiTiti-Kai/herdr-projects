@@ -126,7 +126,7 @@ fn the_panel_never_opens_full_screen_by_itself_something_going_wrong_only_change
     s.load();
     assert!(s.s.sel == id && !s.s.full && !s.s.reply);
     let text = s.screen(80).join("\n");
-    assert!(has(&text, r"\n   ▾ needs you *\n[ ▌]  ✗ PRJ-1 \[運用\] Match the colors [^\n]*\n[ ▌] {10}Merge conflict with main"), "{text}");
+    assert!(has(&text, r"\n   ▾ needs you *\n[ ▌]  ✗ PRJ-1 \[運用\] Match the colors [^\n]*\n[ ▌] {10}エージェントなし · Merge conflict with main"), "{text}");
     assert!(!text.contains("Conflicting files"));
     // The hint line: what matters now, the main thing first, never more than four; the main thing is the last to go.
     assert!(has(&s.screen(120).join("\n"), &keyed(r"\n[ ▌] {1}{sendBack} tell this task's agent to fix it · {yes} retry as it is · space talk about this task · \? all keys *$")), "{}", s.screen(120).join("\n"));
