@@ -11,8 +11,8 @@ const SHELLS: [&str; 4] = ["sh", "bash", "zsh", "dash"];
 /// Programs that run a script file given first, with no option before it. Only `node` also takes code (`-e`).
 const SCRIPTS: [&str; 7] = ["node", "python", "python3", "ruby", "perl", "deno", "bun"];
 static LATER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"`|\$\(|\$\{?[A-Za-z_]").unwrap());
-/// Code given inline that starts other programs or loads code by a name: which is not read.
-static STARTS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"child_process|\bspawn|\bexec\w*\s*\(|subprocess|os\.system|popen|\bsystem\s*\(|\bimport\s*\(").unwrap());
+/// The one shape of code given to `node -e` that is read: a plugin starting a file of its own (Ponytail's hooks).
+static PLUGIN_START: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\s*require\(\s*require\(\s*'path'\s*\)\.join\(\s*process\.env\.CLAUDE_PLUGIN_ROOT(?:\.split\(String\.fromCharCode\(92\)\)\.join\('/'\))?\s*,\s*'([\w./-]+\.[cm]?js)'\s*\)\s*\)\s*;?\s*$").unwrap());
 
 /// The plugin's folder and the human's home as a command names them, put in.
 pub fn known(command: &str, root: &Path, home: &Path) -> String {
@@ -54,8 +54,9 @@ fn file(w: &str, cwd: &Path, home: &Path) -> Option<PathBuf> {
     p.is_file().then(|| p.components().collect()) // `./x` as the file's own name
 }
 
-/// The files the command starts (its scripts). Err: a part runs what cannot be read before it runs.
-pub fn runs(command: &str, root: &Path, cwd: &Path, home: &Path) -> Result<Vec<PathBuf>, String> {
+/// The files the command starts (its scripts). Err: a part runs what cannot be read before it runs. `plugin`: a plugin's
+/// hook, run with its folder `root` as CLAUDE_PLUGIN_ROOT.
+pub fn runs(command: &str, root: &Path, cwd: &Path, home: &Path, plugin: bool) -> Result<Vec<PathBuf>, String> {
     let text = known(command, root, home);
     if LATER.is_match(&text) { return Err("what it runs is only known when it runs (a `$` value or a command inside it)".into()); }
     let mut out = vec![];
@@ -73,16 +74,16 @@ pub fn runs(command: &str, root: &Path, cwd: &Path, home: &Path) -> Result<Vec<P
         }
         let (opt, rest) = (words.get(1).map(|w| w.as_str()), words.get(2).map(|w| w.as_str()).unwrap_or(""));
         match opt {
-            Some("-c") if SHELLS.contains(&program) => out.extend(runs(rest, root, cwd, home)?),
+            Some("-c") if SHELLS.contains(&program) => out.extend(runs(rest, root, cwd, home, plugin)?),
             Some("-e" | "--eval") if program == "node" => {
-                if STARTS.is_match(rest) { return Err(format!("the code it gives `{program}` starts other programs or loads code by a name")); }
-                // A folder it names (a path it joins to load, `'hooks/pkg'`): node would run what its package.json says.
-                let dir = |n: &str| !n.chars().all(|c| c == '.' || c == '/') && [cwd.join(n), root.join(n)].iter().any(|p| p.is_dir());
-                if let Some(n) = super::scan::quoted(rest).into_iter().find(|n| dir(n)) { return Err(format!("the code it gives `{program}` names the folder {n}, whose own entry the board does not follow")); }
-                // A file it loads by a path is found the way node finds it (`.node`, `.json`, a folder's own), not read.
-                if let Some(n) = super::scan::loads(rest).into_iter().find(|n| n.starts_with('.') || n.starts_with('/')) { return Err(format!("the code it gives `{program}` loads {n}: give `{program}` the file itself, so it is read")); }
                 // Anything after its code that is an option is still `node`'s own (`--require ./x`).
                 if let Some(o) = words.iter().skip(3).find(|w| w.starts_with('-')) { return Err(format!("it gives `{program}` the option {o}, which the board does not judge")); }
+                // Its code is taken in one shape only: a plugin starting a file of its own, named in full. What other code
+                // loads (a name it works out, a folder whose package picks its entry) cannot be known before it runs.
+                let f = PLUGIN_START.captures(rest).filter(|_| plugin).map(|c| c[1].to_string())
+                    .filter(|f| !f.split('/').any(|p| p == ".." || p == "." || p.is_empty())).map(|f| root.join(f)).filter(|p| p.is_file())
+                    .ok_or_else(|| format!("the code it gives `{program}` is not the one shape the board reads (a plugin starting a file of its own: `require(require('path').join(process.env.CLAUDE_PLUGIN_ROOT, 'hooks/x.js'))`)"))?;
+                out.push(f);
             }
             Some(o) if o.starts_with('-') => return Err(format!("it gives `{program}` the option {o}, which the board does not judge")),
             Some(s) => out.push(file(s, cwd, home).ok_or_else(|| format!("it runs {s}, which is not there to read"))?),

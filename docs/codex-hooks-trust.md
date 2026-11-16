@@ -34,8 +34,9 @@ and answers only when every one of them passes:
      its git could be made to say anything. Nor is a hook in a file git does not keep (`~/.codex/hooks.json`).
 4. What each hook runs is read, and only plain shapes pass. Each part of the command (`a && b; c`) is a program by
    its bare name with nothing set before it (`PATH=. node …` does not pass), or a file. A shell takes `-c '…'` (read
-   as a command again) or a script; `node` takes `-e '…'` or a script, with no other option before or after
-   (`--require` does not pass); `python3`, `ruby` and the like take a script only. A name with a path (`./node`) is a
+   as a command again) or a script; `node` takes a script, or `-e '…'` in one shape only: a plugin starting a file of
+   its own named in full (`require(require('path').join(process.env.CLAUDE_PLUGIN_ROOT, 'hooks/x.js'))`, as Ponytail's
+   hooks do), and no other option before or after (`--require` does not pass); `python3`, `ruby` and the like take a script only. A name with a path (`./node`) is a
    file, and a name without one is the seat's folder's, as Codex runs the hook there. The files it names are read, and
    those they name in turn. Not trusted: a part known only when it runs (a `$` value other than the plugin's folder or
    `$HOME`, a command inside it), a program called by name (`make hook`, `rm`), a file that is not there, code given to

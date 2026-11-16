@@ -31,8 +31,6 @@ static LOADS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"(?m)(?:\b(?:requi
 
 static REMOVES: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\b(rm|rmdir|rmSync|rmdirSync|rimraf)\s*\(").unwrap());
 static COMPUTED: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"\b(?:require|import)\s*\(\s*[^'"`\s)]|\bcreateRequire\b|\bModule\._load\b|\bprocess\.dlopen\b"#).unwrap());
-/// The names a text has in quotes.
-pub fn quoted(text: &str) -> Vec<String> { QUOTED.captures_iter(text).filter_map(|c| c.get(1).or(c.get(2)).or(c.get(3)).map(|m| m.as_str().to_string())).collect() }
 /// The modules a text loads by a name written in it.
 pub fn loads(text: &str) -> Vec<String> { LOADS.captures_iter(text).map(|c| c[1].to_string()).collect() }
 
@@ -75,7 +73,7 @@ fn clean(p: &Path) -> PathBuf { p.components().fold(PathBuf::new(), |mut out, c|
 /// folder, also in `root`; in a file, beside that file too. Err: a part runs what cannot be read, a file that does not
 /// read as text, or more files than a hook should have.
 pub fn files(command: &str, root: &Path, cwd: &Path, home: &Path, plugin: bool) -> Result<Vec<(PathBuf, String)>, String> {
-    let mut todo = super::command::runs(command, root, cwd, home)?;
+    let mut todo = super::command::runs(command, root, cwd, home, plugin)?;
     let in_root = plugin && (command.contains("PLUGIN_ROOT"));
     let text = super::command::known(command, root, home);
     let bases: Vec<&Path> = if in_root { vec![cwd, root] } else { vec![cwd] };

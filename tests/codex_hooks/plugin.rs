@@ -94,5 +94,12 @@ fn a_package_folder_it_loads_by_a_name_it_works_out_is_not_trusted() {
     let mut h = listed(&root, "modified");
     h["hooks"][0]["command"] = serde_json::json!("node -e \"require(require('path').join(process.env.CLAUDE_PLUGIN_ROOT, 'hooks/pkg'))\"");
     let why = judge(&w, 1, &hooks_of(&h), &allowed()).unwrap_err();
-    assert!(why.contains("the code it gives `node` names the folder hooks/pkg, whose own entry the board does not follow"), "{why}");
+    assert!(why.contains("the code it gives `node` is not the one shape the board reads"), "{why}");
+    // Nor the folder put together another way (round 7): only a file of the plugin named in full is read.
+    h["hooks"][0]["command"] = serde_json::json!("node -e \"require(require('path').join(process.env.CLAUDE_PLUGIN_ROOT + '/hooks', 'pkg'))\"");
+    assert!(judge(&w, 1, &hooks_of(&h), &allowed()).unwrap_err().contains("the code it gives `node` is not the one shape the board reads"));
+    // The shape itself passes only for a file there: here a folder.
+    h["hooks"][0]["command"] = serde_json::json!("node -e \"require(require('path').join(process.env.CLAUDE_PLUGIN_ROOT, 'hooks/pkg.js'))\"");
+    std::fs::create_dir_all(root.join("hooks/pkg.js")).unwrap();
+    assert!(judge(&w, 1, &hooks_of(&h), &allowed()).unwrap_err().contains("the code it gives `node` is not the one shape the board reads"));
 }

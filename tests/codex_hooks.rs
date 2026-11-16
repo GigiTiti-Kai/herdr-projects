@@ -185,7 +185,7 @@ fn a_command_whose_target_cannot_be_read_before_it_runs_is_not_trusted() {
     // Every part of the command, and what a shell or a program is given to run, is read.
     let a = r.join("hooks/a.sh").display().to_string();
     for (command, what) in [(format!("sh -c 'rm --recursive /synthetic-review-victim'"), "it runs `rm`, which the board does not read"),
-        ("node -e \"require('child_process').execFileSync('curl', ['https://example.com'])\"".to_string(), "the code it gives `node` starts other programs"),
+        ("node -e \"require('child_process').execFileSync('curl', ['https://example.com'])\"".to_string(), "the code it gives `node` is not the one shape the board reads"),
         (format!("sh {a} && unreviewed-helper"), "it runs `unreviewed-helper`, which the board does not read"),
         (format!("sh {a}; rm -rf /tmp/x"), "it runs `rm`")] {
         h["hooks"][0]["command"] = json!(command);
@@ -198,9 +198,9 @@ fn a_command_whose_target_cannot_be_read_before_it_runs_is_not_trusted() {
     let why = judge(&w, 1, &hooks_of(&h), &allowed()).unwrap_err();
     assert!(why.ends_with(&format!("{} is in the seat's own folder, the work under review", w.root.join("node").display())), "{why}");
     h["hooks"][0]["command"] = json!("node -e \"import('node:http').then(h => h.get('http://127.0.0.1:9/?d=x'))\"");
-    assert!(judge(&w, 1, &hooks_of(&h), &allowed()).unwrap_err().contains("the code it gives `node` starts other programs or loads code"), "dynamic import");
+    assert!(judge(&w, 1, &hooks_of(&h), &allowed()).unwrap_err().contains("the code it gives `node` is not the one shape the board reads"), "dynamic import");
     for (command, what) in [("PATH=. node -e '0'", "it sets PATH for what it runs"), ("node --require=./payload -e '0'", "the option --require=./payload"),
-        ("node -e '0' --require ./payload", "the option --require"), ("node -e \"require('payload')\"", "loads the module `payload` by its name")] {
+        ("node -e '0' --require ./payload", "the option --require"), ("node -e \"require('payload')\"", "the code it gives `node` is not the one shape the board reads")] {
         h["hooks"][0]["command"] = json!(command);
         let got = judge(&w, 1, &hooks_of(&h), &allowed()).unwrap_err();
         assert!(got.contains(what), "{command}: {got}");
@@ -209,10 +209,10 @@ fn a_command_whose_target_cannot_be_read_before_it_runs_is_not_trusted() {
     std::fs::create_dir_all(w.root.join("lib")).unwrap();
     std::fs::write(w.root.join("lib/hook.js"), "console.log('FROM_SEAT_UNREVIEWED')\n").unwrap();
     h["hooks"][0]["command"] = json!("node -e \"require('./lib/hook')\"");
-    assert!(judge(&w, 1, &hooks_of(&h), &allowed()).unwrap_err().contains("the code it gives `node` loads ./lib/hook"));
+    assert!(judge(&w, 1, &hooks_of(&h), &allowed()).unwrap_err().contains("the code it gives `node` is not the one shape the board reads"));
     h["hooks"][0]["command"] = json!("node -e \"require('fs').rmSync(require('path').join(require('os').homedir(),'x'),{recursive:true})\"");
-    assert!(judge(&w, 1, &hooks_of(&h), &allowed()).unwrap_err().contains("deletes a tree or history"));
-    for (text, what) in [("const { rm } = require('node:fs/promises'); await rm(d, { recursive: true })", "deletes a tree or history"), ("fs.promises.rmdir(d, { recursive: true })", "deletes a tree or history"),
+    assert!(judge(&w, 1, &hooks_of(&h), &allowed()).unwrap_err().contains("the code it gives `node` is not the one shape the board reads"));
+    for (text, what) in [("require('fs').rmSync(require('path').join(require('os').homedir(),'x'),{recursive:true})", "deletes a tree or history"), ("const { rm } = require('node:fs/promises'); await rm(d, { recursive: true })", "deletes a tree or history"), ("fs.promises.rmdir(d, { recursive: true })", "deletes a tree or history"),
         ("require 'net/http'; Net::HTTP.post(u, d)", "sends over the network"), ("const h = require(`node:http`); h.get(u)", "sends over the network"), ("const http = require ('node:http'); http.get(u)", "sends over the network"), ("import('node:https').then(h => h.get(u))", "sends over the network"),
         ("import { request } from \"http\";", "sends over the network"), ("globalThis.fetch (u)", "sends over the network"), ("rm --recursive /x", "deletes a tree or history"), ("execFileSync('rm', ['-rf', d])", "deletes a tree or history"), ("execFileSync('curl', [u])", "sends over the network")] {
         assert!(sw::agents::codex_hooks::scan::flag(text).is_some_and(|f| f.starts_with(what)), "{text}");
