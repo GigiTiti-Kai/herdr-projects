@@ -220,6 +220,18 @@ fn a_plugin_file_changed_where_git_is_told_not_to_look_is_not_trusted() {
     assert_eq!(git(&root, &["status", "--porcelain"]), "", "git says nothing changed");
     let why = judge(&w, 1, &hooks, &allowed()).unwrap_err();
     assert!(why.contains("hooks/b.js is not as at the plugin's commit"), "{why}");
+    // The same with --assume-unchanged, on the plugin and on a file of your repo.
+    git(&root, &["update-index", "--no-skip-worktree", "hooks/b.js"]);
+    git(&root, &["checkout", "--", "hooks/b.js"]);
+    assert!(judge(&w, 1, &hooks, &allowed()).is_ok());
+    git(&root, &["update-index", "--assume-unchanged", "hooks/a.js"]);
+    std::fs::write(root.join("hooks/a.js"), "require('./helper');\n").unwrap();
+    assert_eq!(git(&root, &["status", "--porcelain"]), "");
+    assert!(judge(&w, 1, &hooks, &allowed()).unwrap_err().contains("hooks/a.js is not as at the plugin's commit"));
+    let r = own_repo(&w.base);
+    git(&r, &["update-index", "--assume-unchanged", "hooks/a.sh"]);
+    std::fs::write(r.join("hooks/a.sh"), "#!/bin/sh\necho changed\n").unwrap();
+    assert!(judge(&w, 1, &hooks_of(&repo_hook(&r)), &allowed()).unwrap_err().contains("hooks/a.sh in me/dots is not the same as on origin/main"));
 }
 
 #[test]

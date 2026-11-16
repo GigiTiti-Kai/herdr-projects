@@ -82,6 +82,8 @@ pub fn agent(f: &F, verb: &str, arg2: &str, argv: &[String], flag: &dyn Fn(&str)
             if st.b("agentGetFails") { return fail("timeout", "timed out"); }
             let due = { let a = &mut st["panes"][pi]["agent"]; a.at("then").is_object() && a.i("thenIn") > 0 && { let n = a.i("thenIn") - 1; a["thenIn"] = json!(n); n == 0 } };
             let id = st["panes"][pi].t("pane_id");
+            // What the board's tasks were when you answered a dialog (the rest of a blocked agent's turn): kept to look at.
+            if due && !st.has("tasksAtThen") && st["panes"][pi]["agent"].s("status") == "blocked" { st["tasksAtThen"] = json!(sw::store::tasks::list(Default::default()).iter().filter_map(|t| sw::store::tasks::get(t.s("id"))).map(|t| json!({ "id": t.at("id"), "stage": t.at("stage"), "msg": t.at("msg") })).collect::<Vec<_>>()); }
             if due { drop(st); go_on(f, pi); st = f.st.borrow_mut(); }
             // The rest of its turn may have closed its terminal, or ended the agent.
             let Some(p) = st.arr("panes").iter().find(|p| p.s("pane_id") == id && p.at("agent").is_object()).cloned() else { return fail("agent_not_found", &format!("agent target {arg2} not found")) };

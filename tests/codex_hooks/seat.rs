@@ -71,5 +71,10 @@ fn a_reviewers_dialog_the_board_did_not_trust_waits_for_you_past_the_reviews_tim
     assert!(typed(&w).is_empty(), "{:?}", typed(&w));
     assert!(began.elapsed().as_millis() > 1000, "you answered within the review's own time");
     assert_eq!(t.s("stage"), "approval", "the review waited for you instead of timing out: {}", t.at("failure"));
+    // While it waited, the row was "needs you" with the reason.
+    let then = w.state().arr("tasksAtThen").iter().find(|x| x.s("id") == id).cloned().unwrap_or_default();
+    assert_eq!(then.s("stage"), "reviewneeds", "{then}");
+    assert!(then.s("msg").starts_with("The reviewer's Codex asks to trust its hooks, and the board did not: the screen counts 2"), "{then}");
+    assert_eq!(sw::state::show(&obj(then.clone()), &json!({}), sw::clock::now()).state, "blocked", "needs you");
     assert!(log().contains("not trusted: the screen counts 2 new or changed hooks, Codex's own list 1 (sessionStart)"), "{}", log());
 }
