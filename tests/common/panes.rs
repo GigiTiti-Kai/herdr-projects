@@ -148,6 +148,12 @@ pub fn pane(st: &mut Value, verb: &str, arg2: &str, argv: &[String], flag: &dyn 
         "send-text" => {
             if argv.get(3).map(|t| t == "\u{3}").unwrap_or(false) && p.s("screen").trim_end().ends_with('>') { st["panes"][pi]["screen"] = json!(format!("{}^C\nuser@host:{}$ ", p.s("screen"), p.s("cwd"))); }
             arr(st, "typed").push(json!({ "pane": arg2, "text": argv.get(3) }));
+            // A number typed on Codex's hooks review moves its choice (`›`) to that line, as Codex 0.169 does.
+            let screen = st["panes"][pi]["agent"].t("screen");
+            if let Some(n) = argv.get(3).filter(|t| t.len() == 1 && t.chars().all(|c| c.is_ascii_digit())).filter(|_| screen.contains("Hooks need review")) {
+                let moved: Vec<String> = screen.lines().map(|l| { let l = l.replacen("› ", "  ", 1); if l.trim_start().starts_with(&format!("{n}. ")) { l.replacen("  ", "› ", 1) } else { l } }).collect();
+                st["panes"][pi]["agent"]["screen"] = json!(moved.join("\n"));
+            }
             ok(json!({ "type": "ok" }))
         }
         "report-metadata" => {
