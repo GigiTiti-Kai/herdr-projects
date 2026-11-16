@@ -43,7 +43,7 @@ pub fn answer(api: &Herdr, pane: &str, cwd: &Path, who: &str) -> Answer {
     let Some(_lock) = Lock::take(pane) else { return Answer::NotIt };
     match list::hooks(cwd).and_then(|hs| decide(n, &hs, &allowed(), &codex_file(), &user_home(), cwd)) {
         Err(why) => { log(who, pane, cwd, &format!("not trusted: {why}")); Answer::Refused(why) }
-        Ok(found) => match press(api, pane) {
+        Ok(found) => match press(api, pane, n) {
             Ok(()) => { log(who, pane, cwd, &format!("trusted {n}: {}", found.join(" | "))); Answer::Trusted }
             Err(why) => { log(who, pane, cwd, &format!("not answered ({why}), though each passed: {}", found.join(" | "))); Answer::Refused(why) }
         },
@@ -53,13 +53,14 @@ pub fn answer(api: &Herdr, pane: &str, cwd: &Path, who: &str) -> Answer {
 /// Why herdr did not take a key, never empty: an empty reason would read as trusted.
 fn said(e: crate::herdr::HerdrError) -> String { if e.message.trim().is_empty() { format!("herdr did not take the key ({})", e.code) } else { e.message } }
 
-fn press(api: &Herdr, pane: &str) -> Result<(), String> {
+/// `n`: the count judged. The screen must still say it before each key: another count is other hooks, not judged.
+fn press(api: &Herdr, pane: &str, n: usize) -> Result<(), String> {
     let s = screen(api, pane);
-    if dialog::count(&s).is_none() { return Err("the dialog went away before it was answered".into()); }
+    match dialog::count(&s) { None => return Err("the dialog went away before it was answered".into()), Some(c) if c != n => return Err(format!("the screen now counts {c} hooks, not the {n} judged")), _ => {} }
     let (number, chosen) = dialog::trust_line(&s).ok_or("its \"Trust all and continue\" line is not on the screen")?;
     if !chosen {
         api.pane_text(pane, &number).map_err(said)?;
-        if !soon(|| { let s = screen(api, pane); dialog::count(&s).is_some() && dialog::trust_line(&s).is_some_and(|(_, c)| c) }) { return Err(format!("\"Trust all and continue\" was not chosen after {number} was typed, so nothing was confirmed")); }
+        if !soon(|| { let s = screen(api, pane); dialog::count(&s) == Some(n) && dialog::trust_line(&s).is_some_and(|(_, c)| c) }) { return Err(format!("\"Trust all and continue\" was not chosen after {number} was typed, so nothing was confirmed")); }
     }
     api.agent_keys(pane, &["enter"]).map_err(said)?;
     if !soon(|| dialog::count(&screen(api, pane)).is_none()) { return Err("enter was pressed on \"Trust all and continue\", and the dialog is still there".into()); }

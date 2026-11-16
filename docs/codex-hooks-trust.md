@@ -41,11 +41,12 @@ and answers only when every one of them passes:
    `$HOME`, a command inside it), a program called by name (`make hook`, `rm`), a file that is not there, code given to
    `node` that starts programs, imports, or loads a file by a path (give `node` the file instead, so it is read), a module loaded by name that is not one of Node's own (it would be found
    where the hook runs), a network module loaded any way (`require(`node:http`)`, `import('https')`, Ruby's `net/http`), a removal with
-   `recursive` in it, a file it loads that is not there to read as text (a native `.node`), `fetch`, `curl`,
+   `recursive` in it, a file it loads that is not there to read as text (a native `.node`), a package folder it loads (its
+   `package.json` names what runs), `fetch`, `curl`,
    secrets (`~/.ssh`, `auth.json`, tokens, `history.jsonl`), deleting a tree or history, or hidden code (`eval`,
    base64 into a shell).
-5. All passed: the board types the number of "Trust all and continue", checks that line is the chosen one, and presses
-   enter; then checks the dialog is gone. Codex writes the trust in its own config.toml, as when you press it.
+5. All passed: the board reads the screen again (it must still count as many hooks as were judged), types the number
+   of "Trust all and continue", checks that line is the chosen one and the count again, and presses enter; then checks the dialog is gone. Codex writes the trust in its own config.toml, as when you press it.
 
 Anything else, and the board presses nothing: the seat waits for you (needs you). A reviewer's row says why
 (`The reviewer's Codex asks to trust its hooks, and the board did not: …`), and its review waits however long you take:
@@ -57,6 +58,8 @@ folder, and for each hook its event, where it comes from and what was read, or t
 The board never turns the check off and never starts Codex with `--dangerously-bypass-hook-trust`.
 
 ## Its limits
+
+Judging runs nothing of what it judges: git is asked only what runs none of a checkout's own filters or monitors.
 
 The reading in step 4 looks for plain words, not for what the code does: it stops the plain ways of doing those things,
 not a hidden one, and not what a program the hook calls by name does. It can also stop a hook that only names such a

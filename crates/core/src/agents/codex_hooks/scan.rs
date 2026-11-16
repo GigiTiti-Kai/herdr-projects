@@ -62,7 +62,7 @@ fn files_of(name: &str, bases: &[&Path], home: &Path) -> Vec<PathBuf> {
     let places: Vec<PathBuf> = if name.starts_with('/') { vec![PathBuf::from(&name)] } else { bases.iter().map(|b| b.join(&name)).collect() };
     // Every file node (or a script's own loader) may take for the name, so none of them runs unread.
     let ends = ["", ".js", ".cjs", ".mjs", ".ts", ".d.ts", ".json", ".node"];
-    places.into_iter().flat_map(|p| ends.iter().map(|e| PathBuf::from(format!("{}{e}", p.display()))).chain(["index.js", "index.cjs", "index.mjs", "index.json", "index.node", "package.json"].iter().map(|i| p.join(i))).collect::<Vec<_>>())
+    places.into_iter().flat_map(|p| ends.iter().map(|e| PathBuf::from(format!("{}{e}", p.display()))).chain(["index.js", "index.cjs", "index.mjs", "index.json", "index.node"].iter().map(|i| p.join(i))).collect::<Vec<_>>())
         .filter(|p| p.is_file()).map(|p| clean(&p)).collect()
 }
 fn clean(p: &Path) -> PathBuf { p.components().fold(PathBuf::new(), |mut out, c| { match c { std::path::Component::ParentDir => { out.pop(); } std::path::Component::CurDir => {} c => out.push(c) } out }) }
@@ -86,6 +86,8 @@ pub fn files(command: &str, root: &Path, cwd: &Path, home: &Path, plugin: bool) 
         let base = f.parent().map(Path::to_path_buf).unwrap_or_default();
         let bases: Vec<&Path> = if plugin { vec![&base, cwd, root] } else { vec![&base, cwd] };
         todo.extend(named(&text).iter().flat_map(|n| files_of(n, &bases, home)));
+        // A folder it loads as a package: node runs what its package.json names, which is not followed here.
+        if let Some(n) = loads(&text).into_iter().find(|n| (n.starts_with('.') || n.starts_with('/')) && base.join(n).join("package.json").is_file()) { return Err(format!("{} loads the package folder {n}, whose own entry the board does not follow", f.display())); }
         // A file it loads by a path that is not there to read: whatever node would take for it is not judged.
         if let Some(n) = loads(&text).into_iter().find(|n| (n.starts_with('.') || n.starts_with('/')) && files_of(n, &[&base], home).is_empty()) { return Err(format!("{} loads {n}, which is not there to read", f.display())); }
         seen.push((f, text));

