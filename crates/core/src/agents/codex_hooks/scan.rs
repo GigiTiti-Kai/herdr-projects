@@ -11,11 +11,11 @@ use std::sync::LazyLock;
 const FLAGS: [(&str, &str); 7] = [
     ("reads secrets", r"\.ssh/|id_rsa|id_ed25519|\.netrc|\.aws/|\.git-credentials|auth\.json|credentials|gh auth token|\bbws\b|history\.jsonl|keychain|\.gnupg"),
     ("sends over the network", r"\b(curl|wget|nc|ncat|socat|telnet|ssh|scp|sftp|rsync|ftp)\b"),
-    ("sends over the network", r#"require\(\s*['"](node:)?(http|https|http2|net|tls|dgram)['"]"#),
-    ("sends over the network", r"\bfetch\(|XMLHttpRequest|WebSocket|/dev/(tcp|udp)/|Invoke-(WebRequest|RestMethod)|\burllib\b|\brequests\.(get|post|put)\(|\bsocket\.|\bhttp\.client"),
+    ("sends over the network", r#"['"](node:)?(http|https|http2|net|tls|dgram|dns|undici)['"]"#), // a module, however it is loaded (`require (…)`, `import(…)`, `from …`)
+    ("sends over the network", r"\bfetch\s*\(|XMLHttpRequest|WebSocket|/dev/(tcp|udp)/|Invoke-(WebRequest|RestMethod)|\burllib\b|\brequests\.(get|post|put)\(|\bsocket\.|\bhttp\.client"),
     ("deletes a tree or history", r#"\brm\b[^\n]{0,80}?(\s|['"])(-[a-zA-Z]*[rR][a-zA-Z]*\b|--recursive)|\.rm\([^)]*recursive|\bfind\b[^\n]*\s-delete\b"#),
     ("deletes a tree or history", r"rmSync\([^)]*recursive|rmdirSync\([^)]*recursive|shutil\.rmtree|\brimraf\b|git\s+(push|reset\s+--hard|clean\s+-)|\bmkfs|\bdd\s+if=|\bshred\b"),
-    ("runs code it hides", r#"base64\s+(-d|--decode)|\batob\(|['"]base64['"]|\beval\(|new\s+Function\(|\|\s*(ba|z)?sh\b"#),
+    ("runs code it hides", r#"base64\s+(-d|--decode)|\batob\s*\(|['"]base64['"]|\beval\s*\(|\bFunction\s*\(|\|\s*(ba|z)?sh\b"#),
 ];
 static RES: LazyLock<Vec<(&str, Regex)>> = LazyLock::new(|| FLAGS.iter().map(|(w, r)| (*w, Regex::new(r).unwrap())).collect());
 static QUOTED: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"['"]([^'"\n]{1,300})['"]"#).unwrap());

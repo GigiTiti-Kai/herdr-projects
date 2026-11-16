@@ -11,8 +11,8 @@ const SHELLS: [&str; 4] = ["sh", "bash", "zsh", "dash"];
 /// Programs that run code: `-e`/`-c`/`--eval` gives them the code itself, a file their script.
 const CODE: [&str; 8] = ["node", "python", "python3", "ruby", "perl", "deno", "bun", "pwsh"];
 static LATER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"`|\$\(|\$\{?[A-Za-z_]").unwrap());
-/// Code given inline that starts other programs: which ones is not read.
-static STARTS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"child_process|\bspawn|\bexec\w*\(|subprocess|os\.system|popen|\bsystem\(").unwrap());
+/// Code given inline that starts other programs or loads code by a name: which is not read.
+static STARTS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"child_process|\bspawn|\bexec\w*\s*\(|subprocess|os\.system|popen|\bsystem\s*\(|\bimport\s*\(").unwrap());
 
 /// The plugin's folder and the human's home as a command names them, put in.
 pub fn known(command: &str, root: &Path, home: &Path) -> String {
@@ -48,7 +48,7 @@ fn parts(s: &str) -> Result<Vec<Vec<String>>, String> {
 /// A name the command gives as a file: absolute, from home, or in the seat's folder.
 fn file(w: &str, cwd: &Path, home: &Path) -> Option<PathBuf> {
     let p = if let Some(rest) = w.strip_prefix("~/") { home.join(rest) } else if w.starts_with('/') { PathBuf::from(w) } else { cwd.join(w) };
-    p.is_file().then_some(p)
+    p.is_file().then(|| p.components().collect()) // `./x` as the file's own name
 }
 
 /// The files the command starts (its scripts). Err: a part runs what cannot be read before it runs.
@@ -59,7 +59,8 @@ pub fn runs(command: &str, root: &Path, cwd: &Path, home: &Path) -> Result<Vec<P
     for words in parts(&text)? {
         let words: Vec<&String> = words.iter().skip_while(|w| w.split_once('=').is_some_and(|(k, _)| !k.is_empty() && k.chars().all(|c| c.is_alphanumeric() || c == '_'))).collect();
         let Some(first) = words.first() else { continue };
-        let program = first.rsplit('/').next().unwrap_or(first);
+        // A program is one by its name alone, found on PATH; a name with a path (`./node`) is a file like any other.
+        let program = first.as_str();
         let (shell, code) = (SHELLS.contains(&program), CODE.contains(&program));
         if !shell && !code {
             out.push(file(first, cwd, home).ok_or_else(|| format!("it runs `{first}`, which the board does not read"))?);
@@ -70,7 +71,7 @@ pub fn runs(command: &str, root: &Path, cwd: &Path, home: &Path) -> Result<Vec<P
             match args.next().map(|w| w.as_str()) {
                 Some("-c") if shell => { out.extend(runs(args.next().map(|w| w.as_str()).unwrap_or(""), root, cwd, home)?); break None; }
                 Some("-e" | "--eval" | "-c" | "-Command") if code => {
-                    if STARTS.is_match(args.next().map(|w| w.as_str()).unwrap_or("")) { return Err(format!("the code it gives `{program}` starts other programs")); }
+                    if STARTS.is_match(args.next().map(|w| w.as_str()).unwrap_or("")) { return Err(format!("the code it gives `{program}` starts other programs or loads code by a name")); }
                     break None;
                 }
                 Some(w) if w.starts_with('-') => continue,

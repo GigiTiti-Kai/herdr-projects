@@ -35,8 +35,9 @@ and answers only when every one of them passes:
    command again) or a program (`node -e '…'`, which may not start other programs), the files it names, and those they
    name in turn. A name without a path is the seat's folder's, as Codex runs the hook there. A part whose target is
    known only when it runs (a `$` value other than the plugin's folder or `$HOME`, a command inside it), that calls a
-   program by name instead of a file (`make hook`, `rm`), or names a file that is not there, is not trusted. Nor is a
-   hook that sends over the network, reads secrets (`~/.ssh`, `auth.json`, tokens, `history.jsonl`), deletes a tree or
+   program by name instead of a file (`make hook`, `rm`), or names a file that is not there, is not trusted. Only a bare
+   name is a shell or `node` and the like; one with a path (`./node`) is a file, read and judged as any other. Nor is a
+   hook that sends over the network (a network module loaded any way, `fetch`, `curl`), reads secrets (`~/.ssh`, `auth.json`, tokens, `history.jsonl`), deletes a tree or
    history, or runs hidden code (`eval`, base64 into a shell).
 5. All passed: the board types the number of "Trust all and continue", checks that line is the chosen one, and presses
    enter; then checks the dialog is gone. Codex writes the trust in its own config.toml, as when you press it.
