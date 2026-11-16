@@ -62,11 +62,11 @@ fn resizing_keeps_the_chat_on_the_last_line_and_the_working_rows_columns_at_the_
                 // (At 120 the row stands a step in under the machine's row on top, and its time gives way first.)
                 assert!(has(l, r"Pin the chat to the bottom +█+░+ +55% 12m left {2}PR#3( {2}6m {4})? *$"), "{note}: {l:?}"); assert_eq!(width(l), columns, "{note}");
                 if columns >= 130 { assert!(l.trim_end().ends_with("PR#3  6m"), "{note}: {l:?}"); }
-                assert!(has(&lines[n + 1], r"^[ ▌] {10,12}Checking every window size\. *$"), "{note}: {:?}", lines[n + 1]);
+                assert!(has(&lines[n + 1], r"^[ ▌] {10,12}エージェントなし · Checking every window size\. *$"), "{note}: {:?}", lines[n + 1]);
             } else {
-                // Under 80 columns its first line is the name alone: the columns are on its third line, the bar filling the width.
-                assert!(has(l.trim_end(), r"^[ ▌] ◐ PRJ-\d+ +\[運用\] Pin the chat to the bottom$"), "{note}: {l:?}");
-                if rows >= 20 { let third = lines[n + 2].trim_end(); assert!(has(third, r"^[ ▌] {9,11}█+░+ 55% 12m left {2}PR#3 {2}6m$"), "{note}: {third:?}"); assert_eq!(width(third), columns, "{note}"); }
+                // Under 80 columns its first line is the name alone: the columns are on the line after its words, the bar filling the width.
+                assert!(has(l.trim_end(), r"^[ ▌] ○ PRJ-\d+ +\[運用\] Pin the chat to the bottom$"), "{note}: {l:?}");
+                if rows >= 20 { let third = lines[n + 2..].iter().find(|l| l.contains("55%")).map(|l| l.trim_end()).unwrap_or_default(); assert!(has(third, r"^[ ▌] {9,11}█+░+ 55% 12m left {2}PR#3 {2}6m$"), "{note}: {third:?}"); assert_eq!(width(third), columns, "{note}"); }
             }
         }
         // All spare height is the list's (a narrow screen's working row is one line taller). The old test made the row

@@ -14,6 +14,8 @@ use sw::shown::ink::{Ink, Inked};
 mod kinds;
 /// Each row measured once while a long list folds to its room.
 mod measured;
+/// A row no agent of the board's works, and 運用中 (shown/ongoing.rs).
+mod ongoing;
 
 const NOW: i64 = 1_800_000_000_000;
 fn has(text: &str, re: &str) -> bool { Regex::new(re).unwrap().is_match(text) }

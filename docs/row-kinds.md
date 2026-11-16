@@ -53,3 +53,6 @@ machine's. A task of the same repo is named too. Where the name is cut, the tag 
 When the message changes, so does the tag: a later message that no longer says `に委任` takes it off.
 
 Both are in the `?` menu, under **on a row**.
+
+A row said to be at work with no agent of the board's on it (most `[運用]` rows) has `○` for a mark and says
+`エージェントなし` first; a day after it was added it stands under its own heading, `運用中` ([運用中](ongoing.md)).

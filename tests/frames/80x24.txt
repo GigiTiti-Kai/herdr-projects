@@ -11,8 +11,8 @@
    ◆ #11    [運用] Max length for task titles                 R#1 PR#60       1m
             Pass
    ▾ working
-   ◐ #2     [運用] Max length for task titles                                 1m
-            Drafting
+   ○ #2     [運用] Max length for task titles                                 1m
+            エージェントなし · Drafting
    ◇ #4     [運用] Max length for task titles                                 1m
             Starting
 ▌  ◐ #5     [運用] Max length for task titles                                 1m
@@ -34,8 +34,8 @@
    ◆ #11    [運用] Max length for task titles                 R#1 PR#60       1m
             Pass
    ▾ working
-   ◐ #2     [運用] Max length for task titles                                 1m
-            Drafting
+   ○ #2     [運用] Max length for task titles                                 1m
+            エージェントなし · Drafting
    ◇ #4     [運用] Max length for task titles                                 1m
             Starting
 ▌  ◐ #5     [運用] Max length for task titles                                 1m
@@ -92,7 +92,7 @@
 
  ctrl: does something
    ctrl+l       yes: approve the merge, say yes, retry, take it as it is
- ↓ 51 more
+ ↓ 52 more
 
 ────────────────────────────────────────────────────────────────────────────────
 ❯ Add a task
@@ -111,8 +111,8 @@
    ◆ #11    [運用] Max length for task titles                 R#1 PR#60       1m
             Pass
    ▾ working
-   ◐ #2     [運用] Max length for task titles                                 1m
-            Drafting
+   ○ #2     [運用] Max length for task titles                                 1m
+            エージェントなし · Drafting
    ◇ #4     [運用] Max length for task titles                                 1m
             Starting
 ▌  ◐ #5     [運用] Max length for task titles                                 1m

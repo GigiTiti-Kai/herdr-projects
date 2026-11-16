@@ -59,7 +59,7 @@ sidebar ([other machines](other-machines.md)); a click on it does the same. Ever
 |---|---|
 | `All` | every task in its group and the automations, as always |
 | `Coordinators` | only the coordinators that run (started and not stopped: working, idle, needs you; on autopilot; or failed, so you can fix it): each such machine's row and project's row ([machine and project coordinators](machine-and-project-coordinators.md)). A stopped or never started one is not there, nor in the count; its row stays in the other filters, with no mark. The main Coordinator has no row |
-| `Needs you`, `Working`, `Ready`, `To do` | only the tasks of that group (`Ready` is ready to approve) |
+| `Needs you`, `Working`, `Ready`, `To do` | only the tasks of that group (`Ready` is ready to approve; `Working` not those under `運用中`, [運用中](ongoing.md)) |
 | `Done` | every done task, which the other filters hide |
 | `Automations` | only the automations' rows, in their places |
 | `Pinned` | only what you pinned, in its places: a pinned task, a pinned project with its tasks, a pinned machine with its projects and tasks ([pins](pinned.md)). Its count is each pin once: the pinned machines, projects and tasks, not the other rows under them |
@@ -191,6 +191,7 @@ Each state has a mark of its own, so no two are told apart by colour alone:
 | `◆` | ready to approve |
 | `✓` | done |
 | `○` | to do |
+| `○` (amber) | said to be at work (`report --state working`), with no agent of the board's on it: its line 2 starts with `エージェントなし` ([運用中](ongoing.md)) |
 
 The `?` menu has the list too.
 
@@ -291,7 +292,7 @@ is on it, or it waits for you.
   is whole in the task's panel.
 - **Line 2 is there from the start**, so a row does not grow, and nothing under it moves, when its words arrive. It is
   never empty and never a bare `…`: a task with no words of its own says something true and quiet (`Just started`,
-  `Yours: no agent on it` for a task you marked as your own, `Not reviewed` for finished work nobody reviewed, or the
+  `エージェントなし` for a task said to be at work with no agent on it ([運用中](ongoing.md)), `Not reviewed` for finished work nobody reviewed, or the
   plain word for where it stands).
 
 **Done and to-do tasks keep one line**, so that many of them show at once. (A to-do with a note says it after its name,

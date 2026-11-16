@@ -7,10 +7,11 @@ use crate::board::state::{Row, State};
 use crate::board::update::coords::REPO_HEAD_INK;
 use crate::board::tags::{row_tag, tag_cells};
 use crate::board::theme::Theme;
-use crate::board::view::fields::{bare_title, fields, mark, row_title};
+use crate::board::view::fields::{bare_title, fields, mark, no_agent, row_title};
 use crate::board::view::row::list_numbering;
 use crate::json::*;
 use crate::shown::row_says::{row_fields, sentence};
+use crate::shown::ongoing::{by_hand, ONGOING};
 use crate::shown::states::{group_ink, is_live, status_ink};
 use crate::shown::words::{id_label, repo_label};
 
@@ -21,7 +22,7 @@ pub fn row_of(s: &State, t: &Theme, r: &Obj, now: i64) -> Value {
     json!({
         "id": r.s("id"), "label": id_label(if r.b("rid") { r.s("rid") } else { r.s("id") }), "tag": row_tag(r, &s.data.keys), "host": r.s("host"), "title": bare_title(s, r), "kind": crate::board::view::kind::chip(r), // `kind`: the chip before its title (view/kind.rs)
         "strong": false, "mark": m.s("t"), "markDim": m.b("d"), "markBold": m.b("b"), "color": status_ink(r).name(), "live": is_live(r),
-        "says": pieces(&sentence(r)), "progress": if live { json!(r.f("progress").clamp(0.0, 100.0)) } else { Value::Null },
+        "says": pieces(&if by_hand(r) { no_agent(sentence(r)) } else { sentence(r) }), "progress": if live { json!(r.f("progress").clamp(0.0, 100.0)) } else { Value::Null },
         "percent": f.percent.text().trim(), "eta": f.eta.text(), "review": pieces(&f.review), "pr": pieces(&f.pr), "prUrl": crate::review_page::render::web_url(r.s("pr")),
         "time": format!("{}{}", f.elapsed, if f.ago { " ago" } else { "" }), "quiet": (r.s("state") == "done"),
         "pinned": r.b("pinned"), "archived": r.b("archivedAt"), "app": r.s("app"), "made": r.at("automation").b("id"), // `made`: by an automation (its [auto] tag is dimmed, as every tag is)
@@ -77,7 +78,7 @@ pub fn list_of(s: &State, t: &Theme) -> Value {
                 // it dimmed (a repo's key, what a folded row holds, what the top row holds).
                 let (words, shown) = crate::board::view::list::heading_words(s, t, &s.rows, at);
                 let repo = !*autos && (s.by_repo || id.starts_with(&format!("{}repo\t", crate::board::update::heads::HEAD)));
-                let color = if *autos { "auto" } else if *machine || *id == top || repo { REPO_HEAD_INK.name() } else if ["needs you", "ready to approve", "working", "to do", "done"].contains(&name.as_str()) { group_ink(name).name() } else { "subtext0" };
+                let color = if *autos { "auto" } else if *machine || *id == top || repo { REPO_HEAD_INK.name() } else if ["needs you", "ready to approve", "working", ONGOING, "to do", "done"].contains(&name.as_str()) { group_ink(name).name() } else { "subtext0" };
                 groups.push(obj(json!({ "name": if repo { repo_label(name) } else { name.clone() }, "key": if repo { crate::board::tags::heading_key(s, at) } else { String::new() }, "id": id,
                     "folded": *folded > 0 || *empty, "count": if *empty { json!("0 tasks") } else { count(*folded, *folded_autos) }, "color": color, "repo": repo, "machine": *machine, "top": *id == top, "automations": *autos,
                     "words": pieces(&words), "depth": depth, "coord": coord(id), "pilot": pilot(shown), "rows": [], "more": 0 })));

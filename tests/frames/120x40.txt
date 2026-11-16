@@ -17,8 +17,8 @@
    ◆ #11    [運用] Max length for task titles                                                         R#1 PR#60       1m
             Pass
    ▾ working
-   ◐ #2     [運用] Max length for task titles                                           40% 90m left                  1m
-            Drafting
+   ○ #2     [運用] Max length for task titles                                           40% 90m left                  1m
+            エージェントなし · Drafting
    ◇ #4     [運用] Max length for task titles                                                                         1m
             Starting
 ▌  ◐ #5     [運用] Max length for task titles                                           60% 11m left                  1m
@@ -59,8 +59,8 @@
    ◆ #11    [運用] Max length for task titles         R#1 PR#60       1m │  /all/src/board/view/row-wrap.js and more
             Pass                                                         │  words after it.
    ▾ working                                                             │
-   ◐ #2     [運用] Max length for task titles                         1m │  Settings ──────────────────────────────────
-            Drafting                                                     │  Reading its settings…
+   ○ #2     [運用] Max length for task titles                         1m │  Settings ──────────────────────────────────
+            エージェントなし · Drafting                                  │  Reading its settings…
    ◇ #4     [運用] Max length for task titles                         1m │
             Starting                                                     │  alt+t shows the whole task
 ▌  ◐ #5     [運用] Max length for task titles                         1m │
@@ -156,7 +156,7 @@
    alt+p        show the side panel: this task, beside the list
    alt+t        show the whole task, full screen
    alt+a        show the archive
- ↓ 27 more
+ ↓ 28 more
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ❯ Add a task
@@ -181,8 +181,8 @@
    ◆ #11    [運用] Max length for task titles                                                         R#1 PR#60       1m
             Pass
    ▾ working
-   ◐ #2     [運用] Max length for task titles                                           40% 90m left                  1m
-            Drafting
+   ○ #2     [運用] Max length for task titles                                           40% 90m left                  1m
+            エージェントなし · Drafting
    ◇ #4     [運用] Max length for task titles                                                                         1m
             Starting
 ▌  ◐ #5     [運用] Max length for task titles                                           60% 11m left                  1m
