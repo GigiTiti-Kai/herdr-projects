@@ -68,7 +68,8 @@ pub fn agent(f: &F, verb: &str, arg2: &str, argv: &[String], flag: &dyn Fn(&str)
             st["panes"][pi]["agent"] = a;
             if refused { return fail("invalid_input", &canonical); }
             let d = st.at("dialogs").i(&kind);
-            if d > 0 { st["dialogs"][&kind] = json!(d - 1); st["panes"][pi]["agent"]["status"] = json!("blocked"); return fail("agent_not_ready", &format!("agent {arg2} is blocked during startup and is not ready for prompts")); }
+            // `dialogScreen`: per kind, what the dialog shows (Codex's hooks review).
+            if d > 0 { st["dialogs"][&kind] = json!(d - 1); st["panes"][pi]["agent"]["status"] = json!("blocked"); if st.at("dialogScreen").b(&kind) { st["panes"][pi]["agent"]["screen"] = st["dialogScreen"][&kind].clone(); } return fail("agent_not_ready", &format!("agent {arg2} is blocked during startup and is not ready for prompts")); }
             let p = st["panes"][pi].clone();
             return ok(json!({ "type": "agent_started", "agent": F::agent_out(&p) }));
         }
@@ -113,7 +114,11 @@ pub fn agent(f: &F, verb: &str, arg2: &str, argv: &[String], flag: &dyn Fn(&str)
                 let t = text_of(st["panes"][pi]["agent"].at("box")); st["panes"][pi]["agent"]["box"] = Value::Null;
                 drop(st); play(f, pi, &t); return ok(json!({ "type": "ok" }));
             }
-            if st["panes"][pi]["agent"].s("status") == "blocked" && enter { F::bump(&mut st, pi, "idle", true); }
+            if st["panes"][pi]["agent"].s("status") == "blocked" && enter {
+                // Codex's hooks review answered: it goes on to its own screen, whichever line was chosen.
+                if st["panes"][pi]["agent"].s("screen").contains("Hooks need review") { st["panes"][pi]["agent"]["screen"] = json!("› Ask Codex to do anything\n"); }
+                F::bump(&mut st, pi, "idle", true);
+            }
             else if keys.iter().any(|k| k == "esc") && st["panes"][pi]["agent"].s("status") == "working" { F::bump(&mut st, pi, "idle", true); }
             ok(json!({ "type": "ok" }))
         }

@@ -123,10 +123,13 @@ pub fn start_agent(id: &str, g: &mut Guard, prompt: &str, resume: Option<&str>) 
         }
     })?;
     crate::land::park::resumed(id);
-    if prompt.is_empty() { return Ok("started"); }
+    // Codex's hooks review in the way: answered by the board when every hook is the human's own (agents/codex_hooks),
+    // after the text waits in the inbox, so the turn it starts is delivered as for any dialog answered.
+    let hooks = || if blocked && kind == "codex" { let _ = crate::agents::codex_hooks::press::answer(&api, &pane, &cwd, &format!("{id} worker")); };
+    if prompt.is_empty() { hooks(); return Ok("started"); }
     let mut extra = Obj::new();
     if resume.is_none() { extra.put("first", true); }
-    if blocked { queue_text(id, prompt, extra)?; return Ok("queued"); }
+    if blocked { queue_text(id, prompt, extra)?; hooks(); return Ok("queued"); }
     flow::send::deliver(&t, prompt, None, resume.is_none())
 }
 /// Which program works on the task is `worker.agent` as it reads when the agent starts, not when it was queued. Only
