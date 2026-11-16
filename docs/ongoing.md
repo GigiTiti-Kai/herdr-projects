@@ -2,21 +2,21 @@
 
 **A row shows whether an agent of the board's is on it.** An agent's row has the moon (`◐`), and its bar, its time
 left, its review round, its pull request, how long it has worked, and under its name what it is doing now. A task that
-is only said to be at work (`herdr-projects report <id> --state working`, by you, a coordinator or a resident seat
-such as Hermes) has no agent of the board's: its row has a ring (`○`, amber) where the moon would be, and its line 2
+is only said to be at work (`herdr-projects report <id> --state working`, by you, a coordinator or a resident seat)
+has no agent of the board's: its row has a ring (`○`, amber) where the moon would be, and its line 2
 says so first.
 
 ```
  ▾ working
-   ◐ APP-29 [自動] Check the hooks' trust                   ████░░░░ 50% 6m left  R#6 PR#30  40m
-            Looking at F9's risky read, and running the tests again
-   ○ OPS-54 [運用] Hand the hook to the seat                                                     6m
-            エージェントなし · Pulled; now the hook and the wording
+   ◐ APP-12 [自動] Speed up the image cache                 ███░░░░░ 30% 9m left  R#2 PR#14  25m
+            Measuring the cache misses after the change
+   ○ OPS-21 [運用] Note the new rota                                                            12m
+            エージェントなし · Asked the team for Friday's slot
  ▾ 運用中
-   ○ OPS-138 [運用] Walk the job boards every hour                                               20h
-            エージェントなし · Round 7: 12 read, 2 kept
+   ○ OPS-7  [運用] Read the shared inbox each morning                                            3h
+            エージェントなし · Morning pass: 4 mails, 1 answered
  ▾ to do
-   ○ OPS-60 [運用] Not begun                                                                 1d ago
+   ○ OPS-30 [運用] Not begun                                                                 1d ago
 ```
 
 - **The board cannot tell who is behind such a row**, or whether anyone is: only that no agent of its own is. So it
@@ -27,7 +27,7 @@ says so first.
 ## 運用中
 
 **A row no agent of the board's works, added more than a day ago, stands under its own heading, `運用中`, right after
-`working`.** Those are the rows whose end is not coming: a seat's round that runs on, a ledger kept by hand. `working`
+`working`.** Those are the rows whose end is not coming: a seat's daily pass that runs on, a ledger kept by hand. `working`
 keeps what is on its way to done: the agents' rows, the reviewer's, the board's own steps, the queued ones, and a row
 said to be at work for less than a day.
 

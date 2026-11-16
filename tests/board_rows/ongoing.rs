@@ -28,13 +28,13 @@ fn only_a_row_no_agent_works_added_over_a_day_ago_stands_under_運用中() {
 }
 
 #[test]
-fn on_the_board_a_round_that_runs_on_moves_under_運用中_and_says_no_agent_works_it() {
+fn on_the_board_a_pass_that_runs_on_moves_under_運用中_and_says_no_agent_works_it() {
     let w = world();
     sw::clock::set(Some(NOW));
-    let round = w.add("Walk the job boards every hour");
-    let ledger = w.add("Hand the hook to the seat");
+    let round = w.add("Read the shared inbox each morning");
+    let ledger = w.add("Note the new rota");
     w.add("Not begun");
-    at_work(&round, "Round 7: 12 read, 2 kept");
+    at_work(&round, "Morning pass: 4 mails, 1 answered");
     at_work(&ledger, "");
     added(&round, NOW - 2 * AFTER);
     let mut s = open(&w.root, 40);
@@ -43,16 +43,16 @@ fn on_the_board_a_round_that_runs_on_moves_under_運用中_and_says_no_agent_wor
     let text = list(&mut s);
     let at = |p: &str| text.lines().position(|l| l.contains(p)).unwrap_or_else(|| panic!("{p}: {text}"));
     // working, then 運用中, then to do; each row under its own heading.
-    assert!(at("▾ working") < at("] Hand the hook") && at("] Hand the hook") < at(&format!("▾ {ONGOING}")) && at(&format!("▾ {ONGOING}")) < at("] Walk the job boards") && at("] Walk the job boards") < at("▾ to do"), "{text}");
+    assert!(at("▾ working") < at("] Note the new rota") && at("] Note the new rota") < at(&format!("▾ {ONGOING}")) && at(&format!("▾ {ONGOING}")) < at("] Read the shared inbox") && at("] Read the shared inbox") < at("▾ to do"), "{text}");
     // No moon: nobody the board runs works them, and line 2 says so first.
-    for name in ["] Walk the job boards", "] Hand the hook"] { assert!(text.lines().nth(at(name)).unwrap().trim_start_matches(['▌', ' ']).starts_with("○ PRJ-"), "{name}: {text}"); }
-    assert_eq!(text.lines().nth(at("] Walk the job boards") + 1).unwrap().trim_matches(['▌', ' ']), "エージェントなし · Round 7: 12 read, 2 kept", "{text}");
-    assert_eq!(text.lines().nth(at("] Hand the hook") + 1).unwrap().trim_matches(['▌', ' ']), "エージェントなし", "{text}");
+    for name in ["] Read the shared inbox", "] Note the new rota"] { assert!(text.lines().nth(at(name)).unwrap().trim_start_matches(['▌', ' ']).starts_with("○ PRJ-"), "{name}: {text}"); }
+    assert_eq!(text.lines().nth(at("] Read the shared inbox") + 1).unwrap().trim_matches(['▌', ' ']), "エージェントなし · Morning pass: 4 mails, 1 answered", "{text}");
+    assert_eq!(text.lines().nth(at("] Note the new rota") + 1).unwrap().trim_matches(['▌', ' ']), "エージェントなし", "{text}");
     // The Working filter counts and shows working only.
     assert!(text.contains("Working 1 "), "{text}");
     while s.s.show != 3 { s.press(&["tab"]); }
     let text = list(&mut s);
-    assert!(text.contains("Hand the hook") && !text.contains("Walk the job boards"), "{text}");
+    assert!(text.contains("Note the new rota") && !text.contains("Read the shared inbox"), "{text}");
     // The web board has the same heading, in the brighter grey, and the same line 2.
     let page = web(&w, "board", json!({}));
     let groups = page.at("list").arr("groups");
@@ -60,7 +60,7 @@ fn on_the_board_a_round_that_runs_on_moves_under_運用中_and_says_no_agent_wor
     assert_eq!(ongoing.s("color"), "subtext0");
     let row = &ongoing.arr("rows")[0];
     let said: String = row.arr("says").iter().map(|p| p.t("t")).collect();
-    assert_eq!((row.s("mark"), said.as_str()), ("○", "エージェントなし · Round 7: 12 read, 2 kept"));
+    assert_eq!((row.s("mark"), said.as_str()), ("○", "エージェントなし · Morning pass: 4 mails, 1 answered"));
 }
 
 #[test]

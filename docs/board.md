@@ -179,7 +179,9 @@ So the live tasks, the ones that need your eye, stay on screen, also on a phone 
 
 ## Marks: where a task stands
 
-Each state has a mark of its own, so no two are told apart by colour alone:
+Each state has a mark of its own, so no two are told apart by colour alone (but one: a task said to be at work with no
+agent on it has the ring of to do, in amber, and is told apart by its line 2, which a to-do row has not and which
+always starts with `エージェントなし`):
 
 | Mark | Means |
 |---|---|
