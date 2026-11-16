@@ -67,7 +67,7 @@ fn a_drag_over_the_task_panel_leaves_the_list_and_the_rule_out() {
     b.s.sel = id; b.load();
     let lines = b.lines();
     let (top, last) = (row_of(&lines, "State"), row_of(&lines, "Next "));
-    let list = lines[top].find('│').map(|n| lines[top][..n].chars().count()).unwrap();
+    let list = lines[top].find('│').map(|n| sw::text::width(&lines[top][..n])).unwrap();
     let (text, _) = drag(&mut b, (list, top), (119, last));
     let rows: Vec<&str> = text.lines().collect();
     assert_eq!(rows.len(), last - top + 1, "{text}");

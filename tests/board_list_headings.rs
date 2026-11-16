@@ -41,14 +41,14 @@ fn every_machine_a_heading_its_repos_under_it_and_rows_with_the_number_alone() {
     let here = sw::shown::words::clean(&sw::remote::check::hostname());
     // Under All machines on top: each machine a step in, its projects a step further, their tasks one more.
     assert!(t.starts_with(" herdr-projects") && has(&t, r"\n ▾ All machines  2 machines · 5 tasks *\n"), "{t}");
-    assert!(has(&t, &format!(r"{}     ▾ proj · PRJ *\n[ ▌] {{6}}○ PRJ-\d+ +Mine", head(&regex::escape(&here)))), "this machine first, under its own name, its project a step in, its tasks a step further: {t}");
+    assert!(has(&t, &format!(r"{}     ▾ proj · PRJ *\n[ ▌] {{6}}○ PRJ-\d+ +\[運用\] Mine", head(&regex::escape(&here)))), "this machine first, under its own name, its project a step in, its tasks a step further: {t}");
     // The repo the board is in comes first on every machine, as on one.
-    assert!(has(&t, &format!(r"{}     (○ |  )?▾ proj *\n[ ▌] {{6}}○ #151 +Theirs in proj[^\n]*\n     (○ |  )?▾ crm *\n[ ▌] {{6}}○ #4 +Theirs in crm", head("otherbox"))), "{t}");
+    assert!(has(&t, &format!(r"{}     (○ |  )?▾ proj *\n[ ▌] {{6}}○ #151 +\[運用\] Theirs in proj[^\n]*\n     (○ |  )?▾ crm *\n[ ▌] {{6}}○ #4 +\[運用\] Theirs in crm", head("otherbox"))), "{t}");
     assert!(!t.contains("otherbox#") && !t.contains("otherbox:"), "a row never names its machine, nor a heading the repo's machine: {t}");
     // By status (after by machine): the same machines, their status groups under them.
     s.press(&["alt+s", "alt+s"]);
     let t = s.screen(100).join("\n");
-    assert!(has(&t, &format!(r"{}     ▾ to do\n[ ▌] {{4}}○ #\d+ +Theirs in (crm|proj)[^\n]*\n[ ▌] {{4}}○ #\d+ +Theirs", head("otherbox"))), "{t}");
+    assert!(has(&t, &format!(r"{}     ▾ to do\n[ ▌] {{4}}○ #\d+ +\[運用\] Theirs in (crm|proj)[^\n]*\n[ ▌] {{4}}○ #\d+ +\[運用\] Theirs", head("otherbox"))), "{t}");
     // One machine's board: that machine's row on top, its groups a step in under it.
     s.press(&["alt+m"]); s.s.scope.clear(); sw::board::update::list::relist(&mut s.s);
     let t = s.screen(100).join("\n");

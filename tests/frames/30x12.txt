@@ -1,8 +1,8 @@
 == the list
  herdr-projects  proj
  All 18  tab next
-▌ ◐ #5     Max length for task
-▌          titles
+▌ ◐ #5     [運用] Max length
+▌          for task titles
 ▌   Found the cause; now
 ▌   checking every caller of …
 ▌          ████████░░░░░    1m
@@ -14,8 +14,8 @@
 == the task beside it
  herdr-projects  proj
  All 18  tab next
-▌ ◐ #5     Max length for task
-▌          titles
+▌ ◐ #5     [運用] Max length
+▌          for task titles
 ▌   Found the cause; now
 ▌   checking every caller of …
 ──────────────────────────────
@@ -45,7 +45,7 @@
                 headings
    ← →          fold the
                 heading; on a
- ↓ 182 more
+ ↓ 201 more
 ──────────────────────────────
 ❯ Add a task
 ──────────────────────────────
@@ -53,8 +53,8 @@
 == a draft
  herdr-projects  proj
  All 18  tab next
-▌ ◐ #5     Max length for task
-▌          titles
+▌ ◐ #5     [運用] Max length
+▌          for task titles
 ▌   Found the cause; now
 ▌   checking every caller of …
 ▌          ████████░░░░░    1m

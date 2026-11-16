@@ -65,7 +65,7 @@ fn resizing_keeps_the_chat_on_the_last_line_and_the_working_rows_columns_at_the_
                 assert!(has(&lines[n + 1], r"^[ ▌] {10,12}Checking every window size\. *$"), "{note}: {:?}", lines[n + 1]);
             } else {
                 // Under 80 columns its first line is the name alone: the columns are on its third line, the bar filling the width.
-                assert!(has(l.trim_end(), r"^[ ▌] ◐ PRJ-\d+ +Pin the chat to the bottom$"), "{note}: {l:?}");
+                assert!(has(l.trim_end(), r"^[ ▌] ◐ PRJ-\d+ +\[運用\] Pin the chat to the bottom$"), "{note}: {l:?}");
                 if rows >= 20 { let third = lines[n + 2].trim_end(); assert!(has(third, r"^[ ▌] {9,11}█+░+ 55% 12m left {2}PR#3 {2}6m$"), "{note}: {third:?}"); assert_eq!(width(third), columns, "{note}"); }
             }
         }

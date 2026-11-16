@@ -42,7 +42,7 @@ fn rows(s: &mut State, r: &Rec, list: &[Rec], width: usize) -> Vec<String> { let
 fn drawn(s: &mut State, width: usize, h: usize) -> Vec<Inked> { list_lines(s, &t(), width, h, width) }
 fn plain(lines: &[Inked]) -> Vec<String> { lines.iter().map(|x| x.text().trim_end().to_string()).collect() }
 fn is_lit(l: &Inked) -> bool { l.0.iter().any(|p| p.bg == Some(Ink::Selection) || p.inv) }
-fn len(l: &str) -> usize { l.chars().count() }
+fn len(l: &str) -> usize { sw::text::width(l) }
 
 #[test]
 fn narrow_screen_a_live_tasks_name_and_what_it_says_wrap_to_two_lines_each_under_the_name_and_are_cut_only_after_the_second() {
@@ -50,15 +50,15 @@ fn narrow_screen_a_live_tasks_name_and_what_it_says_wrap_to_two_lines_each_under
     let mut s = board(&list, "", "");
     let b = busy();
     let r52 = rows(&mut s, &b, &list, 52);
-    assert_eq!(r52[..4], [" ◐ #1 Research capy.ai and other coding agents for", "      ideas we could use", "      Researching coding agents and harnesses for", "      ideas, reading what each one says about itself"]);
+    assert_eq!(r52[..4], [" ◐ #1 [運用] Research capy.ai and other coding", "      agents for ideas we could use", "      Researching coding agents and harnesses for", "      ideas, reading what each one says about itself"]);
     assert!(has(&r52[4], r"^ {6}[█░]+ +3% +5h$"), "the progress line stays under them: {r52:?}"); assert_eq!(r52.len(), 5);
     // Longer than two lines: the second one is cut with "…", never a third.
     let wordy = with(&b, json!({ "title": words(30, "word"), "msg": words(30, "say") }));
     let lines = rows(&mut s, &wordy, &list, 43);
     assert_eq!(lines.len(), 5); assert!(lines.iter().all(|l| len(l) <= 43));
-    assert!(has(&lines[0], r"^[ ▌]◐ #1 word1 word2 .*\d$") && has(&lines[1], r"^[ ▌] {5}word\d+ .*…$") && has(&lines[2], r"^[ ▌] {5}say1 say2 .*\d$") && has(&lines[3], r"^[ ▌] {5}say\d+ .*…$"), "{lines:?}");
+    assert!(has(&lines[0], r"^[ ▌]◐ #1 \[運用\] word1 word2 .*\d$") && has(&lines[1], r"^[ ▌] {5}word\d+ .*…$") && has(&lines[2], r"^[ ▌] {5}say1 say2 .*\d$") && has(&lines[3], r"^[ ▌] {5}say\d+ .*…$"), "{lines:?}");
     // What fits one line takes one line: a short row is the three lines it was.
-    assert_eq!(rows(&mut s, &with(&b, json!({ "title": "Short", "msg": "Busy." })), &list, 52)[..2], [" ◐ #1 Short", "      Busy."]);
+    assert_eq!(rows(&mut s, &with(&b, json!({ "title": "Short", "msg": "Busy." })), &list, 52)[..2], [" ◐ #1 [運用] Short", "      Busy."]);
     // With nothing to say, its line is still there and says where it stands: never empty, never a bare "…".
     let quiet = rows(&mut s, &with(&b, json!({ "msg": "" })), &list, 52);
     assert_eq!(quiet[2].trim(), "Working"); assert_eq!(quiet.len(), rows(&mut s, &with(&b, json!({ "msg": "Busy." })), &list, 52).len());
@@ -77,7 +77,7 @@ fn narrow_screen_the_selected_row_shows_its_whole_name_on_as_many_lines_as_it_ne
         let working = group_of(&rc) == "working";
         let name = &lines[..if working { lines.len() - 3 } else { lines.len() }];
         assert!(name.len() > 4, "more than two lines"); assert!(name.iter().all(|l| len(l) <= 52));
-        assert_eq!(name.iter().map(|l| l.chars().skip(6).collect::<String>()).collect::<Vec<_>>().join(" "), title, "the whole name, not cut");
+        assert_eq!(name.iter().map(|l| l.chars().skip(6).collect::<String>()).collect::<Vec<_>>().join(" "), format!("[運用] {title}"), "the whole name, not cut");
         assert!(name[1..].iter().all(|l| l.starts_with("      ") && l.chars().nth(6) != Some(' ')), "under the name, right of the task's number");
         // Not selected, it is cut again: two lines for a live task, one for any other.
         s.sel = String::new();
@@ -87,9 +87,9 @@ fn narrow_screen_the_selected_row_shows_its_whole_name_on_as_many_lines_as_it_ne
     // In the list: the highlight covers every line of it, each to the edge, and its neighbours stay one line.
     let mut s = board(&all(), "p/2", "");
     let d = drawn(&mut s, 52, 30);
-    let shown: Vec<String> = plain(&d).into_iter().filter(|l| has(l, "Rethink|told before|Bring")).collect();
+    let shown: Vec<String> = plain(&d).into_iter().filter(|l| has(l, "Rethink|remembers|Bring")).collect();
     // One step in under the top row (update/depth.rs).
-    assert_eq!(shown, ["▌ ○ #2 Rethink how the Coordinator works, restarts", "▌      and remembers what it was told before it", "  ○ #3 Bring the board to herdr's web UI"]);
+    assert_eq!(shown, ["▌ ○ #2 [運用] Rethink how the Coordinator works,", "▌      restarts and remembers what it was told", "  ○ #3 [運用] Bring the board to herdr's web UI"]);
     let lit: Vec<&Inked> = d.iter().filter(|l| is_lit(l)).collect();
     assert_eq!(lit.len(), 3); assert!(lit.iter().all(|l| len(&l.text()) == 52));
 }
@@ -101,12 +101,12 @@ fn narrow_screen_to_do_and_done_rows_stay_one_line_and_go_without_their_time_so_
     let wide = plain(&drawn(&mut s, 140, 30));
     let lg = long();
     // One step in under the top row (update/depth.rs): a cell less for the names.
-    assert!(narrow.contains(&"  ✓ #4 Third row line on narrow screens for progres…".to_string()) && narrow.contains(&"  ○ #3 Bring the board to herdr's web UI".to_string()), "{}", narrow.join("\n"));
-    assert!(narrow.contains(&format!("  ○ #2 {}…", lg.s("title").chars().take(44).collect::<String>())), "a name cut at the edge, not before a time: {}", narrow.join("\n"));
+    assert!(narrow.contains(&"  ✓ #4 [運用] Third row line on narrow screens for …".to_string()) && narrow.contains(&"  ○ #3 [運用] Bring the board to herdr's web UI".to_string()), "{}", narrow.join("\n"));
+    assert!(narrow.contains(&format!("  ○ #2 [運用] {}…", lg.s("title").chars().take(37).collect::<String>())), "a name cut at the edge, not before a time: {}", narrow.join("\n"));
     assert!(!narrow.iter().any(|l| has(l, r"^ +[○✓].* 5h")));
     // A wider screen is as it was: the time at the right of every row, one line for a to-do or done row, two for a live one.
     assert_eq!(wide.iter().filter(|l| l.ends_with(" 5h ago")).count(), 3);
-    assert!(has(wide.iter().find(|l| l.contains("Research")).unwrap(), r"^[ ▌] +◐ #\d+ Research.* 5h$"));
+    assert!(has(wide.iter().find(|l| l.contains("Research")).unwrap(), r"^[ ▌] +◐ #\d+ \[運用\] Research.* 5h$"));
     assert_eq!(wide.iter().filter(|l| !l.trim().is_empty()).count(), 1 + 3 + 5, "the top row, three headings, five lines of rows");
     let mut sel = board(&all(), "p/2", "");
     assert_eq!(plain(&drawn(&mut sel, 140, 30)).iter().filter(|l| !l.trim().is_empty()).count(), 1 + 3 + 5, "the selected row does not wrap on a wide screen");

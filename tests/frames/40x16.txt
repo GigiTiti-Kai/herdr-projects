@@ -1,14 +1,14 @@
 == the list
  herdr-projects  proj
  All 18  tab next
-  ◇ #4     Max length for task titles
+  ◇ #4     [運用] Max length for task
+           titles
            Starting                   1m
-▌ ◐ #5     Max length for task titles
+▌ ◐ #5     [運用] Max length for task
+▌          titles
 ▌          Found the cause; now checking
 ▌          every caller of the resize h…
 ▌          █████░░░░  60% 11m left    1m
-
-
  ↓ 9 more · ↑ 7 more
 
 ────────────────────────────────────────
@@ -18,14 +18,14 @@
 == the task beside it
  herdr-projects  proj
  All 18  tab next
-  ◇ #4     Max length for task titles
-           Starting                   1m
-▌ ◐ #5     Max length for task titles
+▌ ◐ #5     [運用] Max length for task
+▌          titles
 ▌          Found the cause; now checking
 ▌          every caller of the resize h…
 ▌          █████░░░░  60% 11m left    1m
 
- ↓ 9 more · ↑ 7 more
+
+ ↓ 9 more · ↑ 8 more
 
 ────────────────────────────────────────
 ❯ Add a task
@@ -60,7 +60,7 @@
    pgup pgdn    a page of tasks up or
                 down (in the whole
                 task: a page of its
- ↓ 107 more
+ ↓ 117 more
 
 ────────────────────────────────────────
 ❯ Add a task
@@ -69,14 +69,14 @@
 == a draft
  herdr-projects  proj
  All 18  tab next
-  ◇ #4     Max length for task titles
+  ◇ #4     [運用] Max length for task
+           titles
            Starting                   1m
-▌ ◐ #5     Max length for task titles
+▌ ◐ #5     [運用] Max length for task
+▌          titles
 ▌          Found the cause; now checking
 ▌          every caller of the resize h…
 ▌          █████░░░░  60% 11m left    1m
-
-
  ↓ 9 more · ↑ 7 more
 
 ────────────────────────────────────────

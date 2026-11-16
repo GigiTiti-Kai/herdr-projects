@@ -22,8 +22,8 @@ fn three(w: &World) -> Vec<Obj> {
 fn row_id(a: &Obj) -> String { format!("auto:{}", a.s("id")) }
 fn t(s: &mut Board, width: usize) -> String { s.screen(width).join("\n") }
 fn like(text: &str, re: &str) { assert!(regex::Regex::new(re).unwrap().is_match(text), "{re}\n{text}"); }
-/// Where `part` starts in `l`, in characters (the JS test's indexOf).
-fn col(l: &str, part: &str) -> usize { l[..l.find(part).unwrap()].chars().count() }
+/// Where `part` starts in `l`, in cells (the JS test's indexOf).
+fn col(l: &str, part: &str) -> usize { sw::text::width(&l[..l.find(part).unwrap()]) }
 fn ink_of(l: &sw::shown::ink::Inked, part: &str) -> Option<Ink> { l.0.iter().find(|p| p.t.contains(part)).map(|p| p.c) }
 
 #[test]
@@ -36,8 +36,8 @@ fn the_group_has_a_colour_of_its_own_narrow_rows_a_menu_of_its_own_and_stays_wit
     l::turn(all[2].s("id"), false).unwrap(); s.s.sel = "proj/1".into(); s.load();
     let lines = s.screen(120);
     // every name starts where the task's title starts; "2h" ends where the task's "0s" does, and "never fired" at the right edge
-    for (n, name) in [(6, "Look"), (7, "Release"), (8, "Nightly")] { assert_eq!(col(&lines[n], name), col(&lines[4], "Mine"), "{}", lines[n]); }
-    assert_eq!(lines[6].chars().count(), col(&lines[4], " ago")); assert_eq!(lines[7].chars().count(), lines[4].chars().count());
+    for (n, name) in [(6, "Look"), (7, "Release"), (8, "Nightly")] { assert_eq!(col(&lines[n], name), col(&lines[4], "[運用]"), "{}", lines[n]); }
+    assert_eq!(sw::text::width(&lines[6]), col(&lines[4], " ago")); assert_eq!(sw::text::width(&lines[7]), sw::text::width(&lines[4]));
     // a colour of its own: the heading and the mark of one that is on are the automations' ink, which no status has; off is not
     let inked = s.inked(120);
     assert_eq!(ink_of(&inked[5], "automations"), Some(Ink::Auto)); assert_eq!(ink_of(&inked[6], "⟳"), Some(Ink::Auto));
@@ -55,7 +55,7 @@ fn the_group_has_a_colour_of_its_own_narrow_rows_a_menu_of_its_own_and_stays_wit
     // too narrow for the tasks' numbers: they go, the names still start where the task's title does, and on or off is the first word under each
     let tiny = s.screen(22);
     let at = |re: &str| { let r = regex::Regex::new(re).unwrap(); tiny.iter().position(|l| r.is_match(l)).unwrap_or_else(|| panic!("{re}\n{}", tiny.join("\n"))) };
-    assert!(at(r"^ +○ Mine") > 0);
+    assert!(at(r"^ +○ \[運用\] Mine") > 0);
     like(&tiny[at(r"^▌ ⟳ Look for old") + 2], r"^▌ {3}on · every 2h"); like(&tiny[at(r"^  ⟳ Release note") + 2], r"^ {4}on · when a task"); like(&tiny[at(r"^  ⟳ Nightly audit") + 1], r"^ {4}off · daily 03:00");
     // off, tab would only say so: its hint goes
     s.press(&["space"]); like(&s.screen(120)[6], r"^▌  ⟳ off {3}Look for old dependencies {2}every 2h +never fired");
@@ -100,7 +100,7 @@ fn more_automations_than_fit_the_list_says_how_many_it_does_not_show_and_the_sel
     let note = |l: &[String]| l.iter().find(|x| regex::Regex::new(r"^ [↓↑] ").unwrap().is_match(x)).cloned().unwrap_or_default();
     let lines = s.screen(100);
     let l1 = list(&lines);
-    assert!(lines.iter().any(|l| regex::Regex::new(r"^▌  ○ PRJ-\d Task \d").unwrap().is_match(l)), "{}", lines.join("\n")); assert!(l1.iter().any(|x| x == "   ▾ automations"));
+    assert!(lines.iter().any(|l| regex::Regex::new(r"^▌  ○ PRJ-\d \[運用\] Task \d").unwrap().is_match(l)), "{}", lines.join("\n")); assert!(l1.iter().any(|x| x == "   ▾ automations"));
     assert!(l1.iter().any(|x| regex::Regex::new(r"^   ⟳ on {4}Automation 01 {2}every 1h +next in {2}1h$").unwrap().is_match(x)), "{}", lines.join("\n"));
     assert_eq!(note(&l1), format!(" ↓ {} automations", 16 - shown(&l1))); assert!(shown(&l1) >= 2 && shown(&l1) < 16);
     // no task gives way for them: every task shows

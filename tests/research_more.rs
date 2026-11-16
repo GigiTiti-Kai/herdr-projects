@@ -135,7 +135,7 @@ fn the_settings_page_has_it_with_its_plain_label_and_a_row_from_another_machine_
     assert!(s.screen(120).join("\n").contains("Fix the page [research]"));
     // Another machine's task: its own machine worked it out, and nothing here is asked.
     set_value(NAME, &json!(true), &Scope::you()).unwrap();
-    assert_eq!(sw::board::view::fields::row_title(&s.s, &obj(json!({ "id": "far/1", "host": "vm-a", "title": "Their change", "research": false }))), "Their change");
+    assert_eq!(sw::board::view::fields::row_title(&s.s, &obj(json!({ "id": "far/1", "host": "vm-a", "title": "Their change", "research": false }))), "[運用] Their change");
     unset_value(NAME, &Scope::you()).unwrap();
-    assert_eq!(sw::board::view::fields::row_title(&s.s, &obj(json!({ "id": "far/2", "host": "vm-a", "title": "Their research", "research": true }))), "Their research [research]");
+    assert_eq!(sw::board::view::fields::row_title(&s.s, &obj(json!({ "id": "far/2", "host": "vm-a", "title": "Their research", "research": true }))), "[調査] Their research [research]");
 }

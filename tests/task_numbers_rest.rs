@@ -29,5 +29,5 @@ fn one_row_laid_out_on_its_own_takes_the_number_column_of_its_list() {
     let one = std::slice::from_ref(&list[2]);
     let lay = row_layout(&mut s, &t, one, 60, &[one.to_vec()], 200);
     let first = row_lines(&s, &t, &list[2], 60, &lay)[0].text();
-    assert!(Regex::new(r"^[ ▌]○ #9 {3}Rename").unwrap().is_match(&first), "on a list, the list's column: {first:?}");
+    assert!(Regex::new(r"^[ ▌]○ #9 {3}\[運用\] Rename").unwrap().is_match(&first), "on a list, the list's column: {first:?}");
 }

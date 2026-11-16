@@ -3,6 +3,7 @@
 //! into cells in herdr's colours. One file per part of the screen.
 pub mod fields;
 pub mod guard;
+pub mod kind;
 pub mod row;
 pub mod row_fit;
 pub mod row_tall;

@@ -2,12 +2,12 @@
  herdr-projects  proj
  All 18   Needs 5   Working 9   Ready 1   To do 2   Done 1
    ▾ working
-   ◐ #2     Max length for task titles
+   ◐ #2     [運用] Max length for task titles
             Drafting
             ████░░░░░░  40% 90m left                      1m
-   ◇ #4     Max length for task titles
+   ◇ #4     [運用] Max length for task titles
             Starting                                      1m
-▌  ◐ #5     Max length for task titles
+▌  ◐ #5     [運用] Max length for task titles
 ▌           Found the cause; now checking every caller of
 ▌           the resize handler for the same mistake
 ▌           ██████░░░░  60% 11m left                      1m
@@ -23,12 +23,12 @@
  herdr-projects  proj
  All 18   Needs 5   Working 9   Ready 1   To do 2   Done 1
    ▾ working
-   ◐ #2     Max length for task titles
+   ◐ #2     [運用] Max length for task titles
             Drafting
             ████░░░░░░  40% 90m left                      1m
-   ◇ #4     Max length for task titles
+   ◇ #4     [運用] Max length for task titles
             Starting                                      1m
-▌  ◐ #5     Max length for task titles
+▌  ◐ #5     [運用] Max length for task titles
 ▌           Found the cause; now checking every caller of
 ▌           the resize handler for the same mistake
 ▌           ██████░░░░  60% 11m left                      1m
@@ -76,7 +76,7 @@
                 heading
    space        talk to this row's agent, and back to the
                 top row's coordinator
- ↓ 68 more
+ ↓ 73 more
 
 ────────────────────────────────────────────────────────────
 ❯ Add a task
@@ -86,12 +86,12 @@
  herdr-projects  proj
  All 18   Needs 5   Working 9   Ready 1   To do 2   Done 1
    ▾ working
-   ◐ #2     Max length for task titles
+   ◐ #2     [運用] Max length for task titles
             Drafting
             ████░░░░░░  40% 90m left                      1m
-   ◇ #4     Max length for task titles
+   ◇ #4     [運用] Max length for task titles
             Starting                                      1m
-▌  ◐ #5     Max length for task titles
+▌  ◐ #5     [運用] Max length for task titles
 ▌           Found the cause; now checking every caller of
 ▌           the resize handler for the same mistake
 ▌           ██████░░░░  60% 11m left                      1m

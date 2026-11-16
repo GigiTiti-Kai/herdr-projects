@@ -39,9 +39,9 @@ fn t() -> Theme { Theme::default_dark(false) }
 fn lay(s: &mut State, list: &[Rec], width: usize, screen: usize) -> Layout { row_layout(s, &t(), list, width, &[list.to_vec()], screen) }
 fn inked(s: &State, r: &Rec, width: usize, l: &Layout) -> Vec<Inked> { row_lines(s, &t(), r, width, l) }
 fn plain(s: &State, r: &Rec, width: usize, l: &Layout) -> Vec<String> { inked(s, r, width, l).iter().map(|x| x.text()).collect() }
-fn len(l: &str) -> usize { l.chars().count() }
-fn idx(l: &str, p: &str) -> usize { l.find(p).map(|b| l[..b].chars().count()).unwrap() }
-fn run_of(l: &str, re: &str) -> usize { Regex::new(re).unwrap().find(l).map(|m| m.as_str().chars().count()).unwrap_or(0) }
+fn len(l: &str) -> usize { sw::text::width(l) }
+fn idx(l: &str, p: &str) -> usize { l.find(p).map(|b| sw::text::width(&l[..b])).unwrap() }
+fn run_of(l: &str, re: &str) -> usize { Regex::new(re).unwrap().find(l).map(|m| sw::text::width(m.as_str())).unwrap_or(0) }
 
 #[test]
 fn narrow_screen_a_live_rows_third_line_has_the_bar_the_percent_the_minutes_left_the_review_tag_the_pull_request_and_the_time() {
@@ -52,15 +52,15 @@ fn narrow_screen_a_live_rows_third_line_has_the_bar_the_percent_the_minutes_left
         let mut rows: Vec<Vec<String>> = all.iter().map(|r| plain(&s, r, width, &l)).collect();
         let note = format!("at {width}:\n{}", rows.concat().join("\n"));
         // A name longer than its line wraps onto a second one: that row is one line taller.
-        let long = if width < 6 + review().s("title").len() { 1 } else { 0 };
+        let long = if width < 6 + 7 + review().s("title").len() { 1 } else { 0 };
         // A row with nothing for a third line but its time has the time at the end of what it says, and no line for it alone.
         for (n, lines) in rows.iter().enumerate() {
             assert_eq!(lines.len(), if n == 1 { 3 + long } else if n == 3 { 2 } else { 3 }, "{note}");
             assert!(lines.iter().all(|x| len(x) <= width), "{note}"); assert_eq!(len(lines.last().unwrap()), width, "{note}");
         }
         // Line 1 is the mark, the task's number and the name with the whole width: nothing beside it.
-        assert_eq!(rows[0][0].trim_end(), " ◐ #1 Agent at work"); assert_eq!(rows[2][0].trim_end(), " ◆ #3 Good work"); assert_eq!(rows[3][0].trim_end(), " ◐ #4 Brand new");
-        assert_eq!(rows[1][..1 + long].iter().map(|x| x.trim().trim_start_matches("◑ #2 ").to_string()).collect::<Vec<_>>().join(" "), review().s("title"), "{note}");
+        assert_eq!(rows[0][0].trim_end(), " ◐ #1 [運用] Agent at work"); assert_eq!(rows[2][0].trim_end(), " ◆ #3 [運用] Good work"); assert_eq!(rows[3][0].trim_end(), " ◐ #4 [運用] Brand new");
+        assert_eq!(rows[1][..1 + long].iter().map(|x| x.trim().trim_start_matches("◑ #2 ").to_string()).collect::<Vec<_>>().join(" "), format!("[運用] {}", review().s("title")), "{note}");
         // Then what the task says, as on a wide screen.
         let said: Vec<String> = rows[..3].iter().map(|x| x[x.len() - 2].trim_end().to_string()).collect();
         assert_eq!(said, ["      Reading the panel and its tests.", "      Running the tests", "      Pass · 1 minor"]);
@@ -92,7 +92,8 @@ fn the_third_line_is_there_under_80_columns_of_screen_and_gone_from_80_on_for_ev
     assert_eq!(TALL_BELOW, 80);
     let heights = |s: &mut State, width: usize, screen: usize| { let l = lay(s, &all, width, screen); all.iter().map(|r| row_lines(s, &t(), r, width, &l).len()).collect::<Vec<_>>() };
     // (The fourth has only a time for its third line: it goes on the second, and the row is two lines.)
-    for width in [60, 79] { assert_eq!(heights(&mut s, width, width), [3, 3, 3, 2, 1, 1], "at {width}"); }
+    // (At 60 the second row's name, with its chip, no longer fits its line: that row is one line taller, as in the first test.)
+    assert_eq!(heights(&mut s, 79, 79), [3, 3, 3, 2, 1, 1], "at 79"); assert_eq!(heights(&mut s, 60, 60), [3, 4, 3, 2, 1, 1], "at 60");
     // Narrower, the names and words that do not fit their line wrap: no live row with columns is under three.
     for width in [30, 40, 55] { let tall = heights(&mut s, width, width); assert!(tall[..3].iter().all(|n| *n >= 3) && tall[3] >= 2, "at {width}"); assert_eq!(tall[4..], [1, 1], "at {width}"); }
     for width in [80, 81, 120, 200] { assert_eq!(heights(&mut s, width, width), [2, 2, 2, 2, 1, 1], "at {width}"); }
@@ -104,16 +105,16 @@ fn the_third_line_is_there_under_80_columns_of_screen_and_gone_from_80_on_for_ev
     let list = |s: &mut State, w: usize| { let k = if w + 2 >= 60 { 2 } else { 1 }; list_lines(s, &t(), w + k, 40, w + k).iter().map(|l| l.text().chars().skip(k).collect::<String>()).collect::<Vec<_>>() };
     let (narrow, wide) = (list(&mut s, 60), list(&mut s, 80));
     let count = |v: &[String]| v.iter().filter(|l| !l.trim().is_empty()).count();
-    assert_eq!(count(&narrow) - count(&wide), 3, "one more line for each live row that has columns for it: three of the four");
+    assert_eq!(count(&narrow) - count(&wide), 3 + 1, "one more line for each live row that has columns for it: three of the four, and one for the name that wraps (the kind chip takes 7 cells of its line)");
     let find = |v: &[String], w: &str| v.iter().find(|l| l.contains(w)).cloned().unwrap_or_default();
-    assert!(has(&find(&narrow, "Finished"), r"^[ ▌]✓ #\d+ Finished +R#1 PR#3$") && has(&find(&narrow, "Not begun"), r"^[ ▌]○ #\d+ Not begun *$"), "{}", narrow.join("\n"));
-    assert!(has(&find(&wide, "Finished"), r"^[ ▌]✓ #\d+ Finished +R#1 PR#3 +2h$") && has(&find(&wide, "Not begun"), r"^[ ▌]○ #\d+ Not begun +2h$"), "{}", wide.join("\n"));
-    // At 80 the columns sit beside a name of 40 cells: the widest of each kind, bar and all. The task's number is not
+    assert!(has(&find(&narrow, "Finished"), r"^[ ▌]✓ #\d+ \[運用\] Finished +R#1 PR#3$") && has(&find(&narrow, "Not begun"), r"^[ ▌]○ #\d+ \[運用\] Not begun *$"), "{}", narrow.join("\n"));
+    assert!(has(&find(&wide, "Finished"), r"^[ ▌]✓ #\d+ \[運用\] Finished +R#1 PR#3 +2h$") && has(&find(&wide, "Not begun"), r"^[ ▌]○ #\d+ \[運用\] Not begun +2h$"), "{}", wide.join("\n"));
+    // At 80 the columns sit beside a name of 40 cells (the kind chip and 33 more): the widest of each kind, bar and all. The task's number is not
     // counted in the 80: with it that is 83, and at 80 the bar is what gives way.
-    let full = work(json!({ "id": "p/1", "title": "A".repeat(40), "msg": "Reading the panel and its tests.", "progress": 40, "eta": 120, "reviewRound": 12, "stage": "reviewing", "pr": 123 }));
+    let full = work(json!({ "id": "p/1", "title": "A".repeat(33), "msg": "Reading the panel and its tests.", "progress": 40, "eta": 120, "reviewRound": 12, "stage": "reviewing", "pr": 123 }));
     let one = std::slice::from_ref(&full);
-    let l = lay(&mut s, one, 88, 88); assert!(has(&plain(&s, &full, 88, &l)[0], r"^[ ▌]◑ #1 A{40} {3}[█░]{8} 40% 120m left {2}R#12 PR#123 {2}2h$"), "{:?}", plain(&s, &full, 88, &l));
-    let l = lay(&mut s, one, 80, 80); assert!(has(&plain(&s, &full, 80, &l)[0], r"^[ ▌]◑ #1 A{40} +40% 120m left {2}R#12 PR#123 {2}2h$"), "{:?}", plain(&s, &full, 80, &l));
+    let l = lay(&mut s, one, 88, 88); assert!(has(&plain(&s, &full, 88, &l)[0], r"^[ ▌]◑ #1 \[運用\] A{33} {3}[█░]{8} 40% 120m left {2}R#12 PR#123 {2}2h$"), "{:?}", plain(&s, &full, 88, &l));
+    let l = lay(&mut s, one, 80, 80); assert!(has(&plain(&s, &full, 80, &l)[0], r"^[ ▌]◑ #1 \[運用\] A{33} +40% 120m left {2}R#12 PR#123 {2}2h$"), "{:?}", plain(&s, &full, 80, &l));
 }
 
 #[test]

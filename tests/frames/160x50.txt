@@ -3,41 +3,41 @@
  All 18   Coordinators 0   Needs you 5   Working 9   Ready 1   To do 2   Done 1   Automations 0   Pinned 0
  ▾ this machine  1 project · 18 tasks
    ▾ needs you
-   ? #9     Max length for task titles                                                                                                                    1m ago
+   ? #9     [運用] Max length for task titles                                                                                                             1m ago
             Should the old settings file be removed, or kept for one more version so that nobody loses what they set?
-   @ #10    Max length for task titles                                                                                                                    1m ago
+   @ #10    [運用] Max length for task titles                                                                                                             1m ago
             Needs a login
-   ! #12    Max length for task titles                                                                                                    R#1 PR#123456   1m ago
+   ! #12    [運用] Max length for task titles                                                                                             R#1 PR#123456   1m ago
             The pull request's checks fail
-   ✗ #13    Max length for task titles                                                                                                                    1m ago
+   ✗ #13    [運用] Max length for task titles                                                                                                             1m ago
             Conflict with main
-   ✗ #14    Max length for task titles                                                                                                                    1m ago
+   ✗ #14    [運用] Max length for task titles                                                                                                             1m ago
             Stopped without a summary
    ▾ ready to approve
-   ◆ #11    Max length for task titles                                                                                                    R#1 PR#60       1m ago
+   ◆ #11    [運用] Max length for task titles                                                                                             R#1 PR#60       1m ago
             Pass
    ▾ working
-   ◐ #2     Max length for task titles                                                                            ███░░░░░  40% 90m left                  1m
+   ◐ #2     [運用] Max length for task titles                                                                     ███░░░░░  40% 90m left                  1m
             Drafting
-   ◇ #4     Max length for task titles                                                                                                                    1m
+   ◇ #4     [運用] Max length for task titles                                                                                                             1m
             Starting
-▌  ◐ #5     Max length for task titles                                                                            █████░░░  60% 11m left                  1m
+▌  ◐ #5     [運用] Max length for task titles                                                                     █████░░░  60% 11m left                  1m
 ▌           Found the cause; now checking every caller of the resize handler for the same mistake
-   ◐ #12345 Max length for task titles                                                                            ████████ 100% 24h left                400d
+   ◐ #12345 [運用] Max length for task titles                                                                     ████████ 100% 24h left                400d
             xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…
-   ◇ #7     Max length for task titles                                                                            █████░░░  65%  3m left                  1m
+   ◇ #7     [運用] Max length for task titles                                                                     █████░░░  65%  3m left                  1m
             Running the check · tests 31 of 47
-   ◑ #8     Max length for task titles                                                                            ███░░░░░  35%  6m left  R#1             1m
+   ◑ #8     [運用] Max length for task titles                                                                     ███░░░░░  35%  6m left  R#1             1m
             Reading the diff.
-   ◐ #17    Max length for task titles [research]                                                                                                         1m
+   ◐ #17    [調査] Max length for task titles [research]                                                                                                  1m
             Reading the logs
-   ◐ #18    日本語のタイトルはとても長いので二倍の幅になります 🚀🚀 and then some more                            ░░░░░░░░   5%                           1m
+   ◐ #18    [運用] 日本語のタイトルはとても長いので二倍の幅になります 🚀🚀 and then some more                     ░░░░░░░░   5%                           1m
             幅の広い文字 🎉 の行
-   ◷ #3     Max length for task titles                                                                                      Q#2                           1m
+   ◷ #3     [運用] Max length for task titles                                                                               Q#2                           1m
             Waiting for a free slot
    ▾ to do
-   ○ #1     Max length for task titles                                                                                                                    1m ago
-   ○ #19    TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT                                                                                  1m ago
+   ○ #1     [運用] Max length for task titles                                                                                                             1m ago
+   ○ #19    [運用] TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT                                                                           1m ago
    ▾ done
      ↓ 1 done (alt+d shows them)
 
@@ -54,42 +54,42 @@
  All 18   Coords 0   Needs 5   Working 9   Ready 1   To do 2   Done 1   Autos 0   Pinned 0        │  #5 Max length for task titles
  ▾ this machine  1 project · 18 tasks                                                             │
    ▾ needs you                                                                                    │  Status ───────────────────────────────────────────────────
-   ? #9     Max length for task titles                                                         1m │  State        ◐ working · for 1m
+   ? #9     [運用] Max length for task titles                                                  1m │  State        ◐ working · for 1m
             Should the old settings file be removed, or kept for one more version so that nobody  │  Progress     ██████████████░░░░░░░░░░ 60% · 11m left
             loses what they set?                                                                  │  Now          Found the cause; now checking every caller of
-   @ #10    Max length for task titles                                                         1m │               the resize handler for the same mistake
+   @ #10    [運用] Max length for task titles                                                  1m │               the resize handler for the same mistake
             Needs a login                                                                         │  On it        claude
-   ! #12    Max length for task titles                                         R#1 PR#123456   1m │
+   ! #12    [運用] Max length for task titles                                  R#1 PR#123456   1m │
             The pull request's checks fail                                                        │  Description ──────────────────────────────────────────────
-   ✗ #13    Max length for task titles                                                         1m │  A task title should have a maximum length. A longer one is
+   ✗ #13    [運用] Max length for task titles                                                  1m │  A task title should have a maximum length. A longer one is
             Conflict with main                                                                    │  cut between words.
-   ✗ #14    Max length for task titles                                                         1m │  Second paragraph, with
+   ✗ #14    [運用] Max length for task titles                                                  1m │  Second paragraph, with
             Stopped without a summary                                                             │  a/very/long/path/that/has/no/space/in/it/at/all/src/board/
    ▾ ready to approve                                                                             │  view/row-wrap.js and more words after it.
-   ◆ #11    Max length for task titles                                         R#1 PR#60       1m │
+   ◆ #11    [運用] Max length for task titles                                  R#1 PR#60       1m │
             Pass                                                                                  │  Settings ─────────────────────────────────────────────────
    ▾ working                                                                                      │  Reading its settings…
-   ◐ #2     Max length for task titles                           40% 90m left                  1m │
+   ◐ #2     [運用] Max length for task titles                    40% 90m left                  1m │
             Drafting                                                                              │  alt+t shows the whole task
-   ◇ #4     Max length for task titles                                                         1m │
+   ◇ #4     [運用] Max length for task titles                                                  1m │
             Starting                                                                              │
-▌  ◐ #5     Max length for task titles                           60% 11m left                  1m │
+▌  ◐ #5     [運用] Max length for task titles                    60% 11m left                  1m │
 ▌           Found the cause; now checking every caller of the resize handler for the same mistake │
-   ◐ #12345 Max length for task titles                          100% 24h left                400d │
+   ◐ #12345 [運用] Max length for task titles                   100% 24h left                400d │
             xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx… │
-   ◇ #7     Max length for task titles                           65%  3m left                  1m │
+   ◇ #7     [運用] Max length for task titles                    65%  3m left                  1m │
             Running the check · tests 31 of 47                                                    │
-   ◑ #8     Max length for task titles                           35%  6m left  R#1             1m │
+   ◑ #8     [運用] Max length for task titles                    35%  6m left  R#1             1m │
             Reading the diff.                                                                     │
-   ◐ #17    Max length for task titles [research]                                              1m │
+   ◐ #17    [調査] Max length for task titles [research]                                       1m │
             Reading the logs                                                                      │
-   ◐ #18    日本語のタイトルはとても長いので二倍の幅になりま…     5%                           1m │
+   ◐ #18    [運用] 日本語のタイトルはとても長いので二倍の幅…      5%                           1m │
             幅の広い文字 🎉 の行                                                                  │
-   ◷ #3     Max length for task titles                           Q#2                           1m │
+   ◷ #3     [運用] Max length for task titles                    Q#2                           1m │
             Waiting for a free slot                                                               │
    ▾ to do                                                                                        │
-   ○ #1     Max length for task titles                                                         1m │
-   ○ #19    TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT                       1m │
+   ○ #1     [運用] Max length for task titles                                                  1m │
+   ○ #19    [運用] TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT                1m │
    ▾ done                                                                                         │
      ↓ 1 done (alt+d shows them)                                                                  │
                                                                                                   │
@@ -196,7 +196,7 @@
    ◇            the board's own step (it checks, waits for GitHub, merges)
    ◷            queued: for a free slot (Q#1 next) or after other tasks
    ?            asks you
- ↓ 13 more
+ ↓ 15 more
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ❯ Add a task
@@ -207,41 +207,41 @@
  All 18   Coordinators 0   Needs you 5   Working 9   Ready 1   To do 2   Done 1   Automations 0   Pinned 0
  ▾ this machine  1 project · 18 tasks
    ▾ needs you
-   ? #9     Max length for task titles                                                                                                                    1m ago
+   ? #9     [運用] Max length for task titles                                                                                                             1m ago
             Should the old settings file be removed, or kept for one more version so that nobody loses what they set?
-   @ #10    Max length for task titles                                                                                                                    1m ago
+   @ #10    [運用] Max length for task titles                                                                                                             1m ago
             Needs a login
-   ! #12    Max length for task titles                                                                                                    R#1 PR#123456   1m ago
+   ! #12    [運用] Max length for task titles                                                                                             R#1 PR#123456   1m ago
             The pull request's checks fail
-   ✗ #13    Max length for task titles                                                                                                                    1m ago
+   ✗ #13    [運用] Max length for task titles                                                                                                             1m ago
             Conflict with main
-   ✗ #14    Max length for task titles                                                                                                                    1m ago
+   ✗ #14    [運用] Max length for task titles                                                                                                             1m ago
             Stopped without a summary
    ▾ ready to approve
-   ◆ #11    Max length for task titles                                                                                                    R#1 PR#60       1m ago
+   ◆ #11    [運用] Max length for task titles                                                                                             R#1 PR#60       1m ago
             Pass
    ▾ working
-   ◐ #2     Max length for task titles                                                                            ███░░░░░  40% 90m left                  1m
+   ◐ #2     [運用] Max length for task titles                                                                     ███░░░░░  40% 90m left                  1m
             Drafting
-   ◇ #4     Max length for task titles                                                                                                                    1m
+   ◇ #4     [運用] Max length for task titles                                                                                                             1m
             Starting
-▌  ◐ #5     Max length for task titles                                                                            █████░░░  60% 11m left                  1m
+▌  ◐ #5     [運用] Max length for task titles                                                                     █████░░░  60% 11m left                  1m
 ▌           Found the cause; now checking every caller of the resize handler for the same mistake
-   ◐ #12345 Max length for task titles                                                                            ████████ 100% 24h left                400d
+   ◐ #12345 [運用] Max length for task titles                                                                     ████████ 100% 24h left                400d
             xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…
-   ◇ #7     Max length for task titles                                                                            █████░░░  65%  3m left                  1m
+   ◇ #7     [運用] Max length for task titles                                                                     █████░░░  65%  3m left                  1m
             Running the check · tests 31 of 47
-   ◑ #8     Max length for task titles                                                                            ███░░░░░  35%  6m left  R#1             1m
+   ◑ #8     [運用] Max length for task titles                                                                     ███░░░░░  35%  6m left  R#1             1m
             Reading the diff.
-   ◐ #17    Max length for task titles [research]                                                                                                         1m
+   ◐ #17    [調査] Max length for task titles [research]                                                                                                  1m
             Reading the logs
-   ◐ #18    日本語のタイトルはとても長いので二倍の幅になります 🚀🚀 and then some more                            ░░░░░░░░   5%                           1m
+   ◐ #18    [運用] 日本語のタイトルはとても長いので二倍の幅になります 🚀🚀 and then some more                     ░░░░░░░░   5%                           1m
             幅の広い文字 🎉 の行
-   ◷ #3     Max length for task titles                                                                                      Q#2                           1m
+   ◷ #3     [運用] Max length for task titles                                                                               Q#2                           1m
             Waiting for a free slot
    ▾ to do
-   ○ #1     Max length for task titles                                                                                                                    1m ago
-   ○ #19    TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT                                                                                  1m ago
+   ○ #1     [運用] Max length for task titles                                                                                                             1m ago
+   ○ #19    [運用] TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT                                                                           1m ago
    ▾ done
      ↓ 1 done (alt+d shows them)
 

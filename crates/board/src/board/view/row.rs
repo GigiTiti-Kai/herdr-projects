@@ -94,7 +94,7 @@ pub fn row_layout(s: &mut State, t: &Theme, records: &[crate::board::state::Rec]
     }
     lay
 }
-pub fn row_name(s: &State, r: &Obj, w: usize) -> Inked { name_ink(r, &row_title(s, r)).cut(w) }
+pub fn row_name(s: &State, r: &Obj, w: usize) -> Inked { let t = row_title(s, r); super::kind::cut_name(s, r, &t, name_ink(r, &t), w) }
 fn fill(x: &Inked, n: usize, left: bool) -> Inked { let gap = Inked::spaces(n.saturating_sub(x.width())); if left { x.clone().add(gap) } else { gap.add(x.clone()) } }
 /// The columns one row shows, drawn: its own from where its section's start.
 pub fn row_keeps(s: &State, t: &Theme, r: &Obj, lay: &Layout) -> Inked {

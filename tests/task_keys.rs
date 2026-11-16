@@ -81,7 +81,7 @@ fn on_the_board_a_keyed_repos_rows_read_hsw_134_the_panel_the_chat_and_the_messa
     assert_eq!([nine.as_str(), big.as_str(), next.as_str()], ["proj/9", "proj/134", "proj/135"]);
     let mut s = open(&w.root, 40); s.s.side = false;
     let row = |s: &mut common::board::Board, title: &str| s.screen(100).into_iter().find(|l| l.contains(title) && has(l, r"^[ ▌] *\S ")).unwrap_or_default();
-    assert!(has(&row(&mut s, "Number nine"), r"^[ ▌]  ○ PRJ-9 {3}Number nine +\ds ago$"), "{}", s.text()); assert!(has(&row(&mut s, "Number one three four"), r"^[ ▌]  ○ PRJ-134 Number one three four +\ds ago$"));
+    assert!(has(&row(&mut s, "Number nine"), r"^[ ▌]  ○ PRJ-9 {3}\[運用\] Number nine +\ds ago$"), "{}", s.text()); assert!(has(&row(&mut s, "Number one three four"), r"^[ ▌]  ○ PRJ-134 \[運用\] Number one three four +\ds ago$"));
     // Find: the number, `#` and the number, or the tag; exactly one task's, the selection goes to it.
     for typed in ["134", "#134"] {
         s.s.sel = nine.clone(); s.press(&["ctrl+f"]); s.typed(typed);
@@ -92,7 +92,7 @@ fn on_the_board_a_keyed_repos_rows_read_hsw_134_the_panel_the_chat_and_the_messa
     // Another key: the tag on the rows, the panel's title, the heading of the details page. The id itself stands once,
     // on the whole task, with the session: where a command needs it.
     set_value("repo.key", &json!("hsw"), &Scope::repo("proj")).unwrap(); s.s.sel = big.clone(); s.load();
-    assert!(has(&row(&mut s, "Number nine"), r"^[ ▌]  ○ HSW-9 {3}Number nine +\ds ago$"), "{}", s.text()); assert!(has(&row(&mut s, "Number one three four"), r"^[ ▌]  ○ HSW-134 Number one three four +\ds ago$"));
+    assert!(has(&row(&mut s, "Number nine"), r"^[ ▌]  ○ HSW-9 {3}\[運用\] Number nine +\ds ago$"), "{}", s.text()); assert!(has(&row(&mut s, "Number one three four"), r"^[ ▌]  ○ HSW-134 \[運用\] Number one three four +\ds ago$"));
     s.s.side = true; let text = s.screen(140).join("\n");
     assert!(has(&text, r"│ {2}HSW-134 Number one three four"), "{text}"); assert!(!text.contains("proj/134"));
     s.s.side = false; s.press(&["alt+t"]); assert!(has(&s.screen(100).join("\n"), r#"^ Task details {2}HSW-134 "Number one three four""#), "{}", s.text());
@@ -111,7 +111,7 @@ fn on_the_board_a_keyed_repos_rows_read_hsw_134_the_panel_the_chat_and_the_messa
     assert_eq!(sent(&big), json!("HSW"));
     // Taken away: the key made from the repo's name again, never a bare number.
     unset_value("repo.key", &Scope::repo("proj")).unwrap(); s.s.sel = big.clone(); s.load();
-    assert!(has(&row(&mut s, "Number one three four"), r"^[ ▌]  ○ PRJ-134 Number one three four")); s.hold("ctrl+a"); s.hold("ctrl+a"); assert!(s.s.msg.contains("Still archiving PRJ-134"), "{}", s.s.msg); s.s.pending.clear();
+    assert!(has(&row(&mut s, "Number one three four"), r"^[ ▌]  ○ PRJ-134 \[運用\] Number one three four")); s.hold("ctrl+a"); s.hold("ctrl+a"); assert!(s.s.msg.contains("Still archiving PRJ-134"), "{}", s.s.msg); s.s.pending.clear();
     assert_eq!(sent(&nine), json!("PRJ"));
 }
 

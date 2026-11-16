@@ -25,15 +25,15 @@ fn has(text: &str, re: &str) -> bool { regex::Regex::new(re).unwrap().is_match(t
 #[test]
 fn a_blocked_tasks_mark_says_what_it_needs_and_is_never_the_mark_of_one_that_went_wrong() {
     for width in [40, 80, 160] {
-        assert!(has(&row(&asks(Some("question")), width), r"^ \? #\d+ +Plan v1 "), "a question at {width}");
-        assert!(has(&row(&asks(Some("permission")), width), r"^ ! #\d+ +Plan v1 "));
-        assert!(has(&row(&asks(Some("auth")), width), r"^ @ #\d+ +Plan v1 "));
-        assert!(has(&row(&login(), width), r"^ @ #\d+ +Plan v1 "), "a login that failed at {width}");
-        assert!(has(&row(&asks(None), width), r"^ ! #\d+ +Plan v1 "));
-        assert!(has(&row(&broke(), width), r"^ ✗ #\d+ +Plan v1 "));
+        assert!(has(&row(&asks(Some("question")), width), r"^ \? #\d+ +\[運用\] Plan v1 "), "a question at {width}");
+        assert!(has(&row(&asks(Some("permission")), width), r"^ ! #\d+ +\[運用\] Plan v1 "));
+        assert!(has(&row(&asks(Some("auth")), width), r"^ @ #\d+ +\[運用\] Plan v1 "));
+        assert!(has(&row(&login(), width), r"^ @ #\d+ +\[運用\] Plan v1 "), "a login that failed at {width}");
+        assert!(has(&row(&asks(None), width), r"^ ! #\d+ +\[運用\] Plan v1 "));
+        assert!(has(&row(&broke(), width), r"^ ✗ #\d+ +\[運用\] Plan v1 "));
     }
     let ready = with(json!({ "state": "blocked", "kind": "permission", "stage": "approval", "msg": "Approve to merge?" }));
-    for width in [40, 160] { assert!(has(&row(&ready, width), r"^ ◆ #\d+ +Plan v1 "), "a merge to approve at {width}"); }
+    for width in [40, 160] { assert!(has(&row(&ready, width), r"^ ◆ #\d+ +\[運用\] Plan v1 "), "a merge to approve at {width}"); }
     let t = Theme::default_dark(false);
     assert_eq!(sw::board::view::fields::mark(&t, &ready).0[0].c, sw::shown::ink::Ink::Green);
     assert_eq!(sw::board::view::fields::mark(&t, &asks(Some("permission"))).0[0].c, sw::shown::ink::Ink::Red);

@@ -40,7 +40,7 @@ fn rows(s: &mut State, r: &Rec, list: &[Rec], width: usize) -> Vec<String> { let
 fn drawn(s: &mut State, width: usize, h: usize) -> Vec<Inked> { list_lines(s, &t(), width, h, width) }
 fn plain(lines: &[Inked]) -> Vec<String> { lines.iter().map(|x| x.text().trim_end().to_string()).collect() }
 fn is_lit(l: &Inked) -> bool { l.0.iter().any(|p| p.bg == Some(Ink::Selection) || p.inv) }
-fn len(l: &str) -> usize { l.chars().count() }
+fn len(l: &str) -> usize { sw::text::width(l) }
 
 #[test]
 fn narrow_screen_rows_of_different_heights_the_selected_row_is_whole_and_in_view_while_you_move_and_the_list_never_runs_past_its_room() {
@@ -102,6 +102,6 @@ fn all_machines_narrow_screen_a_row_never_names_its_machine_its_heading_does_and
     let wordy = with(&busy(), json!({ "host": "box" }));
     let pair = [far.clone(), wordy.clone()];
     let f = rows(&mut s, &far, &pair, 43);
-    assert!(has(&f[0], r"^[ ▌]◐ #1 Fix login *$"), "{f:?}"); assert_eq!(f[1], "      Running the tests one by one"); assert_eq!(f.len(), 3);
-    assert_eq!(rows(&mut s, &wordy, &pair, 43)[..2], [" ◐ #1 Research capy.ai and other coding", "      agents for ideas we could use"]);
+    assert!(has(&f[0], r"^[ ▌]◐ #1 \[運用\] Fix login *$"), "{f:?}"); assert_eq!(f[1], "      Running the tests one by one"); assert_eq!(f.len(), 3);
+    assert_eq!(rows(&mut s, &wordy, &pair, 43)[..2], [" ◐ #1 [運用] Research capy.ai and other", "      coding agents for ideas we could use"]);
 }

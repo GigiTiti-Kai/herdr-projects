@@ -43,28 +43,39 @@ pub fn mark(t: &Theme, r: &Obj) -> Inked {
     let st = r.s("state");
     Inked::of(t.mark(if ["working", "error", "done"].contains(&st) { st } else { "idle" }, ""), c)
 }
-/// The title as the row reads it, with what is said of it in brackets.
+/// The title as the row reads it: its kind chip before it (view/kind.rs) and what is said of it in brackets after it.
 pub fn row_title(s: &State, r: &Obj) -> String {
+    if is_auto(r) { return bare_title(s, r); }
+    format!("{} {}", super::kind::chip(r), bare_title(s, r))
+}
+/// The same without the chip, which the web board shows on its own (webui/model/list.rs: `kind`).
+pub fn bare_title(s: &State, r: &Obj) -> String {
     if is_auto(r) { return crate::shown::words::clean(auto(r).s("name")); }
     let mut t = crate::shown::words::clean(if r.b("title") { r.s("title") } else { r.s("id") });
     if r.arr("attempts").len() > 1 { t.push_str(&format!(" ×{}", r.arr("attempts").len())); }
     if crate::chat_only::is_chat(r) { t.push_str(" [chat]"); }
     if is_research(r) { t.push_str(" [research]"); }
     if r.at("automation").b("id") { t.push_str(" [auto]"); }
+    // Whom it was handed to, and where that stands (view/kind.rs).
+    let handed = super::kind::handed(s, r);
+    if !handed.is_empty() { t.push(' '); t.push_str(&handed); }
     if r.b("archivedAt") && !s.archive_view { t.push_str(" [archived]"); }
     if r.b("pinned") && !r.b("archivedAt") { t.push(' '); t.push_str(crate::board::update::pinned::MARK); } // update/pinned.rs
     t
 }
 /// The title is in the base colour whatever the task's state, never bold: colour means status, and the mark carries
-/// it. What is said of it after it (`×3`, `[auto]`, `[research]`, `[chat]`, `[archived]`) is dimmed, and the pin mark `★`
-/// last is yellow (update/pinned.rs). An automation's name is plain, greyed while it is off.
+/// it. Its kind chip before it (`[運用]`) and what is said of it after it (`×3`, `[auto]`, `[research]`, `[chat]`,
+/// `[委任先 …]`, `[archived]`) are dimmed, and the pin mark `★` last is yellow (update/pinned.rs). An automation's name is
+/// plain, greyed while it is off.
 pub fn name_ink(r: &Obj, s: &str) -> Inked {
     if is_auto(r) { return if auto(r).b("on") { Inked::plain(s) } else { Inked::of(s, Ink::Muted) }; }
     let pin = format!(" {}", crate::board::update::pinned::MARK);
     let (s, pinned) = match s.strip_suffix(pin.as_str()) { Some(rest) => (rest, true), None => (s, false) };
-    let at = crate::re!(r"(?: ×\d+)?(?: \[[a-z]+\])*$").find(s).map(|m| m.start()).unwrap_or(s.len());
+    let from = crate::re!(r"^\[(?:調査|自動|運用)\] ").find(s).map(|m| m.end()).unwrap_or(0);
+    let at = from + crate::re!(r"(?: ×\d+)?(?: \[(?:[a-z]+|委任先 [^\]]*)\])*$").find(&s[from..]).map(|m| m.start()).unwrap_or(s.len() - from);
     let mut out = Inked::new();
-    out.push(&s[..at], Ink::Plain);
+    if from > 0 { out.push(&s[..from], Ink::Muted); }
+    out.push(&s[from..at], Ink::Plain);
     if at < s.len() { out.push(&s[at..], Ink::Muted); }
     if pinned { out = out.add(crate::board::update::pinned::ink()); }
     out

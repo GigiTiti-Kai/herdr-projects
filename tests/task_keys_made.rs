@@ -26,7 +26,7 @@ fn a_repo_a_plain_folder_the_home_folder_and_the_root_each_get_a_key_the_moment_
     assert_eq!(entry("proj"), json!("PRJ")); assert_eq!(keys(), json!({ "proj": "PRJ" }));
     // A task added there is named by it everywhere.
     let id = w.add("First"); b.load();
-    assert_eq!(short(&id), "PRJ-1"); assert!(b.text().contains("○ PRJ-1 First"), "{}", b.text());
+    assert_eq!(short(&id), "PRJ-1"); assert!(b.text().contains("○ PRJ-1 [運用] First"), "{}", b.text());
     assert_eq!(lookup("repo.key", &Scope::repo("proj"), &yours()).unwrap().from, "your entry for proj");
     // A folder that is no git repo, the home folder and `/`: tasks in no repo have a key of their own folder's.
     let notes = add_in(&folder(&w, "meeting-notes"), "Plain folder");
@@ -113,7 +113,7 @@ fn where_the_board_names_a_repo_its_key_stands_beside_it_dimmed_but_never_twice_
     let mut b = common::board::open(&w.root, 30); b.s.side = false; b.press(&["alt+s"]); assert!(b.s.by_repo);
     let text = b.screen(100).join("\n");
     // Under the machine's row on top, each a step further in (update/depth.rs).
-    assert!(has(&text, r"\n   ▾ proj · PRJ\n[ ▌]    ○ PRJ-1 Mine ") && has(&text, r"\n   ▾ gtm-agent · AGN\n[ ▌]    ○ AGN-1 Theirs "), "{text}");
+    assert!(has(&text, r"\n   ▾ proj · PRJ\n[ ▌]    ○ PRJ-1 \[運用\] Mine ") && has(&text, r"\n   ▾ gtm-agent · AGN\n[ ▌]    ○ AGN-1 \[運用\] Theirs "), "{text}");
     let inked = b.inked(100); let at = b.screen(100).iter().position(|l| l.contains("proj · PRJ")).unwrap();
     assert_eq!(inked[at].0.iter().find(|p| p.t.contains("PRJ")).map(|p| p.c), Some(sw::shown::ink::Ink::Muted));
     // Narrow: the heading is cut to the width, the key first.
