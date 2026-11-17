@@ -57,8 +57,8 @@ fn handed_to(s: &State, r: &Obj) -> Vec<(String, Option<&'static str>)> {
     // Named by number in its message and naming it back (a coordinator writes its parent's number into a task it hands
     // on), on a row at work or waiting for you that no agent of the board's works: not one it took back above, nor one
     // whose own sentence (past the brackets right after it) says no after it, at any place it is named.
-    let own = say_id(r.s("id"), &s.data.keys);
     if crate::shown::ongoing::unassigned(r) && ["working", "needs you"].contains(&group_of(r)) {
+        let own = own_tags(s, r);
         for m in num.find_iter(said) {
             let n = m.as_str();
             if named.iter().any(|x| x == n) || taken_back.iter().any(|x| x == n) || said[m.end()..].starts_with(|c: char| c.is_ascii_digit()) { continue; }
@@ -68,8 +68,8 @@ fn handed_to(s: &State, r: &Obj) -> Vec<(String, Option<&'static str>)> {
                 no().is_match(rest)
             });
             if no_after { continue; }
-            let id = id_of_key(n, Some(&s.data.keys));
-            let back = s.data.items.iter().find(|x| x.s("id") == id).is_some_and(|x| names(x.s("title"), &own) || names(x.s("description"), &own));
+            let id = match id_of_key(n, Some(&s.data.keys)) { x if x.is_empty() => before(n), x => x };
+            let back = s.data.items.iter().find(|x| x.s("id") == id).is_some_and(|x| own.iter().any(|o| names(x.s("title"), o) || names(x.s("description"), o)));
             if back { named.push(n.to_string()); }
         }
     }
@@ -82,6 +82,16 @@ fn handed_to(s: &State, r: &Obj) -> Vec<(String, Option<&'static str>)> {
         if out.iter().any(|(t, _)| *t == tag) { continue; }
         out.push((tag, s.data.items.iter().find(|x| x.s("id") == id).map(|x| stands(x))));
     }
+    out
+}
+/// The tags a task goes by: by its repo's key of now, and by each key its repo went by before (store/keys_given.rs).
+fn own_tags(s: &State, r: &Obj) -> Vec<String> {
+    let id = r.s("id");
+    let (repo, num) = id.split_once('/').unwrap_or((id, ""));
+    let mut out = vec![say_id(id, &s.data.keys)];
+    for (k, v) in crate::store::keys_given::had_keys() { if text(&v) == repo && !num.is_empty() { out.push(format!("{k}-{num}")); } }
+    out.sort();
+    out.dedup();
     out
 }
 /// Does `text` name task `tag` (`HCM-22`, not inside `HCM-221` or `XHCM-22`)?

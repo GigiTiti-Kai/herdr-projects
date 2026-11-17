@@ -108,7 +108,7 @@ pub fn board_for(socket: &str) -> Vec<Obj> {
     let session = session_for(&tasks, socket);
     let mut seen = BTreeMap::new();
     let mut rows: Vec<Obj> = tasks.iter().map(|t| shown(t, &session, socket, &mut seen)).collect();
-    super::seats::mark(&mut rows, &tasks, &session, socket);
+    super::seats::mark(&mut rows, &session, socket);
     crate::shown::queue::number(&mut rows);
     rows
 }
@@ -118,7 +118,7 @@ pub fn board(include_archived: bool) -> Vec<Obj> {
     let session = session_for(&tasks, &here);
     let mut seen = BTreeMap::new();
     let mut rows: Vec<Obj> = tasks.iter().map(|t| shown(t, &session, &here, &mut seen)).collect();
-    super::seats::mark(&mut rows, &tasks, &session, &here);
+    super::seats::mark(&mut rows, &session, &here);
     crate::shown::queue::number(&mut rows);
     rows
 }

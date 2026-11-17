@@ -91,12 +91,34 @@ fn not_measured_is_エージェントなし_never_席なし_herdr_not_read_anoth
     let task = std::sync::Arc::new(sw::store::tasks::find(&apply).unwrap());
     let mut rows = vec![sw::flow::live::saved(&task)];
     set_value("board.seats", &json!("proj=[応募]"), &Scope::you()).unwrap();
-    sw::flow::seats::mark(&mut rows, &[task.clone()], &sw::flow::live::Session::Down, &w.socket);
+    sw::flow::seats::mark(&mut rows, &sw::flow::live::Session::Down, &w.socket);
     assert!(!rows[0].has("seat") && !rows[0].has("gonePanes"), "{:?}", rows[0]);
-    sw::flow::seats::mark(&mut rows, &[task], &sw::flow::live::Session::Up { agents: Default::default(), panes: Default::default() }, &w.socket);
+    sw::flow::seats::mark(&mut rows, &sw::flow::live::Session::Up { agents: Default::default(), panes: Default::default() }, &w.socket);
     assert_eq!(rows[0].at("seat"), &json!({ "repo": "proj", "kinds": [], "working": [], "blocked": [] }));
     // Another machine's row says what its own board measured nowhere here.
     let mut far = sw::shown::states::as_row(&rows[0]);
     far.put("host", "far");
     assert_eq!(sw::board::view::measured::line(&s.s, &far, sw::shown::ink::Inked::plain("at it")).text(), "エージェントなし · at it");
+}
+
+#[test]
+fn an_attempt_or_an_archived_task_the_board_started_is_no_seat_and_a_pane_past_9_is_named_by_its_letter() {
+    let w = world();
+    sw::clock::set(Some(NOW));
+    let root = w.root_str();
+    let apply = w.add("[応募] Apply for the jobs");
+    say(&apply, "working", "wEN:pA and wEN:pZ were at it");
+    set_value("board.seats", &json!("proj=[応募]"), &Scope::you()).unwrap();
+    // An attempt of another task, and an archived task, each with its agent in that folder.
+    let top = w.add("Twice");
+    let a = sw::store::attempts::create_attempt(&sw::store::tasks::find(&top).unwrap(), "A", "claude", obj(json!({ "link": { "terminal": "attempt_term" } }))).unwrap().t("id");
+    sw::store::tasks::patch(&top, |t| { t.put("attempts", json!([{ "id": a, "letter": "A" }])); }).unwrap();
+    let old = w.add("Put away");
+    sw::store::tasks::patch(&old, |t| { t.put("terms", json!(["archived_term"])); t.put("archivedAt", NOW); }).unwrap();
+    seat(&w, "wEN:p1", "attempt_term", &root, "claude", "working", "sw-attempt-A");
+    seat(&w, "wEN:p2", "archived_term", &root, "claude", "idle", "sw-old");
+    seat(&w, "wEN:pA", "term_a", "/elsewhere", "hermes", "idle", "");
+    let mut s = open(&w.root, 40);
+    assert_eq!(line(&mut s, "Apply for the jobs"), "席なし（proj） · 報告0s前（wEN:pZ は今は無い）: wEN:pA and wEN:pZ were at it");
+    assert_eq!(sw::flow::seats::panes_named("wEN:p9 old, wEN:pA old, wEN:pZ, wBQ:p1K"), ["wEN:p9", "wEN:pA", "wEN:pZ", "wBQ:p1K"]);
 }

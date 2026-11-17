@@ -51,8 +51,8 @@ work:
 - A seat is named by its name in herdr, or its pane (`wEN:p4`) when it has none. One that waits for input is said in red:
   `入力待ち1(hermes-cw)`. One at rest is counted, not named.
 - None at all is `席なし（crowdsourcing）`, in red: the setting says seats work it, and none is there.
-- The board's own agents, reviewers and coordinators in that folder are no seat: by their terminal, as herdr never hands
-  one out again.
+- The board's own agents (an attempt's and an archived task's too), reviewers and coordinators in that folder are no
+  seat: by their terminal, as herdr never hands one out again.
 - It says where the seats are, not that they work this row: the board cannot tell which row a seat works.
 - herdr not read (not running, or the row is another machine's), or a repo the board does not know: `エージェントなし`,
   as before. It changes within a

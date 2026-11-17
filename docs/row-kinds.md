@@ -51,7 +51,7 @@ it to close it. That does not move it to needs you.
 Most messages do not say `に委任`: `TKN-39で試行中`, `HCM-243を委任済み`. So on a row at work or waiting for you that no
 agent of the board's works, a task its message names by number is whom it handed to too **when that task names it
 back**, in its title or its description: a coordinator writes its parent's number into the task it hands the work to
-(`HCM-221のP3 …`). `HCM-22` in the other task is not `HCM-221`.
+(`HCM-221のP3 …`). `HCM-22` in the other task is not `HCM-221`. A key either repo went by before names it as well.
 
 None it took back is named. A number is left out where its hand-over by `に委任` was taken back (above), and where the
 rest of its sentence after it (past brackets right after it, as in `TKN-39(auto-teikeikun/39)`) has one of the same

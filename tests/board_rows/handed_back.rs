@@ -74,3 +74,13 @@ fn those_not_done_are_named_with_where_they_stand_the_done_ones_counted_and_all_
     let ink = |c: Ink| inked.0.iter().filter(|p| p.c == c).map(|p| p.t.as_str()).collect::<String>();
     assert_eq!((ink(Ink::Teal).as_str(), ink(Ink::Muted).as_str()), ("[委任先 2件すべて完了]", "[運用]  "));
 }
+
+#[test]
+fn a_key_either_repo_went_by_before_still_names_it_both_ways() {
+    let _w = crate::common::world();
+    std::fs::write(sw::store::keys_given::record_file(), json!({ "had": { "PRJ": "proj", "OPS": "ops", "OLD": "proj", "OLDOP": "ops" } }).to_string()).unwrap();
+    let s = state(vec![back("proj/39", "working", "progress", "Try it (OPS-201)"), back("proj/40", "working", "progress", "Try it too (OLDOP-201)")]);
+    assert_eq!(handed(&s, &ledger("PRJ-39で試行中")), "[委任先 PRJ-39・作業中]");
+    assert_eq!(handed(&s, &ledger("OLD-39で試行中")), "[委任先 PRJ-39・作業中]", "its message by the old key");
+    assert_eq!(handed(&s, &ledger("PRJ-40で試行中")), "[委任先 PRJ-40・作業中]", "the other's title by the old key");
+}
