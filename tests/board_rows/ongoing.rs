@@ -74,7 +74,8 @@ fn on_the_board_a_pass_that_runs_on_moves_under_運用中_a_day_after_it_began_a
     assert!(at("▾ working") < at("] Note the new rota") && at("] Fix the hall light") < at(&format!("▾ {ONGOING}")) && at(&format!("▾ {ONGOING}")) < at("] Read the shared inbox") && at("] Read the shared inbox") < at("▾ to do"), "{text}");
     // No moon: nobody the board runs works them, and line 2 says so first.
     for name in ["] Read the shared inbox", "] Note the new rota", "] Fix the hall light"] { assert!(text.lines().nth(at(name)).unwrap().trim_start_matches(['▌', ' ']).starts_with("○ PRJ-"), "{name}: {text}"); }
-    assert_eq!(under(&text, "] Read the shared inbox"), "エージェントなし · Morning pass: 4 mails, 1 answered", "{text}");
+    // What it was told after how long ago it was told (view/measured.rs).
+    assert!(under(&text, "] Read the shared inbox").starts_with("エージェントなし · 報告2d前: Morning pass: 4 mails"), "{text}");
     assert_eq!(under(&text, "] Note the new rota"), "エージェントなし", "{text}");
     // The Working filter counts and shows working only.
     assert!(text.contains("Working 2 "), "{text}");
@@ -88,7 +89,7 @@ fn on_the_board_a_pass_that_runs_on_moves_under_運用中_a_day_after_it_began_a
     assert_eq!(ongoing.s("color"), "subtext0");
     let row = &ongoing.arr("rows")[0];
     let said: String = row.arr("says").iter().map(|p| p.t("t")).collect();
-    assert_eq!((row.s("mark"), said.as_str()), ("○", "エージェントなし · Morning pass: 4 mails, 1 answered"));
+    assert_eq!((row.s("mark"), said.as_str()), ("○", "エージェントなし · 報告2d前: Morning pass: 4 mails, 1 answered"));
 }
 
 #[test]
@@ -119,5 +120,5 @@ fn the_menu_says_what_the_ring_and_運用中_mean() {
     let mut s = open(&w.root, 60);
     s.rows = 80; s.press(&["?"]);
     let text = s.screen(160).join("\n");
-    assert!(text.contains(&format!("said to be at work, no agent on it (any row with none says {NO_AGENT}); a day on, under {ONGOING}")), "{text}");
+    assert!(text.contains(&format!("said to be at work, no agent on it (line 2: its seats, or {NO_AGENT}); a day on, under {ONGOING}")), "{text}");
 }

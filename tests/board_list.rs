@@ -45,7 +45,7 @@ fn one_header_line_five_groups_a_mark_for_each_state_and_the_task_panel_from_90_
     assert_eq!(ink_of(&inks, "50%").map(|x| x.0), Some(Ink::Yellow)); assert_eq!(ink_of(&inks, "12m left").map(|x| x.0), Some(Ink::Yellow));
     // Under the machine's row on top, a step in.
     assert!(has(&text, r"\n   ▾ working +│") && has(&text, r"\n   ▾ to do +│"), "{text}");
-    assert!(has(&text, r"○ PRJ-2 \[運用\] My own task +█+░+ +50% 12m left +\ds {5}│[^\n]*\n[ ▌] {10}エージェントなし · half way +│"), "{text}");
+    assert!(has(&text, r"○ PRJ-2 \[運用\] My own task +█+░+ +50% 12m left +\ds {5}│[^\n]*\n[ ▌] {10}エージェントなし · 報告\ds前: half way +│"), "{text}");
     assert!(has(&text, r"│  Progress     █+░+ 50% · 12m left *\n"));
     assert!(has(&text, r"│  PRJ-2 My own task") && has(&text, r"│  State        ○ working · for \ds *\n") && has(&text, r"│  On it        you *\n"), "{text}");
     // No coordinator can run here: the box adds tasks, under no line that names anyone.

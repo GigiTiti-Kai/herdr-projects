@@ -4,6 +4,7 @@
 pub mod fields;
 pub mod guard;
 pub mod kind;
+pub mod measured;
 pub mod row;
 pub mod row_fit;
 pub mod row_tall;

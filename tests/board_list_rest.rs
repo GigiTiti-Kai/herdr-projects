@@ -66,7 +66,7 @@ fn the_side_panel_is_closed_on_a_first_opening_and_the_list_has_the_whole_width_
     sw::board::run::prefs::apply(&mut first, &sw::board::run::prefs::read(false));
     assert!(!first.side, "a board opened for the first time has it closed");
     let mut s = open(&w.root, 34); s.press(&["alt+p"]); assert!(!s.s.side);
-    assert!(has(&s.screen(120).join("\n"), r"○ PRJ-1 +\[運用\] My own task {70,}█[^\n]*\n[ ▌] {10}エージェントなし · half way *\n"), "{}", s.screen(120).join("\n"));
+    assert!(has(&s.screen(120).join("\n"), r"○ PRJ-1 +\[運用\] My own task {70,}█[^\n]*\n[ ▌] {10}エージェントなし · 報告\ds前: half way *\n"), "{}", s.screen(120).join("\n"));
 }
 
 #[test]

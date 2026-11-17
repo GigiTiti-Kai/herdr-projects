@@ -39,7 +39,7 @@ pub fn menu_lines(s: &mut State, t: &Theme, width: usize, h: usize) -> Vec<Inked
         }
     }
     // What a row shows: each mark in its colour with its word, the numbers on the right, and the tags.
-    let marks: [(Ink, &str, &str); 12] = [(Ink::Yellow, t.mark("working", ""), "an agent works"), (Ink::Review, t.mark("review", ""), "its reviewer works"), (Ink::Check, t.mark("board", ""), "the board's own step (it checks, waits for GitHub, merges)"), (Ink::Queue, t.mark("queue", ""), "queued: for a free slot (Q#1 next) or after other tasks"), (Ink::Red, t.mark("blocked", "question"), "asks you"), (Ink::Red, t.mark("blocked", "permission"), "asks for your OK"), (Ink::Red, t.mark("blocked", "auth"), "needs a login"), (Ink::Red, t.mark("error", ""), "went wrong"), (Ink::Green, t.mark("ready", ""), "ready to approve"), (Ink::Teal, t.mark("done", ""), "done"), (Ink::Todo, t.mark("idle", ""), "to do"), (Ink::Yellow, t.mark("idle", ""), "said to be at work, no agent on it (any row with none says エージェントなし); a day on, under 運用中")];
+    let marks: [(Ink, &str, &str); 12] = [(Ink::Yellow, t.mark("working", ""), "an agent works"), (Ink::Review, t.mark("review", ""), "its reviewer works"), (Ink::Check, t.mark("board", ""), "the board's own step (it checks, waits for GitHub, merges)"), (Ink::Queue, t.mark("queue", ""), "queued: for a free slot (Q#1 next) or after other tasks"), (Ink::Red, t.mark("blocked", "question"), "asks you"), (Ink::Red, t.mark("blocked", "permission"), "asks for your OK"), (Ink::Red, t.mark("blocked", "auth"), "needs a login"), (Ink::Red, t.mark("error", ""), "went wrong"), (Ink::Green, t.mark("ready", ""), "ready to approve"), (Ink::Teal, t.mark("done", ""), "done"), (Ink::Todo, t.mark("idle", ""), "to do"), (Ink::Yellow, t.mark("idle", ""), "said to be at work, no agent on it (line 2: its seats, or エージェントなし); a day on, under 運用中")];
     lines.push(Inked::new());
     lines.push(Inked::plain(" ").add(Inked::of("on a row", Ink::Soft)));
     for (c, m, w) in marks { lines.push(Inked::plain("   ").add(Inked::of(crate::text::pad(m, col), c)).add(Inked::of(w, Ink::Muted))); }
@@ -60,7 +60,7 @@ pub fn menu_lines(s: &mut State, t: &Theme, width: usize, h: usize) -> Vec<Inked
     lines.extend(entry("[chat]", "a conversation: it changes nothing and ends when you say"));
     // A row's kind before its name, and whom it was handed to after it (view/kind.rs).
     lines.extend(entry("[自動]", "its kind: [自動] an agent works it in a worktree, [調査] research only, [運用] worked by hand or by a resident seat"));
-    lines.extend(entry("[委任先]", "handed to another task (its message says so): that task's number and where it stands"));
+    lines.extend(entry("[委任先]", "handed to another task (its message says so): the open ones and where they stand, the done counted"));
     // A machine's or a project's row is its coordinator's, with a task's marks; on autopilot, its tag and a line under it.
     lines.extend(entry("[autopilot]", "a coordinator on autopilot (a machine's or a project's row): the line under it says what it does"));
     // The window: the title stays, and the picked line stays in view while the pick moves.

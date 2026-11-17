@@ -34,13 +34,41 @@ The board reads it off the task's own message (the `--msg` its agent or its coor
 | The message | Shown |
 | --- | --- |
 | `APP-26に委任` | `[委任先 APP-26・作業中]` |
-| `OPS-46・OPS-47に委任` | `[委任先 OPS-46・未着手, OPS-47・完了]` |
-| `APP-38(app/38)に仕様ごと委任済み` | `[委任先 APP-38・完了]` |
+| `OPS-46・OPS-47に委任` | `[委任先 OPS-46・未着手 +完了1]` |
+| `APP-38(app/38)に仕様ごと委任済み` | `[委任先 1件すべて完了]` |
 | `S2=DOC-7 … S2のみ委任` | nothing: no number stands right before `に委任` |
 | `APP-26に委任することは、拒否された。手で続ける` | nothing: its sentence (up to the next `。`, `!` or `?`) says no after `委任`: `ない`, `ません`, `ず`, `禁止`, `拒否`, `取り消`, `やめ` … |
 | `APP-26に委任した。返事はまだない` | `[委任先 APP-26・作業中]`: the no is in the next sentence |
 
 A wrong target is worse than none: a sentence such as `APP-26に委任済み、手では回さない` names nothing either.
+
+**Those not done are named, the done ones counted**: `[委任先 FLS-71・作業中, HCM-244・未着手 +完了3]`. With all of them
+done it is `[委任先 5件すべて完了]`, in the colour of done: the row's own work is over, and it waits for whoever keeps
+it to close it. That does not move it to needs you.
+
+### Named both ways
+
+Most messages do not say `に委任`: `TKN-39で試行中`, `HCM-243を委任済み`. So on a row at work or waiting for you that no
+agent of the board's works, a task its message names by number is whom it handed to too **when that task names it
+back**, in its title or its description: a coordinator writes its parent's number into the task it hands the work to
+(`HCM-221のP3 …`). `HCM-22` in the other task is not `HCM-221`. A key either repo went by before names it as well.
+
+None it took back is named. A number is left out where its hand-over by `に委任` was taken back (above), and where the
+rest of its sentence after it (past brackets right after it, as in `TKN-39(auto-teikeikun/39)`) has one of the same
+words of no, at any place the message names it:
+
+| The message (TKN-39 names this row back) | Shown |
+| --- | --- |
+| `TKN-39で試行中` | `[委任先 TKN-39・承認待ち]` |
+| `TKN-39に委任を取り消した。手で続ける。` | nothing |
+| `TKN-39・OPS-2(v1.2)に委任を取り消した。` | nothing: its `に委任` was taken back |
+| `TKN-39(auto-teikeikun/39)は取り消した。手で続ける` | nothing: the brackets are passed over |
+| `TKN-39に委任をやめた。その後 TKN-39 で再開` | nothing: one place is enough |
+| `OPS-1に委任しない。TKN-39で試行中` | `[委任先 TKN-39・承認待ち]`: the no is another number's |
+| `TKN-39 v1.2 は取り消した` | `[委任先 TKN-39・承認待ち]`: the `.` ends the sentence before the no. What is left |
+
+A task to do, done or archived names none this way: a task to do that names the one it waits for has handed it
+nothing.
 
 A task is named by the key its repo goes by now: a message written while the repo went by another key (`OLD-26`)
 still names that task, as every command takes it, and the tag says its key of now (`[委任先 APP-26・…]`).

@@ -5,13 +5,16 @@
 import { h, icon, ink, said, markEl } from "./dom.js";
 
 // A task's kind chip before its title (`kind`: `[運用]`) and what is said of it after it (`×3`, `[auto]`, `[research]`,
-// `[委任先 …]` …) are dimmed: colour means status only. The pin mark `★` last is yellow, as on the terminal board
+// `[委任先 …]` …) are dimmed: colour means status only (`[委任先 3件すべて完了]` is in the colour of done). The pin mark `★` last is yellow, as on the terminal board
 // (board/view/fields.rs).
 const PIN = " ★";
 const titleOf = (r) => {
   const pinned = r.title.endsWith(PIN), t = pinned ? r.title.slice(0, -PIN.length) : r.title;
   const m = /(?: ×\d+)?(?: \[(?:[a-z]+|委任先 [^\]]*)\])*$/.exec(t); const at = m && m[0] ? m.index : t.length;
-  return [r.kind ? h("span.sw-count", `${r.kind} `) : null, t.slice(0, at), at < t.length ? h("span.sw-count", t.slice(at)) : null, pinned ? h("span.sw-count", " ", h("span.sw-pin", PIN.trim())) : null];
+  // Handed on, and all of it done: in the colour of done (board/view/kind.rs).
+  const tail = t.slice(at), d = /\[委任先 \d+件すべて完了\]/.exec(tail);
+  const after = !tail ? null : d ? h("span.sw-count", tail.slice(0, d.index), h("span.sw-c-teal", d[0]), tail.slice(d.index + d[0].length)) : h("span.sw-count", tail);
+  return [r.kind ? h("span.sw-count", `${r.kind} `) : null, t.slice(0, at), after, pinned ? h("span.sw-count", " ", h("span.sw-pin", PIN.trim())) : null];
 };
 
 export function rowEl(r, { selected, opened, onPick, onOpen }) {

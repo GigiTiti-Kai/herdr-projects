@@ -18,7 +18,7 @@
             Pass
    ▾ working
    ○ #2     [運用] Max length for task titles                       40% 90m left                  1m
-            エージェントなし · Drafting
+            エージェントなし · 報告1m前: Drafting
    ◇ #4     [運用] Max length for task titles                                                     1m
             Starting
 ▌  ◐ #5     [運用] Max length for task titles                       60% 11m left                  1m
@@ -45,7 +45,7 @@
            Pass                                             │  Description ────────────────────────
   ▾ working                                                 │  A task title should have a maximum
   ○ #2     [運用] Max length for task titles             1m │  length. A longer one is cut between
-           エージェントなし · Drafting                      │  words.
+           エージェントなし · 報告1m前: Drafting            │  words.
   ◇ #4     [運用] Max length for task titles             1m │  Second paragraph, with
            Starting                                         │  a/very/long/path/that/has/no/space/i
 ▌ ◐ #5     [運用] Max length for task titles             1m │  n/it/at/all/src/board/view/row-wrap.
@@ -142,7 +142,7 @@
             Pass
    ▾ working
    ○ #2     [運用] Max length for task titles                       40% 90m left                  1m
-            エージェントなし · Drafting
+            エージェントなし · 報告1m前: Drafting
    ◇ #4     [運用] Max length for task titles                                                     1m
             Starting
 ▌  ◐ #5     [運用] Max length for task titles                       60% 11m left                  1m

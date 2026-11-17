@@ -3,7 +3,7 @@
  All 18   Needs 5   Working 9   Ready 1   To do 2   Done 1
    ▾ working
    ○ #2     [運用] Max length for task titles
-            エージェントなし · Drafting
+            エージェントなし · 報告1m前: Drafting
             ████░░░░░░  40% 90m left                      1m
    ◇ #4     [運用] Max length for task titles
             Starting                                      1m
@@ -24,7 +24,7 @@
  All 18   Needs 5   Working 9   Ready 1   To do 2   Done 1
    ▾ working
    ○ #2     [運用] Max length for task titles
-            エージェントなし · Drafting
+            エージェントなし · 報告1m前: Drafting
             ████░░░░░░  40% 90m left                      1m
    ◇ #4     [運用] Max length for task titles
             Starting                                      1m
@@ -76,7 +76,7 @@
                 heading
    space        talk to this row's agent, and back to the
                 top row's coordinator
- ↓ 74 more
+ ↓ 75 more
 
 ────────────────────────────────────────────────────────────
 ❯ Add a task
@@ -87,7 +87,7 @@
  All 18   Needs 5   Working 9   Ready 1   To do 2   Done 1
    ▾ working
    ○ #2     [運用] Max length for task titles
-            エージェントなし · Drafting
+            エージェントなし · 報告1m前: Drafting
             ████░░░░░░  40% 90m left                      1m
    ◇ #4     [運用] Max length for task titles
             Starting                                      1m
