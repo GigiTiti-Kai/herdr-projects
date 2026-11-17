@@ -54,7 +54,8 @@ work:
 - The board's own agents, reviewers and coordinators in that folder are no seat: by their terminal, as herdr never hands
   one out again.
 - It says where the seats are, not that they work this row: the board cannot tell which row a seat works.
-- herdr not read (not running, or the row is another machine's): `エージェントなし`, as before. It changes within a
+- herdr not read (not running, or the row is another machine's), or a repo the board does not know: `エージェントなし`,
+  as before. It changes within a
   second or two of a seat starting or ending its turn.
 
 ## 運用中
