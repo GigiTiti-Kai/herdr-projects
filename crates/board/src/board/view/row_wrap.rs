@@ -36,7 +36,8 @@ fn up_to(lines: Vec<Inked>, max: usize, w: usize) -> Vec<Inked> {
 /// Does this live task say something in red, or stand under "needs you" (a plan to approve, an error)? What it says then
 /// never ends in `…` while the window has the room for it.
 pub fn is_red(s: &State, r: &Obj) -> bool {
-    is_live(r) && !is_auto(r) && (crate::shown::states::group_of(r) == "needs you" || says_under(s, r, false).0.iter().any(|p| p.c == Ink::Red))
+    // A row at work by hand is red only where its seats are (view/measured.rs): its message waits for nobody.
+    is_live(r) && !is_auto(r) && (crate::shown::states::group_of(r) == "needs you" || (!crate::flow::seats::measured(r) && says_under(s, r, false).0.iter().any(|p| p.c == Ink::Red)))
 }
 /// The lines a red message may take beside `used` others: all it needs while the whole list fits its room. In a list
 /// that does not, it may still fill all but RED_KEEP lines (the list scrolls), and the selected row stops one line short

@@ -120,5 +120,5 @@ fn the_menu_says_what_the_ring_and_運用中_mean() {
     let mut s = open(&w.root, 60);
     s.rows = 80; s.press(&["?"]);
     let text = s.screen(160).join("\n");
-    assert!(text.contains(&format!("said to be at work, no agent on it (any row with none says {NO_AGENT}); a day on, under {ONGOING}")), "{text}");
+    assert!(text.contains(&format!("said to be at work, no agent on it (line 2: its seats, or {NO_AGENT}); a day on, under {ONGOING}")), "{text}");
 }

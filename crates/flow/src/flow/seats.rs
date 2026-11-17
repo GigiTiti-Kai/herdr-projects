@@ -43,8 +43,10 @@ pub fn mark(rows: &mut [Obj], tasks: &[Arc<Task>], session: &Session, socket: &s
         let gone: Vec<String> = panes_named(r.s("msg")).into_iter().filter(|p| !panes.contains_key(p)).collect();
         if !gone.is_empty() { r.put("gonePanes", gone); }
         let Some(repo) = seat_of(&rules, r) else { continue };
+        // A repo the board does not know has no folder to look in: not measured, so no seats said (none at all is red).
         let root = roots.s(repo).trim_end_matches('/').to_string();
-        let mut here: Vec<&Value> = agents.values().filter(|a| !root.is_empty() && (a.s("cwd") == root || a.s("cwd").starts_with(&format!("{root}/"))) && !own.contains(&a.t("terminal_id"))).collect();
+        if root.is_empty() { continue; }
+        let mut here: Vec<&Value> = agents.values().filter(|a| (a.s("cwd") == root || a.s("cwd").starts_with(&format!("{root}/"))) && !own.contains(&a.t("terminal_id"))).collect();
         here.sort_by_key(|a| a.t("pane_id"));
         let mut kinds: Vec<(String, i64)> = vec![];
         for a in &here {

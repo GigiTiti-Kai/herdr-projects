@@ -77,3 +77,26 @@ fn a_row_whose_title_says_whom_it_handed_to_drops_エージェントなし_and_o
     assert_eq!(line(&mut s, "Sort the leaks"), format!("報告0s前: P1={}で試行中", short(&child)));
     assert_eq!(line(&mut s, "Pick a floor"), "エージェントなし · Which floor first?");
 }
+
+#[test]
+fn not_measured_is_エージェントなし_never_席なし_herdr_not_read_another_machines_row_or_a_repo_the_board_does_not_know() {
+    let w = world();
+    sw::clock::set(Some(NOW));
+    let apply = w.add("[応募] Apply for the jobs");
+    say(&apply, "working", "wA9:p1 at it");
+    set_value("board.seats", &json!("nowhere=[応募]"), &Scope::you()).unwrap();
+    let mut s = open(&w.root, 40);
+    assert_eq!(line(&mut s, "Apply for the jobs"), "エージェントなし · 報告0s前（wA9:p1 は今は無い）: wA9:p1 at it", "a repo the board does not know");
+    // herdr not read: neither the seats nor a gone pane.
+    let task = std::sync::Arc::new(sw::store::tasks::find(&apply).unwrap());
+    let mut rows = vec![sw::flow::live::saved(&task)];
+    set_value("board.seats", &json!("proj=[応募]"), &Scope::you()).unwrap();
+    sw::flow::seats::mark(&mut rows, &[task.clone()], &sw::flow::live::Session::Down, &w.socket);
+    assert!(!rows[0].has("seat") && !rows[0].has("gonePanes"), "{:?}", rows[0]);
+    sw::flow::seats::mark(&mut rows, &[task], &sw::flow::live::Session::Up { agents: Default::default(), panes: Default::default() }, &w.socket);
+    assert_eq!(rows[0].at("seat"), &json!({ "repo": "proj", "kinds": [], "working": [], "blocked": [] }));
+    // Another machine's row says what its own board measured nowhere here.
+    let mut far = sw::shown::states::as_row(&rows[0]);
+    far.put("host", "far");
+    assert_eq!(sw::board::view::measured::line(&s.s, &far, sw::shown::ink::Inked::plain("at it")).text(), "エージェントなし · at it");
+}
