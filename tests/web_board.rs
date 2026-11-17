@@ -43,7 +43,7 @@ fn the_web_board_shows_the_terminal_boards_list_and_one_task_whole() {
     assert_eq!(said(ready.at("says")), "Pass · 1 minor"); assert_eq!(ready.at("says")[0].s("c"), "green");
     assert_eq!(ready.at("review"), &json!([{ "t": "R#1", "c": "green" }]));
     assert!(regex::Regex::new(r"^\d+s ago$").unwrap().is_match(ready.s("time")), "{}", ready.s("time"));
-    assert_eq!((working.at("progress"), working.s("percent"), said(working.at("says")), working.at("strong"), working.at("live")), (&json!(40.0), "40%", "Drafting".to_string(), &json!(false), &json!(true))); // a title is never bold: colour and weight are not status
+    assert_eq!((working.at("progress"), working.s("percent"), said(working.at("says")), working.at("strong"), working.at("live")), (&json!(40.0), "40%", "エージェントなし · Drafting".to_string(), &json!(false), &json!(true))); // a title is never bold: colour and weight are not status
     assert_eq!((todo.at("progress"), todo.at("says"), todo.at("live"), todo.s("mark")), (&json!(null), &json!([]), &json!(false), "○"));
     // a page that already has this is told only that
     let again = web(&w, "board", json!({ "have": s.s("mark") }));

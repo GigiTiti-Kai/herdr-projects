@@ -14,6 +14,8 @@ use sw::shown::ink::{Ink, Inked};
 mod kinds;
 /// Each row measured once while a long list folds to its room.
 mod measured;
+/// A row no agent of the board's works, and 運用中 (shown/ongoing.rs).
+mod ongoing;
 
 const NOW: i64 = 1_800_000_000_000;
 fn has(text: &str, re: &str) -> bool { Regex::new(re).unwrap().is_match(text) }
@@ -31,8 +33,8 @@ fn a_tight_row_keeps_the_tasks_name_then_the_columns_on_the_right_what_a_live_ta
     let (mut s, t) = board();
     let at = NOW - 6 * 60000;
     let mut records = vec![
-        rec(json!({ "id": "proj/1", "state": "working", "title": "Remove notification pop-ups", "msg": "Removing pop-up calls from plugin, fixing tests, writing closing note.", "progress": 95, "at": at })),
-        rec(json!({ "id": "proj/2", "state": "working", "title": "Fix ugly blocked row on the board", "msg": "Fixing layout so approval names keep width.", "progress": 55, "pr": 3, "at": at })),
+        rec(json!({ "id": "proj/1", "state": "working", "agent": "claude", "title": "Remove notification pop-ups", "msg": "Removing pop-up calls from plugin, fixing tests, writing closing note.", "progress": 95, "at": at })),
+        rec(json!({ "id": "proj/2", "state": "working", "agent": "claude", "title": "Fix ugly blocked row on the board", "msg": "Fixing layout so approval names keep width.", "progress": 55, "pr": 3, "at": at })),
         rec(json!({ "id": "proj/3", "state": "done", "title": "Truncate long descriptions in sidebar", "pr": 2, "at": at })),
     ];
     let draw = |s: &mut State, records: &[Rec], width: usize| { let l = lay(s, &t, records, width, 200); records.iter().map(|r| row(s, &t, r, width, &l).text()).collect::<Vec<_>>() };

@@ -115,7 +115,7 @@ fn a_row_with_nothing_to_say_yet_keeps_its_second_line_which_says_something_true
     let bare = work(json!({ "id": "p/1", "title": "New one", "msg": "" }));
     assert_eq!(lines_in(&mut s, &bare, one, 60, SCREEN)[1].trim(), "Working", "an older board's task that says nothing: the plain word, never a gap");
     let yours = work(json!({ "id": "p/1", "title": "New one", "msg": "", "stage": "progress" }));
-    assert_eq!(lines_in(&mut s, &yours, one, 60, SCREEN)[1].trim(), "Yours: no agent on it");
+    assert_eq!(lines_in(&mut s, &yours, one, 60, SCREEN)[1].trim(), "エージェントなし", "said to be at work and no agent on it: that it has none");
     let w: Vec<String> = lines_in(&mut s, &waits, std::slice::from_ref(&waits), 60, SCREEN).iter().map(|l| l.trim_end().to_string()).collect();
     assert_eq!(w, [format!(" ◆ #2 [運用] Never reviewed{}2h ago", " ".repeat(27)), "      Not reviewed".to_string()]);
     let before = list(&mut s, 60, 20, SCREEN);

@@ -33,17 +33,19 @@ fn one_header_line_five_groups_a_mark_for_each_state_and_the_task_panel_from_90_
     let text = s.screen(120).join("\n");
     assert!(has(&text, r"^ herdr-projects  proj · PRJ +│ *\n All 2   (Coords \d+   )?Working 1   To do 1 +│[^\n]*\n ▾ [^\n]*│"), "the top row right under the filter row: {text}");
     let inks = s.inked(120);
-    assert_eq!(ink_of(&inks, "◐"), Some((Ink::Yellow, false)), "a working task's mark is the working colour");
+    // Its own row's mark: on the line of its name.
+    let mark_on = |name: &str| inks.iter().find(|l| l.text().contains(&format!("] {name}"))).and_then(|l| l.0.iter().find(|p| p.t.contains('○')).map(|p| p.c));
+    assert_eq!(mark_on("My own task"), Some(Ink::Yellow), "a task said to be at work is the working colour, its ring no moon: no agent works it");
     assert_eq!(ink_of(&inks, "My own task"), Some((Ink::Plain, true)), "its title plain, and bold while it lives");
-    assert_eq!(ink_of(&inks, "○").map(|x| x.0), Some(Ink::Todo), "a task nobody started is the readable grey of to do, not green");
+    assert_eq!(mark_on("Write the docs"), Some(Ink::Todo), "a task nobody started is the readable grey of to do, not green");
     assert_eq!(ink_of(&inks, "Write the docs"), Some((Ink::Plain, false)));
     assert_eq!(heading(&inks, "working"), Some(Ink::Yellow)); assert_eq!(heading(&inks, "to do"), Some(Ink::Todo), "the headings are in their group's colour");
     assert_eq!(ink_of(&inks, "50%").map(|x| x.0), Some(Ink::Yellow)); assert_eq!(ink_of(&inks, "12m left").map(|x| x.0), Some(Ink::Yellow));
     // Under the machine's row on top, a step in.
     assert!(has(&text, r"\n   ▾ working +│") && has(&text, r"\n   ▾ to do +│"), "{text}");
-    assert!(has(&text, r"◐ PRJ-2 \[運用\] My own task +█+░+ +50% 12m left +\ds {5}│[^\n]*\n[ ▌] {10}half way +│"), "{text}");
+    assert!(has(&text, r"○ PRJ-2 \[運用\] My own task +█+░+ +50% 12m left +\ds {5}│[^\n]*\n[ ▌] {10}エージェントなし · half way +│"), "{text}");
     assert!(has(&text, r"│  Progress     █+░+ 50% · 12m left *\n"));
-    assert!(has(&text, r"│  PRJ-2 My own task") && has(&text, r"│  State        ◐ working · for \ds *\n") && has(&text, r"│  On it        you *\n"), "{text}");
+    assert!(has(&text, r"│  PRJ-2 My own task") && has(&text, r"│  State        ○ working · for \ds *\n") && has(&text, r"│  On it        you *\n"), "{text}");
     // No coordinator can run here: the box adds tasks, under no line that names anyone.
     assert!(has(&text, r"\n─[^\n]*\n❯ Add a task *\n") && !text.contains("Coordinator") && !text.contains("coordinator"), "{text}");
     assert_eq!(s.screen(120).len(), 34);

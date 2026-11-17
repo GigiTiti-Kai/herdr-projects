@@ -1,6 +1,6 @@
 //! The filter row on top of the board: All · Coordinators · Needs you · Working · Ready · To do · Done · Automations
 //! · Pinned, each with its count. Tab moves to the next, shift+tab back, a click picks one; the list then shows only the tasks of
-//! that status. Coordinators and Automations are filters as the others are: Coordinators leaves the coordinators' own
+//! that status (Working: not what stands under 運用中, shown/ongoing.rs). Coordinators and Automations are filters as the others are: Coordinators leaves the coordinators' own
 //! rows, which are the machines' rows and the projects', of those that run (started and not stopped, on autopilot, or
 //! failed), for the machine shown (the main Coordinator has none); Automations leaves the automations' rows, in the same places and grouping;
 //! Pinned leaves what is pinned, in its places and the board's grouping (pinned.rs).
@@ -10,7 +10,7 @@ use super::Effect;
 use crate::board::keys::Press;
 use crate::board::state::{Row, State};
 use crate::json::*;
-use crate::shown::states::group_of;
+use crate::shown::ongoing::section_of;
 
 /// The filters, each with the status group it shows (None: every task, the coordinators, the automations, what is pinned).
 pub const SHOWS: [(&str, Option<&str>); 9] = [("All", None), ("Coordinators", None), ("Needs you", Some("needs you")), ("Working", Some("working")), ("Ready", Some("ready to approve")), ("To do", Some("to do")), ("Done", Some("done")), ("Automations", None), ("Pinned", None)];
@@ -26,7 +26,7 @@ fn group(s: &State) -> Option<&'static str> { if s.archive_view { None } else { 
 pub fn keeps_task(s: &State, r: &Obj) -> bool {
     if s.archive_view { return true; }
     if s.show == PINNED { return super::pinned::keeps(s, r); }
-    s.show != COORDS && s.show != AUTOS && group(s).is_none_or(|g| group_of(r) == g)
+    s.show != COORDS && s.show != AUTOS && group(s).is_none_or(|g| section_of(r, s.now) == g)
 }
 /// Automations stand in the list under All and under Automations.
 pub fn keeps_all(s: &State) -> bool { s.show == 0 || s.show == AUTOS || s.archive_view }
@@ -36,7 +36,7 @@ pub fn whole(s: &State) -> bool { group(s) == Some("done") }
 /// automations' and the pinned rows its filter shows.
 pub fn counts(s: &State, items: &[std::sync::Arc<Obj>]) -> Vec<usize> {
     let live: Vec<&std::sync::Arc<Obj>> = items.iter().filter(|r| !r.b("archivedAt")).collect();
-    SHOWS.iter().enumerate().map(|(n, (_, g))| match g { Some(g) => live.iter().filter(|r| group_of(r) == *g).count() + if n == NEEDS { needing(s) } else { 0 },
+    SHOWS.iter().enumerate().map(|(n, (_, g))| match g { Some(g) => live.iter().filter(|r| section_of(r, s.now) == *g).count() + if n == NEEDS { needing(s) } else { 0 },
         None if n == COORDS => coords_running(s), None if n == AUTOS => super::list::autos_shown(s, "").len(),
         None if n == PINNED => super::pinned::count(s, &live), None => live.len() }).collect()
 }

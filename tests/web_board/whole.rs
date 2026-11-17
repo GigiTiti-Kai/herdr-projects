@@ -16,7 +16,7 @@ fn a_long_red_message_on_the_web_board_is_never_clamped_and_other_rows_are_as_th
     let rows = rows_of(&s);
     let row = |id: &str| rows.iter().find(|r| r.s("id") == id).unwrap().clone();
     let (red, other) = (row(&asks), row(&busy));
-    assert_eq!(said(red.at("says")), LONG, "every word of it is sent to the page");
+    assert_eq!(said(red.at("says")), format!("{} · {LONG}", sw::shown::ongoing::NO_AGENT), "every word of it is sent to the page, after the no agent it has");
     assert!(red.b("whole"), "its red message is drawn whole");
     assert!(!other.b("whole"), "a working task's line keeps its two lines");
     let css = include_str!("../../crates/web/src/webui/page/board.css");

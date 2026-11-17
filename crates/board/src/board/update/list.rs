@@ -9,13 +9,13 @@ use crate::board::keys::key_name;
 use crate::json::*;
 use crate::shown::ink::Ink;
 use crate::shown::queue::queued;
-use crate::shown::states::{group_of, is_live, GROUPS};
+use crate::shown::{ongoing::{section_of, SECTIONS}, states::{group_of, is_live}};
 
 pub const AUTOMATIONS: &str = "automations";
 /// A done task the list folds away: every one, pinned too (not in the archive, which is a list of its own).
 fn is_done(r: &Obj) -> bool { r.s("state") == "done" && !r.b("archivedAt") }
 fn is_todo(r: &Obj) -> bool { group_of(r) == "to do" && !r.b("archivedAt") }
-fn rank(r: &Obj) -> i64 { if r.b("archivedAt") { -2 } else { GROUPS.iter().position(|g| *g == group_of(r)).map(|n| n as i64).unwrap_or(9) } }
+fn rank(r: &Obj, now: i64) -> i64 { if r.b("archivedAt") { -2 } else { SECTIONS.iter().position(|g| *g == section_of(r, now)).map(|n| n as i64).unwrap_or(9) } }
 fn repo_of(id: &str) -> &str { id.split('/').next().unwrap_or("") }
 /// A task's repo as its heading names it: another machine's by its own id there, so its machine is not in it.
 fn repo_name(r: &Obj) -> &str { repo_of(if r.b("rid") { r.s("rid") } else { r.s("id") }) }
@@ -87,8 +87,8 @@ pub fn relist(s: &mut State) {
     } else {
         let mut g: Vec<(String, Vec<Rec>)> = project_groups;
         g.push(("archived".to_string(), rest.iter().filter(|r| r.b("archivedAt")).cloned().collect()));
-        for name in GROUPS {
-            let mut rows: Vec<Rec> = rest.iter().filter(|r| group_of(r) == name && !r.b("archivedAt")).cloned().collect();
+        for name in SECTIONS {
+            let mut rows: Vec<Rec> = rest.iter().filter(|r| section_of(r, s.now) == name && !r.b("archivedAt")).cloned().collect();
             // The queued tasks stand last under `working`: those that wait for a free slot in the order they get one
             // (Q#1 first), then those queued after other tasks.
             rows.sort_by_key(|r| if r.s("stage") == "queued" && queued(r) { (1, r.i("queuePlace")) } else if queued(r) { (2, 0) } else { (0, 0) });
@@ -119,7 +119,7 @@ pub fn relist(s: &mut State) {
     let base: std::collections::HashMap<String, i64> = s.items.iter().enumerate().map(|(n, r)| (r.t("id"), n as i64)).collect();
     let next: Vec<SelRow> = selectable.iter().map(|(r, group)| { let task = r.has("title"); SelRow { group: group.clone(),
         // Where the row stands, not what the task is: an archived task keeps its row whatever its status. A pin moves nothing.
-        id: r.t("id"), order: serde_json::to_string(&json!([if task { rank(r).to_string() } else { r.t("state") }, r.at("created"), r.b("archivedAt")])).unwrap_or_default(),
+        id: r.t("id"), order: serde_json::to_string(&json!([if task { rank(r, s.now).to_string() } else { r.t("state") }, r.at("created"), r.b("archivedAt")])).unwrap_or_default(),
         at: if task && is_done(r) { r.i("at") } else { 0 }, done: task && is_done(r), base: base.get(r.s("id")).copied().unwrap_or(-1) } }).collect();
     let ids: Vec<String> = next.iter().map(|r| r.id.clone()).collect();
     let selected = s.sel.clone();
@@ -245,7 +245,7 @@ fn lay_rows(s: &mut State) -> Vec<Row> {
                 if !(s.by_machine && name != AUTOMATIONS) || super::heads::archived_head(s, &p.host, name) { rows.push(Row::Head { name: name.clone(), autos: own, id, machine: false, folded: if shut { recs.len() + autos.len() } else { 0 }, folded_autos: if shut { autos.len() } else { 0 }, empty }); }
                 if shut || empty { continue; }
                 let mut list = recs.clone();
-                list.sort_by(|a, b| (if s.by_repo || s.by_machine { rank(a).cmp(&rank(b)) } else { std::cmp::Ordering::Equal })
+                list.sort_by(|a, b| (if s.by_repo || s.by_machine { rank(a, s.now).cmp(&rank(b, s.now)) } else { std::cmp::Ordering::Equal })
                     .then_with(|| if a.b("archivedAt") && b.b("archivedAt") { b.i("archivedAt").cmp(&a.i("archivedAt")) } else { std::cmp::Ordering::Equal })
                     .then_with(|| if is_done(a) && is_done(b) { b.i("at").cmp(&a.i("at")) } else { std::cmp::Ordering::Equal }));
                 let done: Vec<&Rec> = list.iter().filter(|r| is_done(r)).collect();

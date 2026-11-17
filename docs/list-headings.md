@@ -1,7 +1,7 @@
 # List headings
 
 **The task list sits under headings, and `←` on a heading folds it, `→` unfolds it.** The headings are a repo's name when the list
-is grouped by repo (`Alt+S`), or a status (`needs you`, `working`, `to do`, `done` …) when it is grouped by status.
+is grouped by repo (`Alt+S`), or a status (`needs you`, `working`, `運用中`, `to do`, `done` …) when it is grouped by status ([運用中](ongoing.md)).
 Grouped by machine (`Alt+S` again), each machine has its heading and its tasks stand right under it, with no status
 headings.
 

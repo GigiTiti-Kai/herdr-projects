@@ -2,8 +2,8 @@
  herdr-projects  proj
  All 18   Needs 5   Working 9   Ready 1   To do 2   Done 1
    ▾ working
-   ◐ #2     [運用] Max length for task titles
-            Drafting
+   ○ #2     [運用] Max length for task titles
+            エージェントなし · Drafting
             ████░░░░░░  40% 90m left                      1m
    ◇ #4     [運用] Max length for task titles
             Starting                                      1m
@@ -23,8 +23,8 @@
  herdr-projects  proj
  All 18   Needs 5   Working 9   Ready 1   To do 2   Done 1
    ▾ working
-   ◐ #2     [運用] Max length for task titles
-            Drafting
+   ○ #2     [運用] Max length for task titles
+            エージェントなし · Drafting
             ████░░░░░░  40% 90m left                      1m
    ◇ #4     [運用] Max length for task titles
             Starting                                      1m
@@ -76,7 +76,7 @@
                 heading
    space        talk to this row's agent, and back to the
                 top row's coordinator
- ↓ 73 more
+ ↓ 74 more
 
 ────────────────────────────────────────────────────────────
 ❯ Add a task
@@ -86,8 +86,8 @@
  herdr-projects  proj
  All 18   Needs 5   Working 9   Ready 1   To do 2   Done 1
    ▾ working
-   ◐ #2     [運用] Max length for task titles
-            Drafting
+   ○ #2     [運用] Max length for task titles
+            エージェントなし · Drafting
             ████░░░░░░  40% 90m left                      1m
    ◇ #4     [運用] Max length for task titles
             Starting                                      1m

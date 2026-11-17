@@ -8,6 +8,7 @@ use crate::board::theme::Theme;
 use crate::json::*;
 use crate::research::is_research;
 use crate::shown::ink::{Ink, Inked};
+use crate::shown::ongoing::{by_hand, unassigned, NO_AGENT};
 use crate::shown::queue::queued;
 use crate::shown::row_says::{row_fields, sentence};
 use crate::shown::states::{board_step, in_review, is_live, reviewer_mark, status_ink};
@@ -40,6 +41,7 @@ pub fn mark(t: &Theme, r: &Obj) -> Inked {
     if queued(r) { return Inked::of(t.mark("queue", ""), c); } // it waits for a free slot
     if r.s("state") == "blocked" { return Inked::of(t.mark("blocked", r.s("kind")), c).bold(); } // what it needs from you
     if r.s("state") == "done" { return Inked::of(t.mark("done", ""), c).quiet(); } // finished: the same mark, quieter
+    if by_hand(r) { return Inked::of(t.mark("idle", ""), c); } // said to be at work, but no agent: no moon (shown/ongoing.rs)
     let st = r.s("state");
     Inked::of(t.mark(if ["working", "error", "done"].contains(&st) { st } else { "idle" }, ""), c)
 }
@@ -91,10 +93,12 @@ pub fn says_under(s: &State, r: &Obj, says_beside_shown: bool) -> Inked {
     if is_auto(r) { return auto_said(s, r, if says_beside_shown { "why" } else { "all" }); }
     if let Some(p) = pending_said(r.at("pending")) { return p; }
     let said = sentence(r);
+    if unassigned(r) { return no_agent(said); }
     if !said.is_empty() { return said; }
-    let st = r.s("stage");
-    Inked::of(if st == "progress" { "Yours: no agent on it" } else if in_review(r) { "Not reviewed" } else if reviewer_mark(r) { "Under review" } else if r.s("state") == "working" { "Working" } else { "Needs you" }, Ink::Soft)
+    Inked::of(if in_review(r) { "Not reviewed" } else if reviewer_mark(r) { "Under review" } else if r.s("state") == "working" { "Working" } else { "Needs you" }, Ink::Soft)
 }
+/// What line 2 of a live row no agent of the board's works says: that first, then what it said (`エージェントなし · …`).
+pub fn no_agent(said: Inked) -> Inked { if said.is_empty() { Inked::of(NO_AGENT, Ink::Soft) } else { Inked::of(format!("{NO_AGENT} · "), Ink::Soft).add(said) } }
 /// What an automation's row says: its trigger, its repo where that is not the board's (never under its repo's own
 /// heading); and why the board turned it off. Its machine is the heading it stands under. `part`: "beside" its name,
 /// "why" (under it), or "all" under it.

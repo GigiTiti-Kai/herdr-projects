@@ -10,8 +10,8 @@ use crate::store::retries::waiting_of;
 /// The groups, in the order they need you.
 pub const GROUPS: [&str; 5] = ["needs you", "ready to approve", "working", "to do", "done"];
 /// herdr's own colour for each group (its status colour), with two of the board's own: finished work that waits for a
-/// yes is green, and a task nobody has started is the dim grey of "to do".
-pub fn group_ink(g: &str) -> Ink { match g { "needs you" => Ink::Red, "ready to approve" => Ink::Green, "working" => Ink::Yellow, "done" => Ink::Teal, _ => Ink::Todo } }
+/// yes is green, a task nobody has started is the dim grey of "to do", and 運用中 (shown/ongoing.rs) the brighter grey.
+pub fn group_ink(g: &str) -> Ink { match g { "needs you" => Ink::Red, "ready to approve" => Ink::Green, "working" => Ink::Yellow, "done" => Ink::Teal, super::ongoing::ONGOING => Ink::Soft, _ => Ink::Todo } }
 pub fn is_agent(r: &Obj) -> bool { r.b("agent") && !["todo", "progress"].contains(&r.s("stage")) }
 /// Its agent is at rest and the board missed the end of its turn: the row says "Finishing" and stays so. The finish key
 /// takes it on with what the agent said last (actions/finish_stuck.rs).
