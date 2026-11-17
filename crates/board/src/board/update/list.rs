@@ -46,7 +46,7 @@ pub fn relist(s: &mut State) {
     s.items = if s.scope.is_empty() { mine.clone() } else if s.scope == "*" { mine.iter().cloned().chain(super::remotes::others(s).into_iter().flat_map(|m| m.items.iter().cloned())).collect() } else { s.remotes.get(&s.scope).map(|m| m.items.clone()).unwrap_or_default() };
     // The filter row counts every task in view; the list keeps those of the filter shown (shows.rs).
     let all = s.items.clone();
-    s.show_n = super::shows::counts(s, &all);
+    s.show_n = super::shows::counts(s, &all); s.bands = crate::shown::projects::bands(&s.data.projects, all.iter().map(|r| &**r), s.now);
     let keep: Vec<bool> = s.items.iter().map(|r| super::shows::keeps_task(s, r)).collect();
     let mut keep = keep.into_iter();
     s.items.retain(|_| keep.next().unwrap_or(true));

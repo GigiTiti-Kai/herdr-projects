@@ -12,6 +12,7 @@ pub mod row_wrap;
 /// The side panel fits from this width on, when you have it open; below it the same panel opens full screen.
 pub const WIDE: usize = 90;
 pub mod ask;
+pub mod bands;
 pub mod chat;
 pub mod chat_title;
 pub mod chat_call;

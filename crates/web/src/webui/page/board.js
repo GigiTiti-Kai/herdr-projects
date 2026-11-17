@@ -12,7 +12,7 @@ import { goTo } from "./talk.js";
 
 let root = null, timer = null, closing = null, snap = null, mark = "", busy = false;
 let menuOpen = false, picking = false, finding = false, seenMsg = -1, seenGo = null, chat = null, untrap = null, wentTo = 0;
-const drawn = { list: "", panel: "", settings: "", ask: "", menu: "", chips: "", shows: "", pick: "" };
+const drawn = { list: "", panel: "", settings: "", ask: "", menu: "", chips: "", shows: "", projects: "", pick: "" };
 const part = (name) => root.querySelector(`.sw-${name}`);
 
 export const isOpen = () => !!root;
@@ -84,6 +84,12 @@ function draw() {
     const lit = row.querySelector(".sw-show.is-lit:not(.sw-show-machine)"), key = lit?.dataset.n || "";
     if (lit && key !== litShown) { const l = lit.offsetLeft, r = l + lit.offsetWidth; if (l < row.scrollLeft || r > row.scrollLeft + row.clientWidth) row.scrollLeft = Math.max(0, l - 24); }
     litShown = key;
+  });
+  // The band under it, as the terminal board's (board/view/bands.rs): the projects you hold, none with fewer than two.
+  once("projects", snap.list.projects, () => {
+    const all = snap.list.projects || [], band = part("projects");
+    band.hidden = !all.length;
+    band.replaceChildren(...all.map((p) => h("span.sw-project", h("b", p.name), ` ${p.n} `, h(`span.sw-c-${p.color}`, p.says))));
   });
   once("list", [snap.list, !!snap.panel, snap.actions], () => drawList(listEl(snap.list, { opened: snap.panel ? snap.list.selected : "", onPick: (id) => call("pick", { id, open: !!snap.panel && wide() }), onOpen: (id) => call("pick", { id, open: true }), onMore: () => press("allDone"), onFold: (id) => call("fold", { id }), actions: snap.actions, onPress: press })));
   once("panel", [snap.panel, snap.actions, snap.canOpen, snap.role], () => { const el = panelEl(snap, { onPress: press, onMenu: () => { menuOpen = true; draw(); }, onClose: () => call("pick", { id: snap.list.selected, open: false }), onGo: (id) => call("pick", { id, open: true }) }); const host = part("task-host"), top = host.scrollTop; part("panel-host").replaceChildren(...(el ? [el] : [])); host.scrollTop = top; });
@@ -158,6 +164,7 @@ export function openBoard({ onClose }) {
       h("button.icon-button", { type: "button", "aria-label": "More", title: "More", "aria-haspopup": "dialog", onclick: () => { menuOpen = true; draw(); } }, icon("more"))),
     // One row; the wheel scrolls it sideways where it does not fit (a mouse has no sideways swipe).
     h("nav.sw-shows", { "aria-label": "Filters", hidden: true, onwheel: (e) => { const el = e.currentTarget; if (el.scrollWidth <= el.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; e.preventDefault(); el.scrollLeft += e.deltaY; } }),
+    h("div.sw-projects", { "aria-label": "Projects", hidden: true }),
     h("div.sw-find-row", { hidden: true }, find),
     h("div.sw-chips"),
     h("p.sw-note", { hidden: true, role: "status" }),

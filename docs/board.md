@@ -74,6 +74,8 @@ sidebar ([other machines](other-machines.md)); a click on it does the same. Ever
   `Ctrl+X` start and stop it, `Ctrl+O` is its autopilot ([machine and project coordinators](machine-and-project-coordinators.md)).
 - **Where the window is narrow** the names are shorter (`Coords`, `Needs`, `Autos`), then shortest (`Co`, `Need`,
   `Work`), then the filters with nothing in them go; narrower still, only the one shown stands, with `tab next`.
+- **Under the filter row, the projects you hold**: `プロジェクト  garden 7 要対応1   skills 6 未着手 …`, each
+  with its open tasks and where the most urgent of them stand ([projects](projects.md)).
 
 ## Grouping: by status, by repo, by machine
 

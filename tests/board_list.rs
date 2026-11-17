@@ -11,6 +11,8 @@ use sw::shown::ink::{Ink, Inked};
 
 /// Pins and the Pinned filter: a pin moves nothing; the filter shows only what is pinned.
 mod pinned;
+/// The band of the projects you hold, over the list's first heading.
+mod projects;
 
 fn has(text: &str, re: &str) -> bool { regex::Regex::new(re).unwrap().is_match(text) }
 fn report(id: &str, msg: &str, progress: Option<i64>, eta: Option<i64>) { sw::actions::filing::report(id, sw::actions::filing::Report { state: "working".into(), msg: msg.into(), progress: progress.map(|p| json!(p)), eta: eta.map(|e| json!(e)), ..Default::default() }).unwrap(); }
