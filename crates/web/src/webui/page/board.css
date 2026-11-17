@@ -75,6 +75,8 @@
    its most urgent ones stand, in that place's colour. It wraps; it is not a button. */
 .sw-projects { flex: none; display: flex; flex-wrap: wrap; gap: 2px var(--space-4, 16px); padding: var(--space-1, 4px) var(--space-3, 12px); font-size: var(--fs-sm, 13px); color: var(--sw-dim); border-bottom: var(--hairline, 1px) solid var(--sw-line); }
 .sw-project b { color: var(--sw-text); font-weight: var(--fw-semibold, 600); }
+/* It steps aside with the filter row (chat.css): the chat full screen, typing with a phone's keyboard up, a tight list. */
+.sw-board:is(.sw-chat-full, .sw-web-typing, .sw-typing, .sw-tight) > .sw-projects { display: none; }
 /* As the terminal's row gives way: the shorter names first, then the filters with nothing in them go (the one shown and
    All stay); what is left still scrolls sideways where it must. */
 @container (max-width: 720px) { .sw-show-long { display: none; } .sw-show-short { display: inline; } .sw-show { padding: 0 var(--space-2, 8px); } }

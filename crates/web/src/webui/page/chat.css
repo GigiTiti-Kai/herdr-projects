@@ -98,7 +98,7 @@
 .sw-board.sw-chat-empty:not(.is-docked):not(.is-side) .sw-said-box { display: none; }
 /* Full screen, and typing in the web UI's box with a phone's keyboard up: the board's header and list step aside (they
    are still there when it goes back). Docked, the board is then only its bar, over the web UI's chat. */
-.sw-board:is(.sw-chat-full, .sw-web-typing) > :is(.sw-head, .sw-shows, .sw-projects, .sw-body, .sw-chips, .sw-find-row, .sw-note) { display: none; }
+.sw-board:is(.sw-chat-full, .sw-web-typing) > :is(.sw-head, .sw-shows, .sw-body, .sw-chips, .sw-find-row, .sw-note) { display: none; }
 .sw-board.sw-chat-full:not(.is-docked) .sw-chat { flex: 1; height: auto; border-top: 0; }
 /* With no list over it (full screen, typing, side by side) it is no sheet: square, flat. */
 .sw-board:is(.sw-chat-full, .sw-web-typing, .sw-typing, .is-side) .sw-chat { border-radius: 0; box-shadow: none; }
@@ -117,7 +117,7 @@
    the strip iOS floats over it (--sw-kb-cover). With the chat shown, the board's header, chips and list step aside and
    the conversation takes what is left over the box (under its least it steps aside); hidden, the chat stays hidden and
    the board stays in view over the box. */
-.sw-board.sw-typing > :is(.sw-head, .sw-shows, .sw-projects, .sw-body, .sw-chips, .sw-find-row, .sw-note) { display: none; }
+.sw-board.sw-typing > :is(.sw-head, .sw-shows, .sw-body, .sw-chips, .sw-find-row, .sw-note) { display: none; }
 .sw-board.sw-typing .sw-chat { flex: 1; height: auto; min-height: 0; overflow: hidden; border-top: 0; padding-top: env(safe-area-inset-top, 0px); }
 .sw-board.sw-keys .sw-own { padding-bottom: calc(var(--space-2, 8px) + var(--sw-kb-cover, 0px)); }
 .sw-board.sw-typing .sw-said-box { flex: 1 1 0; min-height: 0; overflow: hidden; }
@@ -128,7 +128,7 @@
 .sw-board.sw-typing.sw-cramped .sw-composer { --sw-grip-h: 0px; }
 /* Typing with the chat hidden, the list stays in view (keep.js): where the box (at its one line) leaves it too little,
    the board's header and chips step aside, then the chat's bar and what stands over the box. */
-.sw-board.sw-tight > :is(.sw-head, .sw-shows, .sw-projects, .sw-chips, .sw-find-row, .sw-note) { display: none; }
+.sw-board.sw-tight > :is(.sw-head, .sw-shows, .sw-chips, .sw-find-row, .sw-note) { display: none; }
 .sw-board.sw-tight { padding-top: env(safe-area-inset-top, 0px); }
 .sw-board.sw-tighter .sw-chat > :not(.sw-own), .sw-board.sw-tighter .sw-files, .sw-board.sw-tighter .sw-grip { display: none; }
 .sw-board.sw-tighter .sw-composer { --sw-grip-h: 0px; }
