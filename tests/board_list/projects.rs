@@ -6,6 +6,7 @@ use common::board::{open, web, Board};
 use common::{world_with, Opts};
 use serde_json::json;
 use sw::actions::filing::{report, Report};
+use sw::actions::settings::{settings_command, Where};
 use sw::json::*;
 use sw::shown::projects::{bands, project_of, says, Band};
 
@@ -22,7 +23,8 @@ fn a_task_is_under_the_first_project_with_a_word_that_is_its_repo_or_in_its_titl
     assert_eq!(of("tools/1", "Clean up the SKILL sheet"), "skills", "the first entry wins, letters in any case");
     assert_eq!(of("tools/2", "Mow the lawn"), "garden");
     assert_eq!(of("home/3", "Paint the door"), "home", "a name alone is its own word, and a word may be the repo");
-    assert_eq!(of("tools/4", "Oil the saw"), "tools", "the repo is matched whole");
+    assert_eq!(of("tools/4", "Oil the saw"), "tools");
+    assert_eq!(of("homestead/9", "Oil the saw"), "homestead", "the repo is matched whole: home is not homestead");
     assert_eq!(of("proj/5", "Pay the bill"), "proj", "nothing matches: its repo");
     assert_eq!(project_of(&[], &row("proj/6", "Lawn", "todo")), "proj", "with no projects set, by repo");
     // Another machine's row by its own id there.
@@ -72,6 +74,14 @@ fn on_the_board_the_band_stands_under_the_filter_row_over_the_first_heading_what
     // Another filter shows fewer rows, not fewer projects.
     while s.s.show != 3 { s.press(&["tab"]); }
     assert!(screen(&mut s, 100).contains("garden 2 要対応1   skills 3 未着手   proj 1 未着手"));
+    // The setting changed: the next read shows it. By repo, every task is under the one: no band.
+    let set = |v: &str| settings_command("set", &["set".into(), "board.projects".into()], &Where { task: None, repo: None, automation: None, coord: None }, Some(json!(v))).unwrap();
+    set("garden=lawn|fence|skill");
+    s.load();
+    assert!(screen(&mut s, 100).contains("garden 4 要対応1   proj 2 未着手"), "{}", screen(&mut s, 100));
+    set("none");
+    s.load();
+    assert!(!screen(&mut s, 100).contains("プロジェクト"));
 }
 
 #[test]

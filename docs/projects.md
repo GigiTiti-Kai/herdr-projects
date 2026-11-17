@@ -39,4 +39,4 @@ herdr-projects set board.projects "skills=skill|cleanup garden=lawn|fence|garden
 - Nothing is tagged by hand: a task you add, or a coordinator adds, is under its project from its title at once. A
   task renamed moves.
 
-The board reads the setting as it reads your tasks: a change shows within a second.
+The board reads the setting each time it reads your tasks: a change shows on the next read, within a second or two.

@@ -1,5 +1,5 @@
 //! The band over the list, under the filter row: the projects you hold (shown/projects.rs), each its name, how many open
-//! tasks it has and where its most urgent ones stand (`応募運用 7 要対応1`), most urgent first. Only with two projects
+//! tasks it has and where its most urgent ones stand (`garden 7 要対応1`), most urgent first. Only with two projects
 //! or more, never in the archive, and only where the list keeps room for its rows: a sixth of it at most, what does
 //! not fit counted at the end (`+3`).
 use crate::board::state::State;
