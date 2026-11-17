@@ -72,7 +72,7 @@ pub fn parse_verdict(raw: &str, head: &str, earlier: Option<&[Value]>, used: &[S
     let sentences = |xs: &Value| -> Vec<String> { xs.as_array().map(|a| a.iter().map(|x| crate::text::squash(&text(x))).filter(|s| !s.is_empty()).take(8).collect()).unwrap_or_default() };
     // `risky`, when given (a work review must, review_once.rs): the board's own last sentence then ends `text`.
     let risky = j.at("risky").as_bool();
-    let changes = if risky == Some(true) { sentences(j.at("riskyChanges")) } else { vec![] };
+    let changes = sentences(j.at("riskyChanges")); // named under a false answer still counts: risky is never assumed away
     if j.has("risky") && (risky.is_none() || (risky == Some(true) && changes.is_empty())) { crate::fail!("no valid verdict: `risky` is true or false, and a true one names its `riskyChanges`"); }
     let said = crate::text::squash(j.s("text"));
     let said = if risky.is_some() { risky_end(&said, &changes) } else { said };
@@ -80,6 +80,6 @@ pub fn parse_verdict(raw: &str, head: &str, earlier: Option<&[Value]>, used: &[S
     let mut out = obj(json!({ "meets": j.at("meets"), "findings": findings, "left": left, "text": said, "checks": sentences(j.at("checks")), "limitations": sentences(j.at("limitations")),
         "listed": j.at("artifacts"), "artifacts": [], "at": crate::clock::now(), "head": if head.is_empty() { Value::Null } else { json!(head) } }));
     if j.at("offPlan").is_array() { out.put("offPlan", sentences(j.at("offPlan"))); }
-    if let Some(r) = risky { out.put("risky", r); out.put("riskyChanges", changes); }
+    if risky.is_some() { out.put("risky", !changes.is_empty()); out.put("riskyChanges", changes); }
     Ok(Some(out))
 }

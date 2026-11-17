@@ -138,8 +138,11 @@ fn the_board_ends_the_text_with_its_fixed_line_from_the_risky_answer() {
     assert_eq!(risky_end("問題は見つからなかった。", &[]), "問題は見つからなかった。危ない変更:なし");
     assert_eq!(risky_end("", &[]), "危ない変更:なし");
     assert_eq!(risky_end("Fine.", &["It drops the users table.".into(), "It sends mail.".into()]), "Fine.。危ない変更:あり（It drops the users table. / It sends mail.）");
-    let rv = parsed(json!({ "meets": true, "text": "問題なし。", "risky": false, "riskyChanges": ["ignored when false"] })).unwrap().unwrap();
+    let rv = parsed(json!({ "meets": true, "text": "問題なし。", "risky": false, "riskyChanges": [] })).unwrap().unwrap();
     assert_eq!((rv.t("text"), rv.at("risky").clone(), rv.at("riskyChanges").clone()), ("問題なし。危ない変更:なし".into(), json!(false), json!([])));
+    // A change named under a false answer is not assumed away: it is risky.
+    let rv = parsed(json!({ "meets": true, "text": "問題なし。", "risky": false, "riskyChanges": ["It sends mail."] })).unwrap().unwrap();
+    assert_eq!((rv.t("text"), rv.at("risky").clone()), ("問題なし。危ない変更:あり（It sends mail.）".into(), json!(true)));
     let rv = parsed(json!({ "meets": true, "text": "Fine.", "risky": true, "riskyChanges": ["  It rewrites   the history. "] })).unwrap().unwrap();
     assert_eq!((rv.t("text"), rv.at("risky").clone(), rv.at("riskyChanges").clone()), ("Fine.。危ない変更:あり（It rewrites the history.）".into(), json!(true), json!(["It rewrites the history."])));
     // A true one with nothing named, or an answer that is no true or false, is no verdict.

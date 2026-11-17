@@ -77,9 +77,9 @@ fn plan_approve_you_waits_as_plan_ready_and_the_yes_starts_the_build() {
 #[test]
 fn plan_approve_reviewer_sends_a_failing_plan_back_and_builds_one_that_passes() {
     let w = plan_world(json!({ "plan.approve": "reviewer", "worker.agent": "codex", "review.rounds": 1, "review.when": "never" }));
-    let bad = |subject: &str| json!({ "verdict": { "meets": true, "findings": [{ "severity": "major", "subject": subject, "where": "step 1", "proof": "read the plan" }], "text": "Not yet." } });
+    let bad = |subject: &str| json!({ "verdict": { "meets": true, "findings": [{ "severity": "major", "subject": subject, "where": "step 1", "proof": "read the plan" }], "text": "Not yet.", "risky": null } }); // a look at a plan has no `risky` answer
     w.script(json!({ "worker": [{ "plan": PLAN, "note": "Written." }, { "plan": PLAN, "note": "The same." }, { "plan": "# Plan with tests\n", "note": "Again." }, { "status": "working" }],
-        "reviewer": [bad("Leaves out the tests."), bad("Still leaves out the tests."), { "verdict": { "meets": true, "findings": [], "text": "A good plan." } }] }));
+        "reviewer": [bad("Leaves out the tests."), bad("Still leaves out the tests."), { "verdict": { "meets": true, "findings": [], "text": "A good plan.", "risky": null } }] }));
     let id = w.add("Work");
     delegate(&id);
     let mut t = settle(&id);
