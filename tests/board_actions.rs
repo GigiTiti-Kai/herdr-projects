@@ -25,7 +25,7 @@ fn ready_to_approve_the_merge_asks_first_the_menu_acts_remove_asks_and_messages_
     assert!(has(&text, r"│  Review ─+ *\n[^\n]*│  Review 1     ✓ Pass · 1 minor · \d+s ago *\n[^\n]*│               Good\."), "{text}");
     assert!(has(&text, r"│  Change       1 file, \+1 −0"));
     let tk = task(&id); let r = &tk.arr("reviews")[0];
-    assert_eq!((r.i("round"), r.at("pass").clone(), r.arr("findings").len(), r.t("text")), (1, json!(true), 1, "Good.".into()));
+    assert_eq!((r.i("round"), r.at("pass").clone(), r.arr("findings").len(), r.t("text")), (1, json!(true), 1, "Good.。危ない変更:なし".into()));
     assert!(text.contains(&format!("{} approve and merge this task · {} send the review to the agent · space talk to the agent · ? all keys", key_name("yes"), key_name("sendBack"))), "{text}");
     s.press(&["ctrl+l"]);
     assert!(has(&s.text(), r#"\n[ ▌]\? Merge PRJ-1 "Make f" into \S+\? *\n   A merge cannot be undone\. *\n   y = merge · n = do not merge"#), "{}", s.text());

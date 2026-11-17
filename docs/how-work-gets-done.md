@@ -132,6 +132,11 @@ When the agent's turn ends, the board:
      only through it.
    - A reviewer that ends its turn with no verdict is started once more by itself, as the same review. If it again gives
      none, the review fails, with its last message.
+   - The reviewer must also say whether the change does anything risky (`risky`, true or false: deleting or rewriting
+     data, a migration, secrets or sign-in, sending to an outside service, billing, what runs by itself), and name each
+     risky change when it does (`riskyChanges`). A verdict without it does not count: the review fails, saying so. The
+     board ends the review's text with a fixed last sentence from it, `危ない変更:なし`, or `危ない変更:あり（…）` with
+     what was named, and keeps both fields in the review (`list --json` shows them). A look at a plan has no such answer.
    - Only the reviewer's own turn ending counts. A helper it hands part of the review to (Codex's sub-agents, Claude
      Code's background agents) finishing is not the review ending, and while a helper is still at work the review is
      still going. (The same holds for a working agent and its task.) A helper is back when its answer is in the

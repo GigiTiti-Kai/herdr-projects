@@ -1,9 +1,10 @@
 //! The gate, more: a later round's verdict read against the earlier findings and what the reviewer is told, the
-//! review.mustFix and review.rounds settings, and the review page and the pull request showing every finding.
+//! review.mustFix and review.rounds settings, the review page and the pull request showing every finding, and the
+//! required `risky` answer that ends the review's text with the board's fixed line (shown in `list --json` too).
 use crate::common;
 use common::*;
 use serde_json::{json, Value};
-use sw::finish::review_brief::{parse_verdict, review_brief, Brief};
+use sw::finish::review_brief::{parse_verdict, review_brief, risky_end, Brief};
 use sw::gate as g;
 use sw::json::*;
 use sw::store::settings::change::{set_value, unset_value};
@@ -126,4 +127,60 @@ fn the_pull_request_and_the_review_page_show_every_finding_those_below_the_gate_
     let mut pass = review_of(true, vec![], "major"); pass.put("at", sw::clock::now());
     let clean = sw::review_page::render::render_review_page(&json!({ "id": id, "title": "T", "summary": "Did it." }), &Value::Object(pass), &[], &w.base);
     assert!(re(r#"No findings reported by the reviewer\.[\s\S]*<div class="score success">Pass</div><p class="decision">Nothing found</p>"#, &clean), "{clean}");
+}
+
+fn parsed(v: serde_json::Value) -> sw::err::Res<Option<Obj>> { parse_verdict(&v.to_string(), "", None, &[]) }
+
+#[test]
+fn the_board_ends_the_text_with_its_fixed_line_from_the_risky_answer() {
+    // The last sentence, split at 「。」 with no spaces, is exactly 「危ない変更:なし」, and the phrase is there once.
+    assert_eq!(risky_end("Looks right. Nothing found.", &[]), "Looks right. Nothing found.。危ない変更:なし");
+    assert_eq!(risky_end("問題は見つからなかった。", &[]), "問題は見つからなかった。危ない変更:なし");
+    assert_eq!(risky_end("", &[]), "危ない変更:なし");
+    assert_eq!(risky_end("Fine.", &["It drops the users table.".into(), "It sends mail.".into()]), "Fine.。危ない変更:あり（It drops the users table. / It sends mail.）");
+    let rv = parsed(json!({ "meets": true, "text": "問題なし。", "risky": false, "riskyChanges": ["ignored when false"] })).unwrap().unwrap();
+    assert_eq!((rv.t("text"), rv.at("risky").clone(), rv.at("riskyChanges").clone()), ("問題なし。危ない変更:なし".into(), json!(false), json!([])));
+    let rv = parsed(json!({ "meets": true, "text": "Fine.", "risky": true, "riskyChanges": ["  It rewrites   the history. "] })).unwrap().unwrap();
+    assert_eq!((rv.t("text"), rv.at("risky").clone(), rv.at("riskyChanges").clone()), ("Fine.。危ない変更:あり（It rewrites the history.）".into(), json!(true), json!(["It rewrites the history."])));
+    // A true one with nothing named, or an answer that is no true or false, is no verdict.
+    for bad in [json!({ "meets": true, "text": "Fine.", "risky": true, "riskyChanges": [" "] }), json!({ "meets": true, "text": "Fine.", "risky": "none" })] {
+        assert!(parsed(bad.clone()).unwrap_err().msg.contains("no valid verdict"), "{bad}");
+    }
+    // A plan's look has no such answer: its text stays the reviewer's own.
+    let rv = parsed(json!({ "meets": true, "text": "As planned." })).unwrap().unwrap();
+    assert_eq!((rv.t("text"), rv.has("risky")), ("As planned.".into(), false));
+}
+
+#[test]
+fn the_reviewer_is_told_to_answer_risky() {
+    let w = world_with(Opts { repo: true, ..Default::default() });
+    let id = w.add("Make f");
+    let brief = review_brief(&task(&id), &Brief { text: "Did it.", change: None, to_land: true, ch: &Obj::new(), earlier: None, check: "" });
+    assert!(brief.contains("\"risky\": <true or false>, \"riskyChanges\": [") && brief.contains(sw::finish::review_brief::RISKY_RULE), "{brief}");
+}
+
+#[test]
+fn a_review_ends_with_the_fixed_line_and_list_json_shows_the_answer() {
+    let w = world_with(Opts { repo: true, ..Default::default() });
+    w.script(json!({ "worker": [{ "files": { "f.txt": "v1\n" }, "commit": "v1", "note": "Did v1." }], "reviewer": [{ "verdict": { "meets": true, "findings": [], "text": "リポジトリは変更していない。", "risky": false } }] }));
+    let id = w.add("Make f");
+    delegate(&id);
+    let t = settle(&id);
+    assert_eq!(t.s("stage"), "approval", "{}", t.at("failure"));
+    assert_eq!(t.at("review").t("text"), "リポジトリは変更していない。危ない変更:なし");
+    let a = sw::cli::flags::parse(&["list".to_string(), "--json".into()]);
+    let (listed, _) = sw::cli::tasks::command("list", &a).unwrap();
+    let row = listed.as_array().unwrap().iter().find(|r| r.s("id") == id).cloned().unwrap();
+    assert_eq!((row.at("review").t("text"), row.at("review").at("risky").clone(), row.at("review").at("riskyChanges").clone()), (t.at("review").t("text"), json!(false), json!([])));
+}
+
+#[test]
+fn a_verdict_without_risky_does_not_finish_the_review() {
+    let w = world_with(Opts { repo: true, settings: json!({ "review.rounds": 0 }), ..Default::default() });
+    w.script(json!({ "worker": [{ "files": { "f.txt": "v1\n" }, "commit": "v1", "note": "Did v1." }], "reviewer": [{ "verdict": { "meets": true, "findings": [], "text": "Fine.", "risky": null } }] }));
+    let id = w.add("Make f");
+    delegate(&id);
+    let t = settle(&id);
+    assert_ne!(t.s("stage"), "approval", "{t:?}");
+    assert!(t.at("failure").s("detail").contains("no valid verdict: it has no `risky` (true or false)"), "{}", t.at("failure"));
 }

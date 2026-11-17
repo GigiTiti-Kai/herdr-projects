@@ -8,6 +8,15 @@ use crate::json::*;
 use crate::research::{is_research, review_rule};
 use crate::review_page::link_mode;
 
+/// The required `risky` answer of a work review (not of a plan's look): what the human must see before a yes.
+pub const RISKY_RULE: &str = "Also answer, in `risky` (true or false, required), whether the change does anything risky: something hard to undo or that reaches past the repository. That is: deleting or rewriting data, a migration, secrets, credentials or sign-in, sending anything to an outside service, money or billing, or what runs by itself in production or on the human's machine. When true, name each risky change in `riskyChanges`, one sentence each; when false, leave it empty. A verdict without `risky` does not count. Do not write about it in `text`: the board adds its own line from these fields.";
+/// The fixed last sentence the board adds to a review's text from `risky`, as the human's auto-ship reads it
+/// (dotfiles bin/auto-ship: the phrase once, and the last sentence, split at 「。」 with no spaces, exactly 「危ない変更:なし」).
+pub fn risky_end(text: &str, risky: &[String]) -> String {
+    let line = if risky.is_empty() { "危ない変更:なし".to_string() } else { format!("危ない変更:あり（{}）", risky.join(" / ")) };
+    let t = text.trim_end();
+    format!("{t}{}{line}", if t.is_empty() || t.ends_with(['。', '．']) { "" } else { "。" })
+}
 /// What the brief is about: the work's own words, its change, whether it lands, the settings, the round before.
 pub struct Brief<'a> { pub text: &'a str, pub change: Option<&'a Value>, pub to_land: bool, pub ch: &'a Obj, pub earlier: Option<&'a [Value]>, pub check: &'a str }
 pub fn review_brief(t: &Obj, b: &Brief) -> String {
@@ -35,7 +44,7 @@ pub fn review_brief(t: &Obj, b: &Brief) -> String {
             if open.is_empty() { "Earlier findings: none of the task's own.".to_string() } else { format!("Earlier findings:\n{}", open.iter().map(|f| format!("- {} {}", f.s("id"), gate::finding_line(f))).collect::<Vec<_>>().join("\n")) },
             if known.is_empty() { String::new() } else { format!("\n{known}") })
     } else { known.clone() };
-    let verdict = format!("Last of all, save your verdict as JSON in {dir}/verdict.json, then stop. The board waits for that file. Its shape: {{\"commit\": \"{}\", \"meets\": <true or false>, \"text\": \"<two or three plain sentences: your overall judgement>\", \"findings\": [{{{}\"severity\": \"<critical, major, minor or trivial>\", \"subject\": \"<one sentence: what is wrong>\", \"where\": \"<the file or place>\", \"proof\": \"<what you ran or saw; may be empty>\", \"preexisting\": <true or false>}}, ...], \"checks\": [\"<what you actually exercised and the result>\", ...], \"limitations\": [\"<important areas you could not verify>\", ...], {}\"artifacts\": [{{\"file\": \"<file name you saved in that folder>\" or \"url\": \"<link to try it>\", \"caption\": \"<what it shows, a few words>\", \"detail\": \"<why it matters or what to try>\"}}, ...]}}  (findings and artifacts may be empty lists; do not invent findings, checks or proof)",
+    let verdict = format!("Last of all, save your verdict as JSON in {dir}/verdict.json, then stop. The board waits for that file. Its shape: {{\"commit\": \"{}\", \"meets\": <true or false>, \"text\": \"<two or three plain sentences: your overall judgement>\", \"risky\": <true or false>, \"riskyChanges\": [\"<when risky: one risky change, one sentence>\", ...], \"findings\": [{{{}\"severity\": \"<critical, major, minor or trivial>\", \"subject\": \"<one sentence: what is wrong>\", \"where\": \"<the file or place>\", \"proof\": \"<what you ran or saw; may be empty>\", \"preexisting\": <true or false>}}, ...], \"checks\": [\"<what you actually exercised and the result>\", ...], \"limitations\": [\"<important areas you could not verify>\", ...], {}\"artifacts\": [{{\"file\": \"<file name you saved in that folder>\" or \"url\": \"<link to try it>\", \"caption\": \"<what it shows, a few words>\", \"detail\": \"<why it matters or what to try>\"}}, ...]}}  (findings and artifacts may be empty lists; do not invent findings, checks or proof)",
         if head.is_empty() { "<the commit you reviewed>".to_string() } else { head.clone() },
         if b.earlier.is_some() { "\"id\": \"<the earlier finding's id; leave out for a new one>\", " } else { "" },
         if plan_rule.is_empty() { "" } else { "\"offPlan\": [\"<where the build left the approved plan, one sentence each>\", ...], " });
@@ -50,6 +59,7 @@ pub fn review_brief(t: &Obj, b: &Brief) -> String {
         format!("First answer one fixed question, true or false: {} All of it, and working. That answer is `meets`. It decides nothing by itself: whatever makes you answer false, report it as a finding with the severity it deserves. Only an answer of false with no finding at all is counted as a critical finding.", gate::QUESTION),
         "Then report what you found as a list of findings, one fault each. A finding has a `subject` (one sentence saying what is wrong), a `where` (the file or the place), a `proof` (what you actually ran or saw that shows it; leave it empty if you did not show it), `preexisting` (true when the fault was already there before this change and the task did not cause it: such a finding is a note for the human, it never sends the work back and nothing else is done with it) and a `severity`. Choose the severity by what the fault does, never by whether you would like this merged:\n- critical: only one of these four. A fault a user of this would hit in ordinary use; data that is lost or wrong; something unsafe; or a requirement the task states plainly that is not built. Nothing else is critical: not a missing picture or recording, not a line of a document, not a test or proof that cannot be had on this machine, not something the task did not plainly ask for.\n- major: a real fault in an unusual case; or a claim that is not proven (a fix not shown to work, a test that cannot catch the bug it is for); or a document that states something false.\n- minor: correct but could be better: wording, naming, a small inaccuracy, a narrow gap.\n- trivial: a note. Nothing to do.".into(),
         format!("You do not decide whether this {} or goes back, and you give no score: the board decides from your findings by a fixed rule. A critical finding with an empty proof is counted as major. If nothing qualifies, return an empty list and say so. Do not invent findings to have something to report.", if b.to_land { "merges" } else { "is accepted" }),
+        RISKY_RULE.into(),
         later, verdict,
     ].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join("\n\n")
 }
@@ -60,9 +70,16 @@ pub fn parse_verdict(raw: &str, head: &str, earlier: Option<&[Value]>, used: &[S
     // The verdict must name the commit it reviewed; a verdict for another commit is ignored.
     if !head.is_empty() { let c = j.t("commit").trim().to_lowercase(); if c.len() < 7 || !head.to_lowercase().starts_with(&c) { return Ok(None); } }
     let sentences = |xs: &Value| -> Vec<String> { xs.as_array().map(|a| a.iter().map(|x| crate::text::squash(&text(x))).filter(|s| !s.is_empty()).take(8).collect()).unwrap_or_default() };
+    // `risky`, when given (a work review must, review_once.rs): the board's own last sentence then ends `text`.
+    let risky = j.at("risky").as_bool();
+    let changes = if risky == Some(true) { sentences(j.at("riskyChanges")) } else { vec![] };
+    if j.has("risky") && (risky.is_none() || (risky == Some(true) && changes.is_empty())) { crate::fail!("no valid verdict: `risky` is true or false, and a true one names its `riskyChanges`"); }
+    let said = crate::text::squash(j.s("text"));
+    let said = if risky.is_some() { risky_end(&said, &changes) } else { said };
     let (findings, left) = gate::settle(j.at("meets").as_bool(), &gate::read_findings(j.at("findings")), earlier, used);
-    let mut out = obj(json!({ "meets": j.at("meets"), "findings": findings, "left": left, "text": crate::text::squash(j.s("text")), "checks": sentences(j.at("checks")), "limitations": sentences(j.at("limitations")),
+    let mut out = obj(json!({ "meets": j.at("meets"), "findings": findings, "left": left, "text": said, "checks": sentences(j.at("checks")), "limitations": sentences(j.at("limitations")),
         "listed": j.at("artifacts"), "artifacts": [], "at": crate::clock::now(), "head": if head.is_empty() { Value::Null } else { json!(head) } }));
     if j.at("offPlan").is_array() { out.put("offPlan", sentences(j.at("offPlan"))); }
+    if let Some(r) = risky { out.put("risky", r); out.put("riskyChanges", changes); }
     Ok(Some(out))
 }

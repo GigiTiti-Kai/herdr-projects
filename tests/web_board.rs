@@ -54,7 +54,7 @@ fn the_web_board_shows_the_terminal_boards_list_and_one_task_whole() {
     assert_eq!(s.at("panel").arr("parts").iter().map(|p| p.t("head")).collect::<Vec<_>>(), vec!["Status", "Settings", "Description", "Review", "The agent said", "Session"]);
     let fact = |head: &str, label: &str| s.at("panel").arr("parts").iter().find(|p| p.s("head") == head).and_then(|p| p.arr("items").iter().find(|x| x.s("label") == label).cloned()).unwrap_or_default();
     assert_eq!(said(&fact("Status", "State").at("lines")[0]), format!("◆ ready to approve · {}", ready.s("time")));
-    assert!(regex::Regex::new(r"^✓ Pass · 1 minor · \d+s ago · at [0-9a-f]{7}\|Good\.$").unwrap().is_match(&fact("Review", "Review 1").arr("lines").iter().map(said).collect::<Vec<_>>().join("|")), "{}", fact("Review", "Review 1"));
+    assert!(regex::Regex::new(r"^✓ Pass · 1 minor · \d+s ago · at [0-9a-f]{7}\|Good\.。危ない変更:なし$").unwrap().is_match(&fact("Review", "Review 1").arr("lines").iter().map(said).collect::<Vec<_>>().join("|")), "{}", fact("Review", "Review 1"));
     assert!(regex::Regex::new(r"^minor +f\.txt has no title \(f\.txt\) · not required$").unwrap().is_match(&said(&fact("Review", "Findings").at("lines")[0])));
     assert_eq!(fact("Settings", "Merge").at("lines")[0][0].s("t"), "after your yes");
     assert_eq!(s.at("panel").arr("parts").iter().find(|p| p.s("head") == "Description").unwrap().at("items"), &json!([{ "k": "text", "value": [{ "t": "A file called f." }] }]));
