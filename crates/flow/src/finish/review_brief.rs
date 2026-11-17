@@ -72,7 +72,10 @@ pub fn parse_verdict(raw: &str, head: &str, earlier: Option<&[Value]>, used: &[S
     let sentences = |xs: &Value| -> Vec<String> { xs.as_array().map(|a| a.iter().map(|x| crate::text::squash(&text(x))).filter(|s| !s.is_empty()).take(8).collect()).unwrap_or_default() };
     // `risky`, when given (a work review must, review_once.rs): the board's own last sentence then ends `text`.
     let risky = j.at("risky").as_bool();
-    let changes = sentences(j.at("riskyChanges")); // named under a false answer still counts: risky is never assumed away
+    // Every one named, none cut off or dropped; named under a false answer still counts: risky is never assumed away.
+    let rc = j.at("riskyChanges");
+    if j.has("riskyChanges") && !rc.as_array().is_some_and(|a| a.iter().all(|x| x.is_string())) { crate::fail!("no valid verdict: `riskyChanges` is a list of sentences"); }
+    let changes: Vec<String> = rc.as_array().map(|a| a.iter().map(|x| crate::text::squash(x.as_str().unwrap_or(""))).filter(|s| !s.is_empty()).collect()).unwrap_or_default();
     if j.has("risky") && (risky.is_none() || (risky == Some(true) && changes.is_empty())) { crate::fail!("no valid verdict: `risky` is true or false, and a true one names its `riskyChanges`"); }
     let said = crate::text::squash(j.s("text"));
     let said = if risky.is_some() { risky_end(&said, &changes) } else { said };

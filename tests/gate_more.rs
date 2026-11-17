@@ -146,7 +146,13 @@ fn the_board_ends_the_text_with_its_fixed_line_from_the_risky_answer() {
     let rv = parsed(json!({ "meets": true, "text": "Fine.", "risky": true, "riskyChanges": ["  It rewrites   the history. "] })).unwrap().unwrap();
     assert_eq!((rv.t("text"), rv.at("risky").clone(), rv.at("riskyChanges").clone()), ("Fine.。危ない変更:あり（It rewrites the history.）".into(), json!(true), json!(["It rewrites the history."])));
     // A true one with nothing named, or an answer that is no true or false, is no verdict.
-    for bad in [json!({ "meets": true, "text": "Fine.", "risky": true, "riskyChanges": [" "] }), json!({ "meets": true, "text": "Fine.", "risky": "none" })] {
+    // Nine named: all nine are kept, in the fields and in the text.
+    let nine: Vec<String> = (1..=9).map(|n| format!("Risky change {n}.")).collect();
+    let rv = parsed(json!({ "meets": true, "text": "Fine.", "risky": true, "riskyChanges": nine })).unwrap().unwrap();
+    assert_eq!((rv.arr("riskyChanges").len(), rv.t("text").contains("Risky change 9.")), (9, true));
+    // A list that is no list of sentences is no verdict: never read as nothing risky.
+    for bad in [json!({ "meets": true, "text": "Fine.", "risky": true, "riskyChanges": [" "] }), json!({ "meets": true, "text": "Fine.", "risky": "none" }),
+        json!({ "meets": true, "text": "Fine.", "risky": false, "riskyChanges": "Deletes the production database." }), json!({ "meets": true, "text": "Fine.", "risky": false, "riskyChanges": [{ "what": "Deletes it." }] })] {
         assert!(parsed(bad.clone()).unwrap_err().msg.contains("no valid verdict"), "{bad}");
     }
     // A plan's look has no such answer: its text stays the reviewer's own.
