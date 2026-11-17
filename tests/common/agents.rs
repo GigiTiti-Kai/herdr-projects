@@ -184,6 +184,8 @@ fn run(f: &F, pi: usize, prompt: &str, step: Value) {
                 for (n, body) in step.at("evidence").as_object().cloned().unwrap_or_default() { write(&m.join("review").join(n), &text(&body)); }
                 let mut v = step.at("verdict").clone();
                 if !v.b("commit") || v.s("commit") == "HEAD" { v["commit"] = json!(git(dir, &["rev-parse", "HEAD"]).unwrap_or_default()); }
+                if v.get("risky").is_none() { v["risky"] = json!(false); } // as a real reviewer is told; `"risky": null` leaves it out
+                if v["risky"].is_null() { v.as_object_mut().unwrap().remove("risky"); }
                 write(&m.join("review").join("verdict.json"), &v.to_string());
             }
         }

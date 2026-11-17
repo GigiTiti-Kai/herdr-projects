@@ -72,7 +72,7 @@ fn work_that_still_fails_review_after_its_rounds_goes_to_the_next_agent_with_the
     assert_eq!(starts(&w), vec!["claude", "codex"]);
     assert_eq!(handover_line(&handovers(&t)[0]), "codex took over from claude: its work still failed review after 1 round");
     let told = prompts(&w, t.at("link").s("pane"))[0].clone();
-    assert!(told.contains("The last review of this work failed (Fail · 1 major), and what it found is still open:\n\nNot what was asked.\n\nRequired: fix each of these.\n- [major] The file says v1, the task asked for v2 (f.txt:1)"), "{told}");
+    assert!(told.contains("The last review of this work failed (Fail · 1 major), and what it found is still open:\n\nNot what was asked.。危ない変更:なし\n\nRequired: fix each of these.\n- [major] The file says v1, the task asked for v2 (f.txt:1)"), "{told}");
     assert!(told.contains("Its last message was:\nTried."), "{told}");
     assert_eq!(sw::store::reviews::review_history(&t).iter().map(|e| (e.i("round"), e.t("by"), e.at("pass").clone())).collect::<Vec<_>>(), vec![(1, "codex".into(), json!(false)), (2, "codex".into(), json!(false))]);
     assert_eq!(t.i("reviewRounds"), 0);

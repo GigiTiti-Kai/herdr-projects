@@ -123,6 +123,8 @@ pub fn review_once(id: &str, g: &mut Guard, text: &str, change: Option<&Value>, 
             if verdict_file.exists() {
                 sleep(every.min(300)); // let the write complete
                 match std::fs::read_to_string(&verdict_file).map_err(crate::err::Error::from).and_then(|raw| parse_verdict(&raw, &head, earlier.as_deref(), &used)) {
+                    // A work review is not done without its `risky` answer (review_brief.rs: RISKY_RULE); a plan's look has none.
+                    Ok(Some(rv)) if plan.is_none() && !rv.at("risky").is_boolean() => { error = "no valid verdict: it has no `risky` (true or false)".into(); break; }
                     Ok(Some(rv)) => { review = Some(rv); break; }
                     Ok(None) => { let _ = std::fs::remove_file(&verdict_file); }
                     Err(e) => { error = crate::text::squash(&e.msg).chars().take(400).collect(); if error.is_empty() { error = "no valid verdict".into(); } break; }

@@ -40,7 +40,7 @@ fn a_review_where_meets_is_false_goes_back_even_if_the_reviewer_listed_nothing_e
     assert_eq!((review_round(&t), t.i("reviewRounds")), (2, 1));
     let p = pane_prompts(&w, &t);
     assert_eq!(p.len(), 2);
-    assert!(re(r"Result: Fail · 1 critical\.\n\nOnly a test was added, no fix\.\n\nRequired: fix each of these\.\n- \[critical\] The change does not do what the task asked\.", &p[1]), "{}", p[1]);
+    assert!(re(r"Result: Fail · 1 critical\.\n\nOnly a test was added, no fix\.。危ない変更:なし\n\nRequired: fix each of these\.\n- \[critical\] The change does not do what the task asked\.", &p[1]), "{}", p[1]);
     assert_eq!(review_history(&t).iter().map(|e| (e.i("round"), e.at("meets").clone(), e.at("pass").clone(), e.arr("findings").len())).collect::<Vec<_>>(), vec![(1, json!(false), json!(false), 1), (2, json!(true), json!(true), 0)]);
     assert!(t.s("msg").starts_with("Approve to merge? Review: Pass. Did v2."), "{}", t.s("msg"));
 }

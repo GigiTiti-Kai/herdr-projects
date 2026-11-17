@@ -124,7 +124,7 @@ fn review_with_a_chat(w: &World, id: &str, chat: impl Fn() + 'static) -> Rc<RefC
         else if step.get() == 1 {
             step.set(2);
             let head = t.at("chat").t("head");
-            let v = json!({ "meets": true, "findings": [], "text": "Looks right.", "commit": head });
+            let v = json!({ "meets": true, "findings": [], "text": "Looks right.", "risky": false, "commit": head });
             let dir = sw::flow::task::review_dir(&t); std::fs::create_dir_all(&dir).unwrap(); std::fs::write(dir.join("verdict.json"), v.to_string()).unwrap();
         }
     }));
