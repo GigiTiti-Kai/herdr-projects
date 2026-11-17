@@ -98,7 +98,8 @@ pub fn queue_place(t: &Task) -> Option<i64> {
     crate::shown::queue::places(all.iter()).into_iter().find(|(id, _)| id == t.s("id")).map(|(_, n)| n)
 }
 fn session_for(tasks: &[Arc<Task>], socket: &str) -> Session {
-    let needs = tasks.iter().any(|t| (is_agent_task(t) || !t.arr("attempts").is_empty()) && same_socket(t.at("link").s("socket"), socket));
+    // A row worked by hand wants herdr too: its seats and the panes its message names (seats.rs).
+    let needs = tasks.iter().any(|t| (is_agent_task(t) || !t.arr("attempts").is_empty()) && same_socket(t.at("link").s("socket"), socket)) || super::seats::wanted(tasks);
     if needs { read_session(socket) } else { Session::Down }
 }
 /// This machine's tasks as one herdr session sees them (the keeper serves several sessions from one data folder).
@@ -107,6 +108,7 @@ pub fn board_for(socket: &str) -> Vec<Obj> {
     let session = session_for(&tasks, socket);
     let mut seen = BTreeMap::new();
     let mut rows: Vec<Obj> = tasks.iter().map(|t| shown(t, &session, socket, &mut seen)).collect();
+    super::seats::mark(&mut rows, &tasks, &session, socket);
     crate::shown::queue::number(&mut rows);
     rows
 }
@@ -116,6 +118,7 @@ pub fn board(include_archived: bool) -> Vec<Obj> {
     let session = session_for(&tasks, &here);
     let mut seen = BTreeMap::new();
     let mut rows: Vec<Obj> = tasks.iter().map(|t| shown(t, &session, &here, &mut seen)).collect();
+    super::seats::mark(&mut rows, &tasks, &session, &here);
     crate::shown::queue::number(&mut rows);
     rows
 }

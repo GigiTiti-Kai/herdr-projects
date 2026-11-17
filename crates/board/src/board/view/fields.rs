@@ -67,7 +67,7 @@ pub fn bare_title(s: &State, r: &Obj) -> String {
 }
 /// The title is in the base colour whatever the task's state, never bold: colour means status, and the mark carries
 /// it. Its kind chip before it (`[運用]`) and what is said of it after it (`×3`, `[auto]`, `[research]`, `[chat]`,
-/// `[委任先 …]`, `[archived]`) are dimmed, and the pin mark `★` last is yellow (update/pinned.rs). An automation's name is
+/// `[委任先 …]`, `[archived]`) are dimmed (but `[委任先 3件すべて完了]`, in the colour of done), and the pin mark `★` last is yellow (update/pinned.rs). An automation's name is
 /// plain, greyed while it is off.
 pub fn name_ink(r: &Obj, s: &str) -> Inked {
     if is_auto(r) { return if auto(r).b("on") { Inked::plain(s) } else { Inked::of(s, Ink::Muted) }; }
@@ -78,7 +78,14 @@ pub fn name_ink(r: &Obj, s: &str) -> Inked {
     let mut out = Inked::new();
     if from > 0 { out.push(&s[..from], Ink::Muted); }
     out.push(&s[from..at], Ink::Plain);
-    if at < s.len() { out.push(&s[at..], Ink::Muted); }
+    // Handed on, and all of it done: in the colour of done (view/kind.rs).
+    if at < s.len() {
+        let tail = &s[at..];
+        match crate::re!(r"\[委任先 \d+件すべて完了\]").find(tail) {
+            Some(m) => { out.push(&tail[..m.start()], Ink::Muted); out.push(m.as_str(), crate::shown::states::group_ink("done")); out.push(&tail[m.end()..], Ink::Muted); }
+            None => { out.push(tail, Ink::Muted); }
+        }
+    }
     if pinned { out = out.add(crate::board::update::pinned::ink()); }
     out
 }
@@ -93,7 +100,7 @@ pub fn says_under(s: &State, r: &Obj, says_beside_shown: bool) -> Inked {
     if is_auto(r) { return auto_said(s, r, if says_beside_shown { "why" } else { "all" }); }
     if let Some(p) = pending_said(r.at("pending")) { return p; }
     let said = sentence(r);
-    if unassigned(r) { return no_agent(said); }
+    if unassigned(r) { return super::measured::line(s, r, said); }
     if !said.is_empty() { return said; }
     Inked::of(if in_review(r) { "Not reviewed" } else if reviewer_mark(r) { "Under review" } else if r.s("state") == "working" { "Working" } else { "Needs you" }, Ink::Soft)
 }

@@ -1,6 +1,6 @@
 //! A task row's kind chip and where it was handed to: `[調査]`, `[自動]` or `[運用]` before its title, worked out from what
 //! the task already has (no tagging by hand), and `[委任先 APP-26・作業中]` after it when its message says it was handed
-//! to another task, kept whole where the name is cut (docs/row-kinds.md).
+//! to another task or names one that names it back, kept whole where the name is cut (docs/row-kinds.md).
 use crate::board::state::State;
 use crate::json::*;
 use crate::research::is_research;
@@ -18,28 +18,75 @@ pub fn chip(r: &Obj) -> &'static str {
     if worker || r.b("worktree") || r.b("branch") { "[自動]" } else { "[運用]" }
 }
 /// The tasks its message says it was handed to (`APP-26に委任`, `OPS-46・OPS-47に委任`, `APP-38(…)に仕様ごと委任済み`),
-/// each by the tag its repo goes by now, with where it stands now: `[委任先 APP-26・作業中]`; "" when it names none. A
-/// task not on the board (archived) is named without a state; a number no repo has or had, not at all.
+/// and, on a live row no agent of the board's works, those its message names that name it back in their title or
+/// description: each by the tag its repo goes by now. Those not done are named with where they stand, the done ones
+/// counted: `[委任先 APP-26・作業中 +完了2]`, `[委任先 3件すべて完了]`; "" when it names none. A task not on the board
+/// (archived) is named without a state; a number no repo has or had, not at all.
 pub fn handed(s: &State, r: &Obj) -> String {
+    let mut done = 0;
+    let open: Vec<String> = handed_to(s, r).into_iter().filter_map(|(tag, at)| match at {
+        Some("完了") => { done += 1; None }
+        Some(at) => Some(format!("{tag}・{at}")),
+        None => Some(tag),
+    }).collect();
+    match (open.is_empty(), done) {
+        (true, 0) => String::new(),
+        (true, n) => format!("[委任先 {n}件すべて完了]"),
+        (false, 0) => format!("[委任先 {}]", open.join(", ")),
+        (false, n) => format!("[委任先 {} +完了{n}]", open.join(", ")),
+    }
+}
+/// The words that take a hand-over back when they follow it in its sentence: `委任しない`, `委任していません`,
+/// `委任することは、拒否された`, `委任を取り消した`. A wrong target is worse than none, so any of them names nothing.
+fn no() -> &'static regex::Regex { crate::re!(r"^[^。．.!?！？\n]*?(?:ない|ません|なかった|ず|ぬ|禁止|拒否|中止|取り?消|撤回|やめ|止め|解除|キャンセル|だめ|ダメ|不可|見送)") }
+/// Whom it was handed to, in the order its message names them: each task's tag and where it stands (None: not on the
+/// board).
+fn handed_to(s: &State, r: &Obj) -> Vec<(String, Option<&'static str>)> {
     // shortcut: another machine's row has that machine's keys, not ours; named there, not here, until rows carry them.
-    if r.b("host") { return String::new(); }
+    if r.b("host") { return vec![]; }
     // A row's `msg` is its shown note; the task's own message is `raw` (shown/states.rs: as_row).
     let said = if r.has("raw") { r.s("raw") } else { r.s("msg") };
-    // Each `…に委任` the message says, but none whose own sentence (up to the next 。, ! or ?) says no after it:
-    // `委任しない`, `委任していません`, `委任してはいけない`, `委任することは、拒否された`, `委任を取り消した`. A wrong
-    // target is worse than none, so a sentence with any of these words after `委任` names nothing.
-    let no = crate::re!(r"^[^。．.!?！？\n]*?(?:ない|ません|なかった|ず|ぬ|禁止|拒否|中止|取り?消|撤回|やめ|止め|解除|キャンセル|だめ|ダメ|不可|見送)");
-    let named: Vec<String> = crate::re!(r"((?:[A-Z][A-Z0-9]{1,4}-\d+(?:\([^)]*\))?\s*[・、,と]?\s*)+)に[^。、\s]{0,6}委任").captures_iter(said)
-        .filter(|c| !no.is_match(&said[c.get(0).map(|m| m.end()).unwrap_or(0)..]))
-        .flat_map(|c| crate::re!(r"[A-Z][A-Z0-9]{1,4}-\d+").find_iter(c.get(1).map(|m| m.as_str()).unwrap_or("")).map(|m| m.as_str().to_string()).collect::<Vec<_>>())
-        .filter_map(|n| {
-            // A key the repo went by before still names its tasks, as every command takes it (store/keys_given.rs).
-            let id = match id_of_key(&n, Some(&s.data.keys)) { x if x.is_empty() => before(&n), x => x };
-            if id.is_empty() || id == r.s("id") { return None; }
-            let tag = say_id(&id, &s.data.keys);
-            Some(match s.data.items.iter().find(|x| x.s("id") == id) { Some(x) => format!("{tag}・{}", stands(x)), None => tag })
-        }).collect();
-    if named.is_empty() { String::new() } else { format!("[委任先 {}]", named.join(", ")) }
+    let num = crate::re!(r"[A-Z][A-Z0-9]{1,4}-\d+");
+    // Each `…に委任` the message says, but none whose own sentence (up to the next 。, ! or ?) says no after it.
+    let (mut named, mut taken_back) = (vec![], vec![]);
+    for c in crate::re!(r"((?:[A-Z][A-Z0-9]{1,4}-\d+(?:\([^)]*\))?\s*[・、,と]?\s*)+)に[^。、\s]{0,6}委任").captures_iter(said) {
+        let back = no().is_match(&said[c.get(0).map(|m| m.end()).unwrap_or(0)..]);
+        let ns = num.find_iter(c.get(1).map(|m| m.as_str()).unwrap_or("")).map(|m| m.as_str().to_string());
+        if back { taken_back.extend(ns) } else { named.extend(ns) }
+    }
+    // Named by number in its message and naming it back (a coordinator writes its parent's number into a task it hands
+    // on), on a row at work or waiting for you that no agent of the board's works: not one it took back above, nor one
+    // whose own sentence (past the brackets right after it) says no after it, at any place it is named.
+    let own = say_id(r.s("id"), &s.data.keys);
+    if crate::shown::ongoing::unassigned(r) && ["working", "needs you"].contains(&group_of(r)) {
+        for m in num.find_iter(said) {
+            let n = m.as_str();
+            if named.iter().any(|x| x == n) || taken_back.iter().any(|x| x == n) || said[m.end()..].starts_with(|c: char| c.is_ascii_digit()) { continue; }
+            let no_after = num.find_iter(said).filter(|k| k.as_str() == n && !said[k.end()..].starts_with(|c: char| c.is_ascii_digit())).any(|k| {
+                let rest = &said[k.end()..];
+                let rest = crate::re!(r"^\([^)]*\)").find(rest).map(|b| &rest[b.end()..]).unwrap_or(rest);
+                no().is_match(rest)
+            });
+            if no_after { continue; }
+            let id = id_of_key(n, Some(&s.data.keys));
+            let back = s.data.items.iter().find(|x| x.s("id") == id).is_some_and(|x| names(x.s("title"), &own) || names(x.s("description"), &own));
+            if back { named.push(n.to_string()); }
+        }
+    }
+    let mut out: Vec<(String, Option<&'static str>)> = vec![];
+    for n in named {
+        // A key the repo went by before still names its tasks, as every command takes it (store/keys_given.rs).
+        let id = match id_of_key(&n, Some(&s.data.keys)) { x if x.is_empty() => before(&n), x => x };
+        if id.is_empty() || id == r.s("id") { continue; }
+        let tag = say_id(&id, &s.data.keys);
+        if out.iter().any(|(t, _)| *t == tag) { continue; }
+        out.push((tag, s.data.items.iter().find(|x| x.s("id") == id).map(|x| stands(x))));
+    }
+    out
+}
+/// Does `text` name task `tag` (`HCM-22`, not inside `HCM-221` or `XHCM-22`)?
+fn names(text: &str, tag: &str) -> bool {
+    text.match_indices(tag).any(|(i, _)| !text[..i].ends_with(|c: char| c.is_ascii_alphanumeric()) && !text[i + tag.len()..].starts_with(|c: char| c.is_ascii_digit()))
 }
 /// `OLD-26` -> `repo/26` by a key its repo went by before; "" for a key no repo ever had.
 fn before(n: &str) -> String {

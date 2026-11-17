@@ -18,7 +18,7 @@
             Pass
    ▾ working
    ○ #2     [運用] Max length for task titles                                                                     ███░░░░░  40% 90m left                  1m
-            エージェントなし · Drafting
+            エージェントなし · 報告1m前: Drafting
    ◇ #4     [運用] Max length for task titles                                                                                                             1m
             Starting
 ▌  ◐ #5     [運用] Max length for task titles                                                                     █████░░░  60% 11m left                  1m
@@ -70,7 +70,7 @@
             Pass                                                                                  │  Settings ─────────────────────────────────────────────────
    ▾ working                                                                                      │  Reading its settings…
    ○ #2     [運用] Max length for task titles                    40% 90m left                  1m │
-            エージェントなし · Drafting                                                           │  alt+t shows the whole task
+            エージェントなし · 報告1m前: Drafting                                                 │  alt+t shows the whole task
    ◇ #4     [運用] Max length for task titles                                                  1m │
             Starting                                                                              │
 ▌  ◐ #5     [運用] Max length for task titles                    60% 11m left                  1m │
@@ -222,7 +222,7 @@
             Pass
    ▾ working
    ○ #2     [運用] Max length for task titles                                                                     ███░░░░░  40% 90m left                  1m
-            エージェントなし · Drafting
+            エージェントなし · 報告1m前: Drafting
    ◇ #4     [運用] Max length for task titles                                                                                                             1m
             Starting
 ▌  ◐ #5     [運用] Max length for task titles                                                                     █████░░░  60% 11m left                  1m

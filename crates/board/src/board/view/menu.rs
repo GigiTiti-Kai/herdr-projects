@@ -60,7 +60,7 @@ pub fn menu_lines(s: &mut State, t: &Theme, width: usize, h: usize) -> Vec<Inked
     lines.extend(entry("[chat]", "a conversation: it changes nothing and ends when you say"));
     // A row's kind before its name, and whom it was handed to after it (view/kind.rs).
     lines.extend(entry("[自動]", "its kind: [自動] an agent works it in a worktree, [調査] research only, [運用] worked by hand or by a resident seat"));
-    lines.extend(entry("[委任先]", "handed to another task (its message says so): that task's number and where it stands"));
+    lines.extend(entry("[委任先]", "handed to another task (its message says so): the open ones and where they stand, the done counted"));
     // A machine's or a project's row is its coordinator's, with a task's marks; on autopilot, its tag and a line under it.
     lines.extend(entry("[autopilot]", "a coordinator on autopilot (a machine's or a project's row): the line under it says what it does"));
     // The window: the title stays, and the picked line stays in view while the pick moves.

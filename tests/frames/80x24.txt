@@ -12,7 +12,7 @@
             Pass
    ▾ working
    ○ #2     [運用] Max length for task titles                                 1m
-            エージェントなし · Drafting
+            エージェントなし · 報告1m前: Drafting
    ◇ #4     [運用] Max length for task titles                                 1m
             Starting
 ▌  ◐ #5     [運用] Max length for task titles                                 1m
@@ -35,7 +35,7 @@
             Pass
    ▾ working
    ○ #2     [運用] Max length for task titles                                 1m
-            エージェントなし · Drafting
+            エージェントなし · 報告1m前: Drafting
    ◇ #4     [運用] Max length for task titles                                 1m
             Starting
 ▌  ◐ #5     [運用] Max length for task titles                                 1m
@@ -112,7 +112,7 @@
             Pass
    ▾ working
    ○ #2     [運用] Max length for task titles                                 1m
-            エージェントなし · Drafting
+            エージェントなし · 報告1m前: Drafting
    ◇ #4     [運用] Max length for task titles                                 1m
             Starting
 ▌  ◐ #5     [運用] Max length for task titles                                 1m

@@ -10,12 +10,16 @@ use sw::board::view::row::{row, row_layout, row_lines, Layout};
 use sw::json::*;
 use sw::shown::ink::{Ink, Inked};
 
+/// Whom a row handed to when that task names it back (view/kind.rs).
+mod handed_back;
 /// A row's kind chip and whom it was handed to (view/kind.rs).
 mod kinds;
 /// Each row measured once while a long list folds to its room.
 mod measured;
 /// A row no agent of the board's works, and 運用中 (shown/ongoing.rs).
 mod ongoing;
+/// Line 2 of a row at work by hand: its seats and how old its report is (view/measured.rs).
+mod seats;
 
 const NOW: i64 = 1_800_000_000_000;
 fn has(text: &str, re: &str) -> bool { Regex::new(re).unwrap().is_match(text) }

@@ -18,7 +18,7 @@ pub fn word(section: &str) -> &'static str {
 /// (`要対応1`).
 pub fn says(b: &Band) -> String { if b.at_n < b.n { format!("{}{}", word(b.at), b.at_n) } else { word(b.at).to_string() } }
 /// `name=word|word`, or `name` alone (its own word), as `board.projects` holds it; the words in lower case.
-fn rule(e: &str) -> (&str, Vec<String>) {
+pub fn rule(e: &str) -> (&str, Vec<String>) {
     let (name, words) = e.split_once('=').unwrap_or((e, e));
     (name, words.split('|').map(str::trim).filter(|w| !w.is_empty()).map(str::to_lowercase).collect())
 }

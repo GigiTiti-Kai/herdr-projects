@@ -121,5 +121,5 @@ fn the_menu_says_what_the_chip_and_the_handed_tag_mean_one_line_each() {
     s.rows = 80; s.press(&["?"]);
     let text = s.screen(160).join("\n");
     assert!(text.contains("[自動]  ") && text.contains("[自動] an agent works it in a worktree, [調査] research only, [運用] worked by hand or by a resident seat"), "{text}");
-    assert!(text.contains("handed to another task (its message says so): that task's number and where it stands"), "{text}");
+    assert!(text.contains("handed to another task (its message says so): the open ones and where they stand, the done counted"), "{text}");
 }
