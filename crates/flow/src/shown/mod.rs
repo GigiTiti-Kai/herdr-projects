@@ -2,6 +2,7 @@
 //! and nothing asks herdr. The board, herdr's sidebar and the web page all say a task with these.
 pub mod ink;
 pub mod ongoing;
+pub mod projects;
 pub mod queue;
 pub mod review_words;
 pub mod row_says;

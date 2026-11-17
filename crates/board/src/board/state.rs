@@ -133,6 +133,8 @@ pub struct State {
     /// The filter row on top (update/shows.rs): which one shows, by its place (0 all); where each was drawn, for a
     /// click (line, first and last cell, which); grouped by machine, the third way alt+s groups the list.
     pub show: usize, pub show_n: Vec<usize>, pub show_hits: Vec<(usize, usize, usize, usize)>, pub by_machine: bool,
+    /// The projects you hold, every task in view counted whatever the filter (shown/projects.rs, view/bands.rs).
+    pub bands: Vec<crate::shown::projects::Band>,
     pub filter: String, pub msg: String, pub msg_kind: Ink,
     pub chat_open: bool, pub chat_folded: bool, pub just_sent: HashMap<String, Sent>, pub chat_at: Option<ChatAt>, pub chat_fit: Option<ChatFit>, pub chat_rows: Option<(usize, usize)>,
     pub input: TextBox,
@@ -180,7 +182,7 @@ impl State {
             selection_rows: vec![], selection_layout: String::new(), sel: String::new(), top: 0, stick: String::new(), top_free: false,
             all_done: false, archive_view: false, archive_back: None, archive_undo: None, reply: false, reply_id: String::new(),
             side: false, full: false, panel_top: 0, panel_height: 1, panel_length: 0, width: 120,
-            mode: Mode::New, menu: None, ask: None, by_repo: false, draft_away: None, auto_open: false, auto_at: -1, folded: Default::default(), scope: String::new(), show: 0, show_n: vec![], show_hits: vec![], by_machine: false,
+            mode: Mode::New, menu: None, ask: None, by_repo: false, draft_away: None, auto_open: false, auto_at: -1, folded: Default::default(), scope: String::new(), show: 0, show_n: vec![], show_hits: vec![], by_machine: false, bands: vec![],
             filter: String::new(), msg: String::new(), msg_kind: Ink::Muted, chat_open: true, chat_folded: false, just_sent: HashMap::new(), chat_at: None, chat_fit: None, chat_rows: None,
             input: TextBox::default(), skill_at: (String::new(), 0), skill_closed: String::new(), editing: None, edit_line: 0, setup: None, paste_text: String::new(), paste_at: 0, paste_more: 0, paste_room: 1, closing: None, leaving: false, leave_at: 0,
             attempt_at: HashMap::new(), pending: HashMap::new(), list_room: 0, list_tall: false, list_tight: false, list_width: 0, fold_sel: String::new(), unread_top: 0, unread_max: 0, list_at: None, list_ids: vec![], panes: vec![],

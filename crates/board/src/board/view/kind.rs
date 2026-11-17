@@ -59,6 +59,5 @@ pub fn cut_name(s: &State, r: &Obj, title: &str, inked: Inked, w: usize) -> Inke
 }
 /// Where a task stands, in the words of the chip: the board's groups (shown/states.rs: group_of).
 fn stands(x: &Obj) -> &'static str {
-    if x.b("archivedAt") { return "アーカイブ済み"; }
-    match group_of(x) { "needs you" => "要対応", "ready to approve" => "承認待ち", "working" => "作業中", "done" => "完了", _ => "未着手" }
+    if x.b("archivedAt") { "アーカイブ済み" } else { crate::shown::projects::word(group_of(x)) }
 }

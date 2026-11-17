@@ -50,6 +50,9 @@ pub fn head_lines(s: &mut State, t: &Theme, w: usize, h: usize) -> Vec<Inked> {
     head.extend(more);
     // In a window too short for it, the filter row gives way before the list's rows do.
     if !s.archive_view && h >= 6 { let (row, hits) = super::shows_row::shows_line(s, t, w); let y = head.len(); s.show_hits = hits.into_iter().map(|(a, b, n)| (y, a, b, n)).collect(); head.push(row); } else { s.show_hits.clear(); }
+    // The projects you hold, over the list's first heading (bands.rs).
+    let band = super::bands::band_lines(s, w, h.saturating_sub(head.len()));
+    head.extend(band);
     let f = (if s.mode == Mode::Find { s.value() } else { s.filter.clone() }).trim().to_string();
     if f.is_empty() { return head; }
     let found: usize = s.grouped.iter().map(|(_, r)| r.len()).sum();

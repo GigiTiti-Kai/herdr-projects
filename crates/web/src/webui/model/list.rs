@@ -114,6 +114,8 @@ pub fn list_of(s: &State, t: &Theme) -> Value {
         },
         // The filter row under the header (shows.rs).
         "shows": super::shows::shows_of(s),
+        // The band under it: the projects you hold (board/view/bands.rs).
+        "projects": if crate::board::view::bands::shown(s) { s.bands.iter().map(|b| json!({ "name": b.name, "n": b.n, "says": crate::shown::projects::says(b), "color": group_ink(b.at).name() })).collect::<Vec<_>>() } else { vec![] },
         "groups": groups, "selected": s.sel,
         // Words on their way to another machine: rows of their own under the list, until that machine has taken them.
         "jobs": s.jobs.iter().map(|j| json!({ "id": j.s("id"), "text": j.s("text"), "failed": j.s("state") == "error", "msg": j.s("msg") })).collect::<Vec<_>>(),
