@@ -5,9 +5,10 @@
 use super::ongoing::{section_of, SECTIONS};
 use crate::json::*;
 
-/// One project of the band: its name, its open tasks, the most urgent section one of them stands in and how many do.
+/// One project of the band: its name, its open tasks, the most urgent section one of them stands in and how many do;
+/// `named`: an entry of `board.projects` named it (else it is a repo's, by its name).
 #[derive(Clone, Debug, PartialEq)]
-pub struct Band { pub name: String, pub n: usize, pub at: &'static str, pub at_n: usize }
+pub struct Band { pub name: String, pub n: usize, pub at: &'static str, pub at_n: usize, pub named: bool }
 
 /// A section in the band's words, as a chip names where a task stands (board/view/kind.rs).
 pub fn word(section: &str) -> &'static str {
@@ -23,10 +24,12 @@ fn rule(e: &str) -> (&str, Vec<String>) {
 }
 /// The project a task's row is under: the first rule with a word that is its repo (another machine's by its id
 /// there) or is in its title, letters in any case; else its repo.
-pub fn project_of(rules: &[String], r: &Obj) -> String {
-    let repo = (if r.b("rid") { r.s("rid") } else { r.s("id") }).split('/').next().unwrap_or("").to_string();
-    let (low, title) = (repo.to_lowercase(), r.s("title").to_lowercase());
-    rules.iter().map(|e| rule(e)).find(|(_, words)| words.iter().any(|w| *w == low || title.contains(w.as_str()))).map(|(n, _)| n.to_string()).unwrap_or(repo)
+pub fn project_of(rules: &[String], r: &Obj) -> String { named(rules, r).unwrap_or_else(|| repo(r)) }
+fn repo(r: &Obj) -> String { (if r.b("rid") { r.s("rid") } else { r.s("id") }).split('/').next().unwrap_or("").to_string() }
+/// The entry of `board.projects` a task is under, if one takes it.
+fn named(rules: &[String], r: &Obj) -> Option<String> {
+    let (low, title) = (repo(r).to_lowercase(), r.s("title").to_lowercase());
+    rules.iter().map(|e| rule(e)).find(|(_, words)| words.iter().any(|w| *w == low || title.contains(w.as_str()))).map(|(n, _)| n.to_string())
 }
 /// The band: every project with an open task (not done, not archived), the most urgent first, then the one that holds
 /// more, then by name.
@@ -36,8 +39,8 @@ pub fn bands<'a>(rules: &[String], rows: impl IntoIterator<Item = &'a Obj>, now:
     for r in rows.into_iter().filter(|r| !r.b("archivedAt")) {
         let at = section_of(r, now);
         if at == "done" { continue; }
-        let name = project_of(rules, r);
-        let b = match out.iter().position(|b| b.name == name) { Some(k) => &mut out[k], None => { out.push(Band { name, n: 0, at, at_n: 0 }); out.last_mut().unwrap() } };
+        let (name, by_entry) = match named(rules, r) { Some(n) => (n, true), None => (repo(r), false) };
+        let b = match out.iter().position(|b| b.name == name) { Some(k) => &mut out[k], None => { out.push(Band { name, n: 0, at, at_n: 0, named: by_entry }); out.last_mut().unwrap() } };
         b.n += 1;
         if rank(at) < rank(b.at) { b.at = at; b.at_n = 0; }
         if at == b.at { b.at_n += 1; }

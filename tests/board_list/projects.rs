@@ -41,8 +41,8 @@ fn the_band_counts_the_open_tasks_and_says_the_most_urgent_place_first() {
         row("proj/7", "Skill three", "done"), obj(json!({ "id": "proj/8", "title": "Skill four", "state": "todo", "archivedAt": 1 })),
     ];
     let b = bands(&rules, rows.iter(), 0);
-    let band = |name: &str, n: usize, at: &'static str, at_n: usize| Band { name: name.into(), n, at, at_n };
-    assert_eq!(b, vec![band("garden", 3, "needs you", 1), band("proj", 1, "working", 1), band("skills", 2, "to do", 2)], "done and archived ones are not counted");
+    let band = |name: &str, n: usize, at: &'static str, at_n: usize| Band { name: name.into(), n, at, at_n, named: name != "proj" };
+    assert_eq!(b, vec![band("garden", 3, "needs you", 1), band("proj", 1, "working", 1), band("skills", 2, "to do", 2)], "done and archived ones are not counted; proj is a repo's own");
     assert_eq!(b.iter().map(says).collect::<Vec<_>>(), ["要対応1", "作業中", "未着手"], "a count where not all of them stand there");
 }
 
@@ -85,6 +85,18 @@ fn on_the_board_the_band_stands_under_the_filter_row_over_the_first_heading_what
 }
 
 #[test]
+fn one_project_you_named_has_its_band_one_repo_alone_has_none() {
+    let w = world_with(Opts { repo: true, settings: json!({ "board.projects": "chores=proj" }), ..Default::default() });
+    w.add("Pay the bill");
+    let tap = w.add("Fix the tap");
+    say(&tap, "blocked");
+    let mut s = open(&w.root, 40); s.s.side = false;
+    let text = screen(&mut s, 80);
+    assert!(text.lines().any(|l| l.contains("プロジェクト  chores 2 要対応1")), "a name of yours the header does not say: {text}");
+    assert_eq!(web(&w, "board", json!({})).at("list").arr("projects")[0].s("name"), "chores");
+}
+
+#[test]
 fn one_project_has_no_band() {
     let w = world_with(Opts { repo: true, ..Default::default() });
     w.add("Pay the bill");
@@ -107,4 +119,25 @@ fn a_band_too_long_for_its_room_says_how_many_are_left() {
     assert!(band.len() >= 2 && band.iter().all(|l| sw::text::width(l) <= 60), "{text}");
     assert!(band.last().unwrap().trim_end().ends_with(&format!("+{}", 12 - band.iter().map(|l| l.matches(" 未着手").count()).sum::<usize>())), "{text}");
     assert_eq!(web(&w, "board", json!({})).at("list").arr("projects").len(), 12, "the web board's band wraps: all of them");
+}
+
+#[test]
+fn on_a_narrow_board_no_count_or_word_is_cut_and_what_is_left_is_counted() {
+    let names = ["応募運用=[応募]", "カスタムコーディネータ=交通整理", "auto-teikeikun=会員", "garden=lawn", "kitchen=tap", "house=door", "shed=saw"];
+    let w = world_with(Opts { repo: true, settings: json!({ "board.projects": names.join(" ") }), ..Default::default() });
+    for t in ["[応募] 案件A", "交通整理 S5", "会員のメモ", "会員の画面", "Mow the lawn", "Fix the tap", "Paint the door", "Oil the saw"] { w.add(t); }
+    let ids: Vec<String> = sw::store::tasks::all().iter().map(|t| t.t("id")).collect();
+    say(&ids[0], "working"); say(&ids[1], "blocked");
+    for cols in [40, 48, 60] {
+        let mut s = open(&w.root, 30); s.s.side = false;
+        let text = screen(&mut s, cols);
+        let first = line(&text, "プロジェクト");
+        let band: Vec<&str> = text.lines().skip(first).take_while(|l| !l.contains("▾ ")).collect();
+        let words = ["要対応", "承認待ち", "作業中", "運用中", "未着手"];
+        // Each project on the band ends with its word, and the band ends with +N: every project is there, shown or counted.
+        let shown: usize = band.iter().map(|l| words.iter().map(|w| l.matches(w).count()).sum::<usize>()).sum();
+        let more: usize = band.last().unwrap().rsplit('+').next().filter(|_| band.last().unwrap().contains('+')).and_then(|n| n.trim().parse().ok()).unwrap_or(0);
+        assert_eq!(shown + more, 7, "{cols} columns:\n{}", band.join("\n"));
+        assert!(band.iter().all(|l| sw::text::width(l) <= cols), "{cols}: {band:?}");
+    }
 }

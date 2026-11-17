@@ -17,9 +17,11 @@ them stand, in that place's colour.
 - **The most urgent first**, then the one with more open tasks, then by name.
 - **Every task in view counts, whatever the filter**: under `Working` the list shows fewer rows, not fewer projects. With
   every machine shown, a project's tasks on each machine count together.
-- **It shows with two projects or more**: with one, the header names it already. Not in the archive, and not where the
-  list part is under 12 lines. It takes a sixth of the list's lines at most; what does not fit is counted at its end
-  (`+3`). The web board has the same band under its filter row, wrapped to as many lines as it needs.
+- **It shows with two projects or more, or with one you named** (below): every task under its one repo, the header
+  names it already. Not in the archive, not where the list part is under 12 lines or 40 columns. It takes a sixth of
+  the list's lines at most; what does not fit is counted at its end (`+3`). A count and its words are never cut; a
+  name too long for a line is. The web board has the same band under its filter row, wrapped to as many lines as it
+  needs.
 
 ## Which project a task is under
 
