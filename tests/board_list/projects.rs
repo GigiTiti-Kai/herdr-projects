@@ -141,3 +141,17 @@ fn on_a_narrow_board_no_count_or_word_is_cut_and_what_is_left_is_counted() {
         assert!(band.iter().all(|l| sw::text::width(l) <= cols), "{cols}: {band:?}");
     }
 }
+
+#[test]
+fn on_a_narrow_board_a_count_of_three_digits_left_is_not_cut() {
+    let names: Vec<String> = (0..106).map(|n| format!("project-number-{n:03}")).collect();
+    let w = world_with(Opts { repo: true, settings: json!({ "board.projects": names.join(" ") }), ..Default::default() });
+    for n in &names { w.add(&format!("{n} chore")); }
+    let mut s = open(&w.root, 30); s.s.side = false;
+    let text = screen(&mut s, 40);
+    let first = line(&text, "プロジェクト");
+    let band: Vec<&str> = text.lines().skip(first).take_while(|l| !l.contains("▾ ")).collect();
+    let shown: usize = band.iter().map(|l| l.matches("未着手").count()).sum();
+    let last = band.last().unwrap().trim_end();
+    assert!(last.ends_with(&format!("  +{}", 106 - shown)) && band.iter().all(|l| sw::text::width(l) <= 40), "{}", band.join("\n"));
+}

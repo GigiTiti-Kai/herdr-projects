@@ -27,7 +27,8 @@ pub fn band_lines(s: &State, w: usize, h: usize) -> Vec<Inked> {
             let at = lines.len() - 1;
             let empty = lines[at].width() <= pad;
             let gap = if empty { 0 } else { 3 };
-            let keep = if lines.len() == max && k + 1 < s.bands.len() { 5 } else { 0 };
+            // Room for `  +N`, N being how many would be left after this one, however many digits that is.
+            let keep = if lines.len() == max && k + 1 < s.bands.len() { 3 + (s.bands.len() - k - 1).to_string().len() } else { 0 };
             let room = w.saturating_sub(lines[at].width() + gap + keep);
             if empty || name.width() + tail.width() <= room {
                 lines[at] = lines[at].clone().add(Inked::spaces(gap)).add(name.cut(room.saturating_sub(tail.width()).max(2))).add(tail);
