@@ -134,10 +134,10 @@ impl Herdr {
         if let Some(n) = lines { a.extend(args(&["--lines", &n.to_string()])); }
         run_raw(self.socket.as_deref(), &a, 30000, "")
     }
-    pub fn metadata(&self, id: &str, extra: &[String]) -> Option<Value> {
+    pub fn metadata(&self, id: &str, extra: &[String]) -> HRes<Value> {
         let mut a = args(&["pane", "report-metadata", id, "--source", "plugin:herdr-projects"]);
         a.extend(extra.iter().cloned());
-        self.call(a).ok()
+        self.call(a)
     }
     // ---- agents
     pub fn agents(&self) -> HRes<Vec<Value>> { Ok(self.call(args(&["agent", "list"]))?.arr("agents").to_vec()) }

@@ -25,7 +25,7 @@ fn the_finish_lines_sidebar_entries_are_written_once_again_only_when_a_word_chan
     let pane = t.at("link").t("pane");
     let st = w.state();
     let said: Vec<String> = st.arr("metadata").iter().filter(|m| m.s("pane") == pane).map(args_of).collect();
-    assert!(has(said.last().unwrap(), r"--clear-state-labels --display-agent ready to approve · R#1 · <1m ago --title PRJ-1 Add a greeting --clear-token summary --clear-token progress --clear-token eta$"), "{said:?}");
+    assert!(has(said.last().unwrap(), r"--clear-state-labels --display-agent ready to approve · R#1 · <1m ago --title PRJ-1 Add a greeting --clear-token summary --clear-token progress --clear-token eta --clear-token task_needs_you --token task_ready=PRJ-1 --clear-token task --token task_title=Add a greeting$"), "{said:?}");
     // The task's space is named the same way, with no line of the agent's under it either.
     let ws: Vec<String> = st.arr("metadata").iter().filter(|m| m.s("workspace") == t.at("link").s("workspace")).map(args_of).collect();
     assert!(has(ws.last().unwrap(), r"--clear-token summary --clear-token progress$"), "{ws:?}");
@@ -37,19 +37,19 @@ fn the_finish_lines_sidebar_entries_are_written_once_again_only_when_a_word_chan
     let live = with(&t, json!({ "state": "blocked", "kind": "permission", "live": { "status": "done" } }));
     let n = calls().len(); sync(&[live.clone()]); sync(&[live.clone()]); assert_eq!(calls().len(), n, "nothing written twice");
     sync(&[with(&t, json!({ "stage": "stopped", "state": "idle", "note": "Stopped", "live": { "status": "idle" } }))]);
-    assert!(has(&last(), r"--display-agent to do · R#1 · <1m ago .*--clear-token summary --clear-token progress --clear-token eta$"), "{}", last());
+    assert!(has(&last(), r"--display-agent to do · R#1 · <1m ago .*--clear-token summary --clear-token progress --clear-token eta --clear-token task_needs_you --clear-token task_ready --token task=PRJ-1 --token task_title=Add a greeting$"), "{}", last());
     let working = with(&t, json!({ "stage": "working", "state": "working", "note": "Writing greet.sh", "progress": 40, "eta": 12, "research": true, "pr": "https://example.com/pull/7", "live": { "status": "working" } }));
     sync(&[working.clone()]);
-    assert!(has(&last(), r"--display-agent agent · working · R#1 PR#7 · \[research\] · <1m .*--clear-token summary --token progress=40% 12m --clear-token eta$"), "{}", last());
+    assert!(has(&last(), r"--display-agent agent · working · R#1 PR#7 · \[research\] · <1m .*--clear-token summary --token progress=40% 12m --clear-token eta --clear-token task_needs_you --clear-token task_ready --token task=PRJ-1 --token task_title=Add a greeting$"), "{}", last());
     let n = calls().len(); sync(&[working.clone()]); assert_eq!(calls().len(), n, "the same words: not written again");
     sync(&[with(&working, json!({ "eta": 11 }))]); assert!(last().contains("progress=40% 11m "), "a minute less: written: {}", last()); assert!(!last().contains("left"), "never \"left\": {}", last());
     sync(&[with(&t, json!({ "stage": "asks", "kind": "question", "msg": "Sand or pebbles?", "note": "Sand or pebbles?", "state": "blocked", "live": { "status": "done" } }))]);
-    assert!(has(&last(), r"--display-agent asks you · R#1 · <1m ago .*--clear-token summary --clear-token progress --clear-token eta$"), "{}", last());
+    assert!(has(&last(), r"--display-agent asks you · R#1 · <1m ago .*--clear-token summary --clear-token progress --clear-token eta --token task_needs_you=PRJ-1 --clear-token task_ready --clear-token task --token task_title=Add a greeting$"), "{}", last());
     // herdr not running, or the pane of another session: nothing is written and nothing taken off.
     let n = calls().len(); sync(&[with(&live, json!({ "live": { "down": true } }))]); assert_eq!(calls().len(), n);
     let archived = with(&live, json!({ "archivedAt": sw::clock::now() }));
     sync(&[archived.clone()]);
-    assert!(has(&last(), r"--clear-state-labels --clear-display-agent --clear-title --clear-token summary --clear-token progress --clear-token eta$"), "{}", last());
+    assert!(has(&last(), r"--clear-state-labels --clear-display-agent --clear-title --clear-token summary --clear-token progress --clear-token eta --clear-token task_needs_you --clear-token task_ready --clear-token task --clear-token task_title$"), "{}", last());
     let n = calls().len(); sync(&[archived]); assert_eq!(calls().len(), n, "taken off once");
     tell_sidebar(&t); assert!(last().contains("--display-agent ready to approve · R#1 "), "as it was: it waits for its yes: {}", last());
     // A review under way: the agent's pane and the reviewer's each name their own agent.

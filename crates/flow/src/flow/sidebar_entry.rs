@@ -17,14 +17,24 @@ pub const CAP: usize = 80;
 const SEP: &str = " · ";
 fn words(s: &str) -> String { crate::text::squash(&crate::store::failures::strip_ansi(s)) }
 fn cut(s: &str) -> String { let all: Vec<char> = s.chars().collect(); if all.len() <= CAP { s.to_string() } else { format!("{}…", all[..CAP - 1].iter().collect::<String>().trim_end()) } }
+/// A task's number as its row has it: the repo's key (`PRJ-37`), else its id (`#152`).
+pub fn task_number(t: &Obj) -> String { let g = tag_of(t.s("id"), &repo_keys()); if g.is_empty() { t.t("id") } else { g } }
 /// A task's number and title as its row has them: `#152 Show automations…`. The number comes first and whole.
 pub fn task_name(t: &Obj) -> String {
-    let tag = { let g = tag_of(t.s("id"), &repo_keys()); if g.is_empty() { t.t("id") } else { g } };
-    cut(&[tag, words(t.s("title"))].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join(" "))
+    cut(&[task_number(t), words(t.s("title"))].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join(" "))
 }
 /// One entry: rows 1, 2 and 3 of a task in herdr's sidebar. `line` is only ever the Coordinator's: a task's is empty.
-#[derive(Clone, Debug, PartialEq, serde::Serialize)]
-pub struct Entry { pub name: String, #[serde(rename = "where")] pub place: String, pub stands: String, pub age: String, pub line: String, pub progress: String }
+/// `number`, `title` and `section` (the board's section of the row) are the pane's task tokens: `task_tokens`.
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize)]
+pub struct Entry { pub name: String, #[serde(rename = "where")] pub place: String, pub stands: String, pub age: String, pub line: String, pub progress: String, pub number: String, pub title: String, pub section: String }
+/// The pane's tokens herdr's folded rows read, in this order; the clear takes off all of them.
+pub const TASK_TOKENS: [&str; 4] = ["task_needs_you", "task_ready", "task", "task_title"];
+/// The number goes under the token of the board's section (needs you, ready to approve, any other); the other two are empty.
+pub fn task_tokens(e: &Entry) -> [(&'static str, String); 4] {
+    let at = match e.section.as_str() { "needs you" => 0, "ready to approve" => 1, _ => 2 };
+    let n = |i: usize| if i == at { e.number.clone() } else { String::new() };
+    [(TASK_TOKENS[0], n(0)), (TASK_TOKENS[1], n(1)), (TASK_TOKENS[2], n(2)), (TASK_TOKENS[3], e.title.clone())]
+}
 /// `t`: a task as the board shows it. `who_is`: whose entry it is, where that is not the task's agent.
 pub fn entry_of(t: &Obj, who_is: &str, now: i64) -> Entry {
     let r = as_row(t);
@@ -42,7 +52,8 @@ pub fn entry_of(t: &Obj, who_is: &str, now: i64) -> Entry {
     let eta = if f.eta.text().is_empty() { String::new() } else { left(r.i("eta")) };
     // The row's time, by the minute: herdr shows what it was last told, so seconds would be a write a second.
     let age = if r.b("at") { format!("{}{}", if f.elapsed.ends_with('s') { "<1m".to_string() } else { f.elapsed.clone() }, if f.ago { " ago" } else { "" }) } else { String::new() };
-    Entry { name: task_name(t), place, stands: cut(&words(&stands)), age, line: String::new(), progress: [f.percent.text(), eta].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join(" ") }
+    Entry { name: task_name(t), place, stands: cut(&words(&stands)), age, line: String::new(), progress: [f.percent.text(), eta].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join(" "),
+        number: task_number(t), title: cut(&words(t.s("title"))), section: crate::shown::ongoing::section_of(&r, now).to_string() }
 }
 pub fn reviewer_entry(t: &Obj, now: i64) -> Entry { entry_of(t, who::REVIEWER, now) }
 /// The Coordinator's: its name and where it stands as the line above the board's box says it, and its last message.
@@ -50,5 +61,5 @@ pub fn coordinator_entry(state_word: &str, waiting: usize, said: &str) -> Entry 
 /// Any coordinator's, under its own name ("vm-str coordinator").
 pub fn named_coordinator_entry(name: &str, state_word: &str, waiting: usize, said: &str) -> Entry {
     let place = format!("{name}{SEP}{}", coordinator_status(state_word, waiting));
-    Entry { name: name.into(), stands: cut(&place), place, age: String::new(), line: cut(&words(said)), progress: String::new() }
+    Entry { name: name.into(), stands: cut(&place), place, age: String::new(), line: cut(&words(said)), progress: String::new(), ..Default::default() }
 }

@@ -14,6 +14,9 @@ use sw::shown::row_says::{row_fields, sentence};
 use sw::shown::states::as_row;
 use sw::store::settings::lookup::Scope;
 
+/// The folded rows' tokens: the number under the board's section, and the title.
+mod task;
+
 fn plain_words(s: &str) -> String { s.split_whitespace().collect::<Vec<_>>().join(" ") }
 fn with(base: &Obj, more: Value) -> Obj { let mut o = base.clone(); for (k, v) in more.as_object().unwrap() { o.insert(k.clone(), v.clone()); } o }
 fn entry(t: &Obj) -> Entry { entry_of(t, "", sw::clock::now()) }
@@ -103,7 +106,7 @@ fn herdrs_sidebar_every_stage_the_entrys_three_rows_are_the_board_rows_number_an
     // (The Rust entry takes the state's words as the Coordinator's sidebar has them: coordinator_stands.)
     let stands = |state: &str| sw::status_words::coordinator_stands(state, "");
     let c = coordinator_entry(&stands("idle"), 0, "Done.\nBoth tasks are added.");
-    assert_eq!(c, Entry { name: "Coordinator".into(), place: "Coordinator · idle".into(), stands: "Coordinator · idle".into(), age: String::new(), line: "Done. Both tasks are added.".into(), progress: String::new() });
+    assert_eq!(c, Entry { name: "Coordinator".into(), place: "Coordinator · idle".into(), stands: "Coordinator · idle".into(), age: String::new(), line: "Done. Both tasks are added.".into(), progress: String::new(), ..Default::default() });
     assert_eq!(coordinator_entry(&stands("working"), 2, "").stands, "Coordinator · working · 2 messages wait to be sent");
     assert_eq!(coordinator_entry(&stands("blocked"), 0, "").stands, "Coordinator · asks you");
 }
