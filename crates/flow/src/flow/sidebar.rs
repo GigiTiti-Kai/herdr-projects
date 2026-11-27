@@ -21,13 +21,23 @@ const SOURCE: &str = "plugin:herdr-projects";
 fn token(name: &str, value: &str) -> Vec<String> { if value.is_empty() { args(&["--clear-token", name]) } else { vec!["--token".into(), format!("{name}={value}")] } }
 /// Row 2 as herdr keeps it: where the task stands, then the row's time, last, so that it is the first thing cut.
 pub fn shown_name(e: &Entry) -> String { [e.stands.clone(), e.age.clone()].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join(" · ").chars().take(80).collect() }
-fn pane_args(e: &Entry, title: &str) -> Vec<String> {
+/// `tasks`: with the task's tokens; without, they are taken off.
+fn pane_args(e: &Entry, title: &str, tasks: bool) -> Vec<String> {
     let mut a = args(&["--clear-state-labels", "--display-agent"]);
     a.push(shown_name(e));
     if !title.is_empty() { a.extend(["--title".to_string(), title.to_string()]); }
     a.extend(token("summary", &e.line)); a.extend(token("progress", &e.progress)); a.extend(args(&["--clear-token", "eta"]));
-    for (k, v) in task_tokens(e) { a.extend(token(k, &v)); }
+    for (k, v) in task_tokens(e) { a.extend(token(k, if tasks { &v } else { "" })); }
     a
+}
+/// herdr keeps at most 32 tokens on a pane, every source's together, and refuses a write that passes that whole: where
+/// the task's tokens would, the pane is told the rest of its entry without them.
+/// shortcut: they are tried again only when the entry changes, not when another source frees room.
+fn tell(api: &Herdr, pane: &str, e: &Entry, title: &str) -> bool {
+    match api.metadata(pane, &pane_args(e, title, true)) {
+        Err(x) if x.code == "metadata_token_limit" => api.metadata(pane, &pane_args(e, title, false)).is_ok(),
+        r => r.is_ok(),
+    }
 }
 fn clear_args() -> Vec<String> {
     let mut a = args(&["--clear-state-labels", "--clear-display-agent", "--clear-title", "--clear-token", "summary", "--clear-token", "progress", "--clear-token", "eta"]);
@@ -42,9 +52,9 @@ fn wanted(t: &Obj, now: i64) -> Vec<Write> {
     let e = entry_of(t, "", now);
     let mut out: Vec<Write> = vec![];
     let pane = t.at("link").t("pane");
-    { let (api, e2, p) = (api.clone(), e.clone(), pane.clone()); out.push((format!("e|{socket}|{pane}"), json!(e), Box::new(move || api.metadata(&p, &pane_args(&e2, &e2.name)).is_some()))); }
+    { let (api, e2, p) = (api.clone(), e.clone(), pane.clone()); out.push((format!("e|{socket}|{pane}"), json!(e), Box::new(move || tell(&api, &p, &e2, &e2.name)))); }
     let rv = t.at("link").at("reviewer").t("pane");
-    if !rv.is_empty() { let r = reviewer_entry(t, now); let (api, name) = (api.clone(), e.name.clone()); let rv2 = rv.clone(); let r2 = r.clone(); out.push((format!("e|{socket}|{rv}"), json!(r), Box::new(move || api.metadata(&rv2, &pane_args(&r2, &name)).is_some()))); }
+    if !rv.is_empty() { let r = reviewer_entry(t, now); let (api, name) = (api.clone(), e.name.clone()); let rv2 = rv.clone(); let r2 = r.clone(); out.push((format!("e|{socket}|{rv}"), json!(r), Box::new(move || tell(&api, &rv2, &r2, &name)))); }
     // The task's space: its name is the task's number and title, and under it the row's numbers. One writer. Only
     // while its pane is in it: a space removed by hand leaves its id to the next one herdr opens.
     let pane_ws = t.at("live").at("pane").at("workspace_id");
@@ -140,7 +150,7 @@ pub fn sync_sidebar(tasks: &[Obj], socket: Option<&str>, now: i64) {
             if parts.len() < 3 || parts[1] != socket || keep.contains(&key) || parts[0] == "c" { continue; }
             // A coordinator's now, or no longer the task's: what it says is not the board's to take off.
             if theirs.contains(parts[2]) { seen.shift_remove(&key); changed = true; continue; }
-            if parts[0] == "e" { api.metadata(parts[2], &clear_args()); }
+            if parts[0] == "e" { let _ = api.metadata(parts[2], &clear_args()); }
             if parts[0] == "w" { let _ = api.call(args(&["workspace", "report-metadata", parts[2], "--source", SOURCE, "--clear-token", "summary", "--clear-token", "progress"])); }
             seen.shift_remove(&key);
             changed = true;
@@ -156,7 +166,7 @@ pub fn tell_pane(socket: &str, pane: &str, entry: &Entry, have: &Value) {
     let key = format!("c|{socket}|{pane}");
     if forgotten(seen.get(&key), have) { seen.shift_remove(&key); }
     let (api, p, e) = (Herdr::new(Some(socket.to_string())), pane.to_string(), entry.clone());
-    let w: Vec<Write> = vec![(key, json!(entry), Box::new(move || api.metadata(&p, &pane_args(&e, &e.name)).is_some()))];
+    let w: Vec<Write> = vec![(key, json!(entry), Box::new(move || tell(&api, &p, &e, &e.name)))];
     if write(&w, &mut seen) { let _ = write_json(&sidebar_file(), &Value::Object(seen)); }
 }
 /// What `tell_sidebar` says of a task: its entry by what was saved alone.

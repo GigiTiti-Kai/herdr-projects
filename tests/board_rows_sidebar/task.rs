@@ -1,5 +1,5 @@
 //! herdr's folded sidebar rows: a task's pane carries its number under the token of the board's section
-//! (`task_needs_you`, `task_ready`, `task`) and its title (`task_title`), cut like the name; the clear takes off all four.
+//! (`task_needs_you`, `task_ready`, `task`) and its title (`task_title`), cut like the name; the clear takes off all four; a pane with no room for them (herdr keeps 32) still gets the rest.
 use crate::common;
 use common::*;
 use serde_json::{json, Value};
@@ -60,4 +60,17 @@ fn task_title_is_cut_like_the_name_and_the_number_stays_whole() {
     assert_eq!(e.title.chars().count(), CAP); assert!(e.title.ends_with('…')); assert!(!e.title.contains('\x1b'));
     assert_eq!(e.number, "PRJ-1");
     assert!(task_name(&long).starts_with(&format!("{} ", e.number)));
+}
+
+#[test]
+fn a_pane_with_no_room_for_the_task_tokens_still_gets_the_rest_of_its_entry() {
+    // herdr keeps 32 tokens on a pane, every source's together: other plugins hold all but one here.
+    let w = world();
+    let t = task(&to_approval(&w, "Add a greeting"));
+    let pane = t.at("link").t("pane");
+    w.patch(|s| { for p in s["panes"].as_array_mut().unwrap() { if p.s("pane_id") == pane { p["tokenRoom"] = json!(1); } } });
+    sw::flow::sidebar::sync_sidebar(&[with(&t, json!({ "stage": "working", "state": "working", "progress": 40, "live": { "status": "working" } }))], None, sw::clock::now());
+    let last = w.state().arr("metadata").iter().filter(|m| m.s("pane") == pane).map(|m| m.arr("args").iter().map(text).collect::<Vec<_>>().join(" ")).last().unwrap();
+    assert!(last.contains("--display-agent agent · working") && last.contains("--token progress=40%"), "{last}");
+    assert!(last.ends_with("--clear-token task_needs_you --clear-token task_ready --clear-token task --clear-token task_title"), "{last}");
 }

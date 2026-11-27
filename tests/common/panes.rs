@@ -157,6 +157,8 @@ pub fn pane(st: &mut Value, verb: &str, arg2: &str, argv: &[String], flag: &dyn 
             ok(json!({ "type": "ok" }))
         }
         "report-metadata" => {
+            // `tokenRoom`: how many tokens the pane still has room for, the other sources' taken (herdr keeps 32 in all).
+            if st["panes"][pi].at("tokenRoom").as_u64().is_some_and(|n| argv.iter().filter(|a| *a == "--token").count() as u64 > n) { return fail("metadata_token_limit", "pane metadata may contain at most 32 tokens"); }
             arr(st, "metadata").push(json!({ "pane": arg2, "args": argv[3..] }));
             if let Some(d) = flag("--display-agent") { st["panes"][pi]["display_agent"] = json!(d); }
             if argv.iter().any(|a| a == "--clear-display-agent") { if let Some(o) = st["panes"][pi].as_object_mut() { o.remove("display_agent"); } }
