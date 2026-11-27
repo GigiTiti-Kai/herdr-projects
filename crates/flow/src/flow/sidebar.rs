@@ -7,7 +7,7 @@
 //! changed; taken off again when the task is archived or removed while its pane lives on. Never into a pane or space
 //! that is no longer the task's (herdr hands their ids out again), nor ever into a coordinator's.
 use super::live::{owns_pane, saved};
-use super::sidebar_entry::{entry_of, reviewer_entry, task_name, Entry};
+use super::sidebar_entry::{entry_of, reviewer_entry, task_name, task_tokens, Entry, TASK_TOKENS};
 use super::task::is_agent_task;
 use crate::herdr::cli::{args, current_socket, same_socket, session_name};
 use crate::herdr::Herdr;
@@ -26,9 +26,14 @@ fn pane_args(e: &Entry, title: &str) -> Vec<String> {
     a.push(shown_name(e));
     if !title.is_empty() { a.extend(["--title".to_string(), title.to_string()]); }
     a.extend(token("summary", &e.line)); a.extend(token("progress", &e.progress)); a.extend(args(&["--clear-token", "eta"]));
+    for (k, v) in task_tokens(e) { a.extend(token(k, &v)); }
     a
 }
-fn clear_args() -> Vec<String> { args(&["--clear-state-labels", "--clear-display-agent", "--clear-title", "--clear-token", "summary", "--clear-token", "progress", "--clear-token", "eta"]) }
+fn clear_args() -> Vec<String> {
+    let mut a = args(&["--clear-state-labels", "--clear-display-agent", "--clear-title", "--clear-token", "summary", "--clear-token", "progress", "--clear-token", "eta"]);
+    for k in TASK_TOKENS { a.extend(args(&["--clear-token", k])); }
+    a
+}
 type Write = (String, Value, Box<dyn Fn() -> bool>);
 /// What a task's panes and space are to say: [key, what is written there, how].
 fn wanted(t: &Obj, now: i64) -> Vec<Write> {
